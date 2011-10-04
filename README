@@ -1,0 +1,17 @@
+LibTeam
+
+How to install
+1) Install autotools, libtool, >libnl 3.2.0
+2) In main dir start
+    a) ./autogen.sh
+    b) ./configure
+    c) make
+    d) make install
+
+How to build tar package
+1) Install autotools, libtool, libnl 3.2.0
+2) In main dir start
+    a) ./autogen.sh
+    b) ./configure
+    c) make
+    d) make dist
