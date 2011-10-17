@@ -1,7 +1,4 @@
 #!/bin/bash
 
-if [ ! -d "m4" ]; then
-	mkdir m4
-fi
-autoreconf -fi;
+autoreconf --force --install -I m4
 rm -Rf autom4te.cache;

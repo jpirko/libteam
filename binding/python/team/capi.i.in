@@ -1,0 +1,8 @@
+%module capi
+%{
+#include "@top_srcdir@/include/team.h"
+%}
+
+%apply unsigned int { uint32_t }
+
+%include @top_srcdir@/include/team.h

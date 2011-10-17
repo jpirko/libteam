@@ -1,0 +1,27 @@
+
+***************************************************************************
+
+NOTE: The python wrapper is experimental and may or may not work.
+
+***************************************************************************
+
+Install python package.
+ cd binding/python
+ python ./setup.py build
+ python ./setup.py install
+
+Expand binding:
+ For access:
+
+ import team
+ team.something
+
+ is necesarry change binding/python/team/__init__.py
+
+ For access:
+
+ import team.core like team
+
+ team.something
+
+ is necesarry change binding/python/team/core.py

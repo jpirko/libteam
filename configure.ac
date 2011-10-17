@@ -4,7 +4,7 @@
 AC_INIT([libteam], [1.0], [jpirko@redhat.com])
 AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([-Wall foreign subdir-objects])
-m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES(yes)], [])
+#m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES(yes)], [])
 
 # Checks for programs.
 AC_PROG_CC
@@ -23,5 +23,14 @@ AC_C_INLINE
 # Checks for library functions.
 AC_FUNC_MALLOC
 
-AC_CONFIG_FILES([Makefile include/Makefile lib/Makefile src/Makefile lib/libteam.pc])
+AC_CONFIG_FILES([Makefile
+include/Makefile \
+lib/Makefile \
+src/Makefile \
+lib/libteam.pc \
+binding/Makefile \
+binding/python/Makefile \
+binding/python/setup.py \
+binding/python/team/Makefile \
+binding/python/team/capi.i])
 AC_OUTPUT
