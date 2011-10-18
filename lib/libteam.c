@@ -160,16 +160,6 @@ static void check_call_change_handlers(struct team_handle *th,
 	}
 }
 
-static void flush_mode_list(struct team_handle *th)
-{
-	struct team_mode *mode, *tmp;
-
-	list_for_each_entry_safe(mode, tmp, &th->mode_list, list) {
-		list_del(&mode->list);
-		free(mode);
-	}
-}
-
 static void flush_port_list(struct team_handle *th)
 {
 	struct team_port *port, *tmp;
@@ -341,69 +331,6 @@ static int set_option_string(struct team_handle *th, char *opt_name,
 			     char *str)
 {
 	return set_option(th, opt_name, str, NLA_STRING);
-}
-
-static int get_mode_list_handler(struct nl_msg *msg, void *arg)
-{
-	struct nlmsghdr *nlh = nlmsg_hdr(msg);
-	struct team_handle *th = arg;
-	struct nlattr *attrs[TEAM_ATTR_MAX + 1];
-	struct nlattr *nl_mode;
-	struct nlattr *mode_attrs[TEAM_ATTR_MODE_MAX + 1];
-	int i;
-	char *str;
-	LIST_HEAD(tmp_list);
-
-	genlmsg_parse(nlh, 0, attrs, TEAM_ATTR_MAX, NULL);
-
-	if (!attrs[TEAM_ATTR_LIST_MODE]) {
-		return NL_SKIP;
-	}
-
-	flush_mode_list(th);
-	nla_for_each_nested(nl_mode, attrs[TEAM_ATTR_LIST_MODE], i) {
-		struct team_mode *mode;
-
-		if (nla_parse_nested(mode_attrs, TEAM_ATTR_MODE_MAX,
-				     nl_mode, NULL)) {
-			printf("failed to parse nested attributes.\n");
-			return NL_SKIP;
-		}
-
-		str = nla_get_string(mode_attrs[TEAM_ATTR_MODE_NAME]);
-		mode = malloc(sizeof(struct team_mode) +
-			      sizeof(char) * (strlen(str) + 1));
-		if (!mode) {
-			printf("malloc failed\n");
-			flush_mode_list(th);
-			return NL_SKIP;
-		}
-
-		strcpy(mode->name, str);
-		list_add_tail(&mode->list, &tmp_list);
-	}
-
-	flush_mode_list(th);
-	list_splice(&tmp_list, &th->mode_list);
-	return NL_SKIP;
-}
-
-static int get_mode_list(struct team_handle *th)
-{
-	struct nl_msg *msg;
-
-	msg = nlmsg_alloc();
-	if (!msg)
-		return -ENOMEM;
-
-	genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, th->family, 0, 0,
-			 TEAM_CMD_MODE_LIST_GET, 0);
-	NLA_PUT_U32(msg, TEAM_ATTR_TEAM_IFINDEX, th->ifindex);
-
-	return send_and_recv(th, msg, get_mode_list_handler, th);
-
-nla_put_failure:
-	return -ENOBUFS;
 }
 
 static int get_port_list_handler(struct nl_msg *msg, void *arg)
@@ -636,7 +563,6 @@ struct team_handle *team_alloc(void)
 		return NULL;
 
 	memset(th, 0, sizeof(struct team_handle));
-	INIT_LIST_HEAD(&th->mode_list);
 	INIT_LIST_HEAD(&th->port_list);
 	INIT_LIST_HEAD(&th->option_list);
 	INIT_LIST_HEAD(&th->change_handler_list);
@@ -712,12 +638,6 @@ int team_init(struct team_handle *th, const char *team_ifname)
 	nl_socket_modify_cb(th->nl_sock_event, NL_CB_VALID, NL_CB_CUSTOM,
 			    event_handler, th);
 
-	err = get_mode_list(th);
-	if (err) {
-		printf("Failed to get mode list.\n");
-		return -EINVAL;
-	}
-
 	err = get_port_list(th);
 	if (err) {
 		printf("Failed to get port list.\n");
@@ -736,7 +656,6 @@ int team_init(struct team_handle *th, const char *team_ifname)
 void team_free(struct team_handle *th)
 {
 	flush_port_list(th);
-	flush_mode_list(th);
 	flush_option_list(th);
 	nl_socket_free(th->nl_sock_event);
 	nl_socket_free(th->nl_sock);
@@ -757,12 +676,6 @@ struct team_port *team_get_next_port(struct team_handle *th,
 				     struct team_port *port)
 {
 	return list_get_next_entry(port, &th->port_list, list);
-}
-
-struct team_mode *team_get_next_mode(struct team_handle *th,
-				     struct team_mode *mode)
-{
-	return list_get_next_entry(mode, &th->mode_list, list);
 }
 
 struct team_option *team_get_next_option(struct team_handle *th,

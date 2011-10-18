@@ -17,7 +17,7 @@ static void usage(void)
 {
 	fprintf(stderr,
 "Usage: " APPNAME " help\n"
-"       " APPNAME " dumplist { ports | modes }\n"
+"       " APPNAME " dumplist { ports }\n"
 "       " APPNAME " get { mode | activeport }\n"
 "       " APPNAME " set { mode | activeport } value\n");
 	exit(1);
@@ -43,11 +43,6 @@ int cmd_dumplist(struct team_handle *th, int argc, char **argv)
 			       "duplex %d\n", port->ifindex, port->linkup,
 			       port->changed, port->speed, port->duplex);
 		}
-	} else if (strcmp(opt, "modes") == 0) {
-		struct team_mode *mode;
-
-		team_for_each_mode(mode, th)
-			printf("%s\n", mode->name);
 	} else {
 		fprintf(stderr, "Unknown option name \"%s\"\n", opt);
 		usage();

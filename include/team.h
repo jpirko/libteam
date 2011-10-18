@@ -22,15 +22,9 @@ struct team_handle {
 	struct nl_sock *	nl_sock_event;
 	int			family;
 	uint32_t		ifindex;
-	struct list_head	mode_list;
 	struct list_head	port_list;
 	struct list_head	option_list;
 	struct list_head	change_handler_list;
-};
-
-struct team_mode {
-	struct list_head	list;
-	char			name[0];
 };
 
 struct team_port {
@@ -53,10 +47,6 @@ struct team_option {
 #define team_for_each_port(port, th)				\
 	for (port = team_get_next_port(th, NULL); port;		\
 	     port = team_get_next_port(th, port))
-
-#define team_for_each_mode(mode, th)				\
-	for (mode = team_get_next_mode(th, NULL); mode;		\
-	     mode = team_get_next_mode(th, mode))
 
 #define team_for_each_option(port, th)				\
 	for (option = team_get_next_option(th, NULL); option;	\
@@ -84,8 +74,6 @@ extern int team_get_event_fd(struct team_handle *th);
 extern void team_process_event(struct team_handle *th);
 extern struct team_port *team_get_next_port(struct team_handle *th,
 					    struct team_port *port);
-extern struct team_mode *team_get_next_mode(struct team_handle *th,
-					    struct team_mode *mode);
 extern struct team_option *team_get_next_option(struct team_handle *th,
 						struct team_option *option);
 extern void team_change_handler_register(struct team_handle *th,

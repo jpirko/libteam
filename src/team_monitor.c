@@ -91,8 +91,6 @@ int main(int argc, char *argv[])
 {
 	struct team_handle *th;
 	int err;
-	char *mode_name;
-	struct team_mode *mode;
 
 	if (argc < 2) {
 		fprintf(stderr, "Usage: %s TEAMDEV\n", APPNAME);
