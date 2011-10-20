@@ -134,7 +134,8 @@ int main(int argc, char **argv)
 {
 	struct team_handle *th;
 	int err;
-	char *team_ifname = NULL;
+	char ifname = NULL;
+	uint32_t ifindex;
 	char *cmd = NULL;
 
 	while (argc > 1) {
@@ -143,15 +144,15 @@ int main(int argc, char **argv)
 		argc--;	argv++;
 		if (strcmp(opt, "help") == 0) {
 			usage();
-		} else if (!team_ifname) {
-			team_ifname = opt;
+		} else if (!ifname) {
+			ifname = opt;
 		} else {
 			cmd = opt;
 			break;
 		}
 	}
 
-	if (!team_ifname) {
+	if (!ifname) {
 		fprintf(stderr, "Team device name not specified.\n");
 		usage();
 	}
@@ -161,12 +162,19 @@ int main(int argc, char **argv)
 		usage();
 	}
 
+	ifindex = team_ifname2ifindex(ifname);
+	if (!ifindex) {
+		fprintf(stderr, "Netdevice %s not found.\n", ifname);
+		return 1;
+	}
+
 	th = team_alloc();
 	if (!th) {
 		fprintf(stderr, "Team alloc failed.\n");
 		return 1;
 	}
-	err = team_init(th, team_ifname);
+
+	err = team_init(th, ifindex);
 	if (err) {
 		fprintf(stderr, "Team init failed.\n");
 		return 1;

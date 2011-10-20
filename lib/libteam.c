@@ -116,25 +116,6 @@ static inline void list_splice(const struct list_head *list,
 	struct list_head *next = (entry ? &entry->member : head)->next;		\
 	(next == head) ? NULL :	list_entry(next, typeof(*entry), member);})
 
-
-/* Route netlink helper function */
-
-static uint32_t get_ifindex(const char *ifname)
-{
-	struct nl_sock *sock;
-	struct nl_cache *link_cache;
-	uint32_t ifindex;
-
-	sock = nl_cli_alloc_socket();
-	nl_cli_connect(sock, NETLINK_ROUTE);
-	link_cache = nl_cli_link_alloc_cache(sock);
-	ifindex = rtnl_link_name2i(link_cache, ifname);
-	nl_cache_free(link_cache);
-	nl_socket_free(sock);
-
-	return ifindex;
-}
-
 static void set_call_change_handlers(struct team_handle *th,
 				     enum team_change_type type)
 {
@@ -587,16 +568,16 @@ err_sk_alloc:
 	return NULL;
 }
 
-int team_init(struct team_handle *th, const char *team_ifname)
+int team_init(struct team_handle *th, uint32_t ifindex)
 {
 	int err;
 	int grp_id;
 
-	th->ifindex = get_ifindex(team_ifname);
-	if (!th->ifindex) {
-		printf("Interface \"%s\" not found.\n", team_ifname);
+	if (!ifindex) {
+		printf("Passed interface index \% is not valid.\n", ifindex);
 		return -ENOENT;
 	}
+	th->ifindex = ifindex;
 
 	nl_socket_disable_seq_check(th->nl_sock_event);
 
@@ -714,4 +695,38 @@ int team_get_active_port(struct team_handle *th, uint32_t *ifindex)
 int team_set_active_port(struct team_handle *th, uint32_t ifindex)
 {
 	return set_option_u32(th, "activeport", ifindex);
+}
+
+/* Route netlink helper function */
+
+uint32_t team_ifname2ifindex(const char *ifname)
+{
+	struct nl_sock *sock;
+	struct nl_cache *link_cache;
+	uint32_t ifindex;
+
+	sock = nl_cli_alloc_socket();
+	nl_cli_connect(sock, NETLINK_ROUTE);
+	link_cache = nl_cli_link_alloc_cache(sock);
+	ifindex = rtnl_link_name2i(link_cache, ifname);
+	nl_cache_free(link_cache);
+	nl_socket_free(sock);
+
+	return ifindex;
+}
+
+char *team_ifindex2ifname(uint32_t ifindex, char *ifname, unsigned int maxlen)
+{
+	struct nl_sock *sock;
+	struct nl_cache *link_cache;
+	char *retval;
+
+	sock = nl_cli_alloc_socket();
+	nl_cli_connect(sock, NETLINK_ROUTE);
+	link_cache = nl_cli_link_alloc_cache(sock);
+	retval = rtnl_link_i2name(link_cache, ifindex, ifname, maxlen);
+	nl_cache_free(link_cache);
+	nl_socket_free(sock);
+
+	return retval;
 }

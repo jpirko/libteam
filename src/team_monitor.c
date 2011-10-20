@@ -91,9 +91,18 @@ int main(int argc, char *argv[])
 {
 	struct team_handle *th;
 	int err;
+	char *ifname;
+	uint32_t ifindex;
 
 	if (argc < 2) {
 		fprintf(stderr, "Usage: %s TEAMDEV\n", APPNAME);
+		return 1;
+	}
+
+	ifname = argv[1];
+	ifindex = team_ifname2ifindex(ifname);
+	if (!ifindex) {
+		fprintf(stderr, "Netdevice %s not found.\n", ifname);
 		return 1;
 	}
 
@@ -103,7 +112,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	err = team_init(th, argv[1]);
+	err = team_init(th, ifindex);
 	if (err) {
 		fprintf(stderr, "team init failed\n");
 		err = 1;

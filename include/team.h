@@ -68,7 +68,7 @@ struct team_change_handler {
 };
 
 extern struct team_handle *team_alloc(void);
-extern int team_init(struct team_handle *th, const char *team_ifname);
+extern int team_init(struct team_handle *th, uint32_t ifindex);
 extern void team_free(struct team_handle *th);
 extern int team_get_event_fd(struct team_handle *th);
 extern void team_process_event(struct team_handle *th);
@@ -84,3 +84,6 @@ extern int team_get_mode_name(struct team_handle *th, char **mode_name);
 extern int team_set_mode_name(struct team_handle *th, char *mode_name);
 extern int team_get_active_port(struct team_handle *th, uint32_t *ifindex);
 extern int team_set_active_port(struct team_handle *th, uint32_t ifindex);
+extern uint32_t team_ifname2ifindex(const char *ifname);
+extern char *team_ifindex2ifname(uint32_t ifindex, char *ifname,
+				 unsigned int maxlen);
