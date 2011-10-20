@@ -15,6 +15,13 @@
 
 #define APPNAME "team_monitor"
 
+static char *get_port_name(uint32_t ifindex)
+{
+	static char ifname[32];
+
+	return team_ifindex2ifname(ifindex, ifname, sizeof(ifname));
+}
+
 static int die = 0;
 
 static void sigint_handler(int signum)
@@ -60,9 +67,9 @@ static void port_change_handler_func(struct team_handle *th, void *arg)
 
 	printf("------------------\nport change\n\tport list:\n");
 	team_for_each_port(port, th) {
-		printf("\tifindex %d, linkup %d, changed %d, speed %d, "
-		       "duplex %d\n", port->ifindex, port->linkup,
-		       port->changed, port->speed, port->duplex);
+		printf("\tifname %s, linkup %d, changed %d, speed %d, "
+		       "duplex %d\n", get_port_name(port->ifindex),
+		       port->linkup, port->changed, port->speed, port->duplex);
 	}
 }
 

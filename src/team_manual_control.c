@@ -17,13 +17,20 @@ static void usage(void)
 {
 	fprintf(stderr,
 "Usage: " APPNAME " help\n"
-"       " APPNAME " dumplist { ports }\n"
-"       " APPNAME " get { mode | activeport }\n"
-"       " APPNAME " set { mode | activeport } value\n");
+"       " APPNAME " TEAMDEV dumplist { ports }\n"
+"       " APPNAME " TEAMDEV get { mode | activeport }\n"
+"       " APPNAME " TEAMDEV set { mode | activeport } value\n");
 	exit(1);
 }
 
-int cmd_dumplist(struct team_handle *th, int argc, char **argv)
+static char *get_port_name(uint32_t ifindex)
+{
+	static char ifname[32];
+
+	return team_ifindex2ifname(ifindex, ifname, sizeof(ifname));
+}
+
+static int cmd_dumplist(struct team_handle *th, int argc, char **argv)
 {
 	int err;
 	char *opt;
@@ -39,9 +46,10 @@ int cmd_dumplist(struct team_handle *th, int argc, char **argv)
 		struct team_port *port;
 
 		team_for_each_port(port, th) {
-			printf("ifindex %d, linkup %d, changed %d, speed %d, "
-			       "duplex %d\n", port->ifindex, port->linkup,
-			       port->changed, port->speed, port->duplex);
+			printf("ifname %s, linkup %d, changed %d, speed %d, "
+			       "duplex %d\n", get_port_name(port->ifindex),
+			       port->linkup, port->changed, port->speed,
+			       port->duplex);
 		}
 	} else {
 		fprintf(stderr, "Unknown option name \"%s\"\n", opt);
@@ -50,7 +58,7 @@ int cmd_dumplist(struct team_handle *th, int argc, char **argv)
 	return 0;
 }
 
-int cmd_get(struct team_handle *th, int argc, char **argv)
+static int cmd_get(struct team_handle *th, int argc, char **argv)
 {
 	int err;
 	char *opt;
@@ -78,7 +86,7 @@ int cmd_get(struct team_handle *th, int argc, char **argv)
 			fprintf(stderr, "Get active port failed, %d\n", err);
 			return 1;
 		}
-		printf("%d\n", ifindex);
+		printf("%s\n", ifindex ? get_port_name(ifindex) : "NONE");
 	} else {
 		fprintf(stderr, "Unknown option name \"%s\"\n", opt);
 		usage();
@@ -86,7 +94,7 @@ int cmd_get(struct team_handle *th, int argc, char **argv)
 	return 0;
 }
 
-int cmd_set(struct team_handle *th, int argc, char **argv)
+static int cmd_set(struct team_handle *th, int argc, char **argv)
 {
 	int err;
 	char *opt;
@@ -113,8 +121,9 @@ int cmd_set(struct team_handle *th, int argc, char **argv)
 	} else if (strcmp(opt, "activeport") == 0) {
 		uint32_t ifindex;
 
-		if (sscanf(val, "%u", &ifindex) != 1) {
-			fprintf(stderr, "Active port value must be ifindex.\n");
+		ifindex = team_ifname2ifindex(val);
+		if (!ifindex) {
+			fprintf(stderr, "Netdevice %s not found.\n", val);
 			usage();
 		}
 
@@ -134,7 +143,7 @@ int main(int argc, char **argv)
 {
 	struct team_handle *th;
 	int err;
-	char ifname = NULL;
+	char *ifname = NULL;
 	uint32_t ifindex;
 	char *cmd = NULL;
 
