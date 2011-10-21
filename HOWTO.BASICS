@@ -1,0 +1,30 @@
+This is basic howto/ introduction to team. Used applications are part of this
+project but note that their main purpose is to act as examples.
+
+First create team device:
+# ip link add team0 type team
+
+Then spawn monitor app on second console:
+# team_monitor team0
+
+You will see incoming events there.
+Now do couple of commands:
+
+# ip link add team0 type team
+# team_manual_control team0 get mode
+*NOMODE*
+# team_manual_control team0 set mode activebackup
+# team_manual_control team0 get mode
+activebackup
+# ip link set dev eth1 master team0
+# ip link set dev eth2 master team0
+# ip addr add 192.168.252.2/24 dev team0
+# ip link set team0 up
+# team_manual_control team0 get activeport
+NONE
+# team_manual_control team0 set activeport eth1
+# team_manual_control team0 get activeport
+eth1
+
+You can do link changes on ports and push some traffic through now to see
+what happens.
