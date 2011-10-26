@@ -1,8 +1,110 @@
 %module capi
 %{
 #include "@top_srcdir@/include/team.h"
+
+typedef struct _py_data _py_data;
+static void PythonCallBack(struct team_handle *th, void *data);
+void py_team_change_handler_register(struct team_handle *th,
+                                     struct team_change_handler *handler);
+void py_team_change_handler_unregister(struct team_handle *th,
+                                       struct team_change_handler *handler);
 %}
 
-%apply unsigned int { uint32_t }
+%include <cstring.i>
+%include <stdint.i>
+%include "typemaps.i"
+
+%apply int *OUTPUT {uint32_t *ifindex};
+%cstring_output_allocate(char **mode_name, )
+
+%typemap(in) (char *ifname, unsigned int maxlen) {
+    $2 = PyInt_AsLong($input);
+    $1 = (char*)malloc(sizeof(char) * $2);
+}
+
+%typemap(freearg) (char *ifname, unsigned int maxlen) {
+    if ($1) free($1);
+}
+
+%typemap(python, in) PyObject *PyFunc {
+  if (!PyCallable_Check($input)) {
+      PyErr_SetString(PyExc_TypeError, "Need a callable object!");
+      return NULL;
+  }
+  $1 = $input;
+}
+
+%typemap(in) void (*func)(struct team_handle *, void *) {
+    $1 = (void*)$input;
+};
+
+
+%extend team_change_handler {
+    team_change_handler(PyObject* func ,enum team_change_type type,
+                        PyObject* data){
+        struct team_change_handler* handler;
+        handler = (struct team_change_handler*) malloc(
+                                    sizeof(struct team_change_handler));
+        handler->func = (void*)func;
+        handler->type = type;
+        handler->data = (void*)data;
+        return handler;
+    }
+
+    ~team_change_handler() {
+        free($self);
+    }
+}
+
+
+void py_team_change_handler_register(struct team_handle *th,
+                                     struct team_change_handler *handler);
+
+void py_team_change_handler_unregister(struct team_handle *th,
+                                     struct team_change_handler *handler);
+
+%{
+typedef struct _py_data{
+    PyObject* py_func;
+    PyObject* data;
+} _py_data;
+
+static void PythonCallBack(struct team_handle *th, void *data)
+{
+    PyObject *func, *arglist;
+    PyObject *result;
+    _py_data *_data = (_py_data*)data;
+    func = _data->py_func;     /* This is the function .... */
+
+    arglist = Py_BuildValue("(O)",_data->data);
+    result =  PyEval_CallObject(func, arglist);
+    if (arglist != NULL)
+        Py_DECREF(arglist);
+    Py_XDECREF(result);
+    return /*void*/;
+}
+
+void py_team_change_handler_register(struct team_handle *th,
+                                     struct team_change_handler *handler)
+{
+    PyObject* py_func =  (PyObject*)handler->func;
+    handler->func = PythonCallBack;
+    _py_data * data = malloc(sizeof(_py_data));
+    data->py_func = py_func;
+    data->data = (PyObject*)handler->data;
+    handler->data = (void*) data;
+
+    Py_XINCREF(py_func);
+    team_change_handler_register(th, handler);
+}
+
+void py_team_change_handler_unregister(struct team_handle *th,
+                                       struct team_change_handler *handler)
+{
+    Py_XDECREF(((_py_data*)handler->data)->py_func);
+    free(handler->data);
+    team_change_handler_unregister(th, handler);
+}
+%}
 
 %include @top_srcdir@/include/team.h
