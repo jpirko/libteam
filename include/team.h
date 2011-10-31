@@ -72,6 +72,7 @@ extern int team_init(struct team_handle *th, uint32_t ifindex);
 extern void team_free(struct team_handle *th);
 extern int team_get_event_fd(struct team_handle *th);
 extern void team_process_event(struct team_handle *th);
+extern void team_check_event(struct team_handle *th);
 extern struct team_port *team_get_next_port(struct team_handle *th,
 					    struct team_port *port);
 extern struct team_option *team_get_next_option(struct team_handle *th,

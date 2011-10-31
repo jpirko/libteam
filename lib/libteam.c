@@ -653,6 +653,21 @@ void team_process_event(struct team_handle *th)
 	check_call_change_handlers(th, TEAM_ALL_CHANGE);
 }
 
+void team_check_event(struct team_handle *th)
+{
+	int err;
+	fd_set rfds;
+	int tfd = team_get_event_fd(th);
+	int fdmax = tfd + 1;
+	struct timeval tv;
+
+	tv.tv_sec = tv.tv_usec = 0;
+	FD_SET(tfd, &rfds);
+	err = select(fdmax, &rfds, NULL, NULL, &tv);
+	if (err == 0 && FD_ISSET(tfd, &rfds))
+		team_process_event(th);
+}
+
 struct team_port *team_get_next_port(struct team_handle *th,
 				     struct team_port *port)
 {
