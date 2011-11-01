@@ -57,6 +57,12 @@ void py_team_change_handler_unregister(struct team_handle *th,
     }
 }
 
+%exception team_process_event {
+    $action
+    if (PyErr_Occurred() != NULL) {
+        return NULL;
+    }
+}
 
 void py_team_change_handler_register(struct team_handle *th,
                                      struct team_change_handler *handler);
