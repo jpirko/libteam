@@ -25,6 +25,10 @@ struct team_handle {
 	struct list_head	port_list;
 	struct list_head	option_list;
 	struct list_head	change_handler_list;
+	struct {
+		struct nl_sock *	sock;
+		struct nl_cache *	link_cache;
+	} nl_cli;
 };
 
 struct team_port {
@@ -85,6 +89,7 @@ extern int team_get_mode_name(struct team_handle *th, char **mode_name);
 extern int team_set_mode_name(struct team_handle *th, char *mode_name);
 extern int team_get_active_port(struct team_handle *th, uint32_t *ifindex);
 extern int team_set_active_port(struct team_handle *th, uint32_t ifindex);
-extern uint32_t team_ifname2ifindex(const char *ifname);
-extern char *team_ifindex2ifname(uint32_t ifindex, char *ifname,
-				 unsigned int maxlen);
+extern uint32_t team_ifname2ifindex(struct team_handle *th,
+				    const char *ifname);
+extern char *team_ifindex2ifname(struct team_handle *th, uint32_t ifindex,
+				 char *ifname, unsigned int maxlen);

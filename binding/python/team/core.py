@@ -1,16 +1,6 @@
 import capi
 import select
 
-def dev_ifindex(dev):
-    if isinstance(dev, int):
-        return dev
-    return capi.team_ifname2ifindex(dev)
-
-def dev_ifname(dev):
-    if isinstance(dev, str):
-        return dev
-    return capi.team_ifindex2ifname(dev, 32)
-
 TEAM_ALL_CHANGE = capi.TEAM_ALL_CHANGE
 TEAM_PORT_CHANGE = capi.TEAM_PORT_CHANGE
 TEAM_OPTION_CHANGE = capi.TEAM_OPTION_CHANGE
@@ -18,13 +8,23 @@ TEAM_OPTION_CHANGE = capi.TEAM_OPTION_CHANGE
 class team:
     def __init__(self, teamdev):
         self.__th = capi.team_alloc()
-        err = capi.team_init(self.__th, dev_ifindex(teamdev))
+        err = capi.team_init(self.__th, self.__dev_ifindex(teamdev))
         if err:
             raise Exception("Failed to init team. Err = %d" % err)
         self.__change_handlers = {}
 
     def __del__(self):
         capi.team_free(self.__th)
+
+    def __dev_ifindex(self, dev):
+        if isinstance(dev, int):
+            return dev
+        return capi.team_ifname2ifindex(self.__th, dev)
+
+    def __dev_ifname(self, dev):
+        if isinstance(dev, str):
+            return dev
+        return capi.team_ifindex2ifname(self.__th, dev, 32)
 
     def loop_forever(self):
         fd = self.get_event_fd()
@@ -76,10 +76,10 @@ class team:
         err, port_ifindex = capi.team_get_active_port(self.__th)
         if err:
             raise Exception("Failed to get active port. Err = %d" % err)
-        return (port_ifindex, dev_ifname(port_ifindex))
+        return (port_ifindex, self.__dev_ifname(port_ifindex))
 
     def set_active_port(self, port):
-        err = capi.team_set_active_port(self.__th, dev_ifindex(port))
+        err = capi.team_set_active_port(self.__th, self.__dev_ifindex(port))
         if err:
             raise Exception("Failed to set active port. Err = %d" % err)
 
@@ -90,7 +90,7 @@ class team:
         while port:
             port_item = {}
             port_item["ifindex"] = port.ifindex
-            port_item["ifname"] = dev_ifname(port.ifindex)
+            port_item["ifname"] = self.__dev_ifname(port.ifindex)
             port_item["speed"] = port.speed
             port_item["duplex"] = port.duplex
             port_item["changed"] = port.changed

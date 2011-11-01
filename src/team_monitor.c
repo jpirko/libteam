@@ -15,11 +15,11 @@
 
 #define APPNAME "team_monitor"
 
-static char *get_port_name(uint32_t ifindex)
+static char *get_port_name(struct team_handle *th, uint32_t ifindex)
 {
 	static char ifname[32];
 
-	return team_ifindex2ifname(ifindex, ifname, sizeof(ifname));
+	return team_ifindex2ifname(th, ifindex, ifname, sizeof(ifname));
 }
 
 static int die = 0;
@@ -68,7 +68,7 @@ static void port_change_handler_func(struct team_handle *th, void *arg)
 	printf("------------------\nport change\n\tport list:\n");
 	team_for_each_port(port, th) {
 		printf("\tifname %s, linkup %d, changed %d, speed %d, "
-		       "duplex %d\n", get_port_name(port->ifindex),
+		       "duplex %d\n", get_port_name(th, port->ifindex),
 		       port->linkup, port->changed, port->speed, port->duplex);
 	}
 }
@@ -106,16 +106,16 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	ifname = argv[1];
-	ifindex = team_ifname2ifindex(ifname);
-	if (!ifindex) {
-		fprintf(stderr, "Netdevice %s not found.\n", ifname);
-		return 1;
-	}
-
 	th = team_alloc();
 	if (!th) {
 		fprintf(stderr, "team alloc failed.\n");
+		return 1;
+	}
+
+	ifname = argv[1];
+	ifindex = team_ifname2ifindex(th, ifname);
+	if (!ifindex) {
+		fprintf(stderr, "Netdevice %s not found.\n", ifname);
 		return 1;
 	}
 

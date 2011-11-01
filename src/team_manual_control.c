@@ -23,11 +23,11 @@ static void usage(void)
 	exit(1);
 }
 
-static char *get_port_name(uint32_t ifindex)
+static char *get_port_name(struct team_handle *th, uint32_t ifindex)
 {
 	static char ifname[32];
 
-	return team_ifindex2ifname(ifindex, ifname, sizeof(ifname));
+	return team_ifindex2ifname(th, ifindex, ifname, sizeof(ifname));
 }
 
 static int cmd_dumplist(struct team_handle *th, int argc, char **argv)
@@ -47,7 +47,7 @@ static int cmd_dumplist(struct team_handle *th, int argc, char **argv)
 
 		team_for_each_port(port, th) {
 			printf("ifname %s, linkup %d, changed %d, speed %d, "
-			       "duplex %d\n", get_port_name(port->ifindex),
+			       "duplex %d\n", get_port_name(th, port->ifindex),
 			       port->linkup, port->changed, port->speed,
 			       port->duplex);
 		}
@@ -86,7 +86,7 @@ static int cmd_get(struct team_handle *th, int argc, char **argv)
 			fprintf(stderr, "Get active port failed, %d\n", err);
 			return 1;
 		}
-		printf("%s\n", ifindex ? get_port_name(ifindex) : "NONE");
+		printf("%s\n", ifindex ? get_port_name(th, ifindex) : "NONE");
 	} else {
 		fprintf(stderr, "Unknown option name \"%s\"\n", opt);
 		usage();
@@ -121,7 +121,7 @@ static int cmd_set(struct team_handle *th, int argc, char **argv)
 	} else if (strcmp(opt, "activeport") == 0) {
 		uint32_t ifindex;
 
-		ifindex = team_ifname2ifindex(val);
+		ifindex = team_ifname2ifindex(th, val);
 		if (!ifindex) {
 			fprintf(stderr, "Netdevice %s not found.\n", val);
 			usage();
@@ -171,15 +171,15 @@ int main(int argc, char **argv)
 		usage();
 	}
 
-	ifindex = team_ifname2ifindex(ifname);
-	if (!ifindex) {
-		fprintf(stderr, "Netdevice %s not found.\n", ifname);
-		return 1;
-	}
-
 	th = team_alloc();
 	if (!th) {
 		fprintf(stderr, "Team alloc failed.\n");
+		return 1;
+	}
+
+	ifindex = team_ifname2ifindex(th, ifname);
+	if (!ifindex) {
+		fprintf(stderr, "Netdevice %s not found.\n", ifname);
 		return 1;
 	}
 

@@ -535,9 +535,15 @@ static int event_handler(struct nl_msg *msg, void *arg)
 	return NL_SKIP;
 }
 
+static int cli_cache_refill(struct team_handle *th)
+{
+	return nl_cache_refill(th->nl_cli.sock, th->nl_cli.link_cache);
+}
+
 struct team_handle *team_alloc(void)
 {
 	struct team_handle *th;
+	int err;
 
 	th = malloc(sizeof(struct team_handle));
 	if (!th)
@@ -553,11 +559,27 @@ struct team_handle *team_alloc(void)
 		goto err_sk_alloc;
 
 	th->nl_sock_event = nl_socket_alloc();
-	if (!th->nl_sock_event) {
+	if (!th->nl_sock_event)
 		goto err_sk_event_alloc;
-	}
+
+	th->nl_cli.sock = nl_cli_alloc_socket();
+	if (!th->nl_cli.sock)
+		goto err_cli_sk_alloc;
+	err = nl_cli_connect(th->nl_cli.sock, NETLINK_ROUTE);
+	if (err)
+		goto err_cli_connect;
+	th->nl_cli.link_cache = nl_cli_link_alloc_cache(th->nl_cli.sock);
+	if (!th->nl_cli.link_cache)
+		goto err_cli_alloc_cache;
 
 	return th;
+
+err_cli_alloc_cache:
+err_cli_connect:
+	nl_socket_free(th->nl_cli.sock);
+
+err_cli_sk_alloc:
+	nl_socket_free(th->nl_sock_event);
 
 err_sk_event_alloc:
 	nl_socket_free(th->nl_sock);
@@ -638,6 +660,8 @@ void team_free(struct team_handle *th)
 {
 	flush_port_list(th);
 	flush_option_list(th);
+	nl_cache_free(th->nl_cli.link_cache);
+	nl_socket_free(th->nl_cli.sock);
 	nl_socket_free(th->nl_sock_event);
 	nl_socket_free(th->nl_sock);
 }
@@ -721,34 +745,18 @@ int team_set_active_port(struct team_handle *th, uint32_t ifindex)
 
 /* Route netlink helper function */
 
-uint32_t team_ifname2ifindex(const char *ifname)
+uint32_t team_ifname2ifindex(struct team_handle *th, const char *ifname)
 {
-	struct nl_sock *sock;
-	struct nl_cache *link_cache;
-	uint32_t ifindex;
-
-	sock = nl_cli_alloc_socket();
-	nl_cli_connect(sock, NETLINK_ROUTE);
-	link_cache = nl_cli_link_alloc_cache(sock);
-	ifindex = rtnl_link_name2i(link_cache, ifname);
-	nl_cache_free(link_cache);
-	nl_socket_free(sock);
-
-	return ifindex;
+	if (cli_cache_refill(th))
+		return 0;
+	return rtnl_link_name2i(th->nl_cli.link_cache, ifname);
 }
 
-char *team_ifindex2ifname(uint32_t ifindex, char *ifname, unsigned int maxlen)
+char *team_ifindex2ifname(struct team_handle *th, uint32_t ifindex,
+			  char *ifname, unsigned int maxlen)
 {
-	struct nl_sock *sock;
-	struct nl_cache *link_cache;
-	char *retval;
-
-	sock = nl_cli_alloc_socket();
-	nl_cli_connect(sock, NETLINK_ROUTE);
-	link_cache = nl_cli_link_alloc_cache(sock);
-	retval = rtnl_link_i2name(link_cache, ifindex, ifname, maxlen);
-	nl_cache_free(link_cache);
-	nl_socket_free(sock);
-
-	return retval;
+	if (cli_cache_refill(th))
+		return NULL;
+	return rtnl_link_i2name(th->nl_cli.link_cache, ifindex,
+				ifname, maxlen);
 }
