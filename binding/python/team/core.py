@@ -44,8 +44,8 @@ class team:
     def process_event(self):
         capi.team_process_event(self.__th)
 
-    def check_event(self):
-        capi.team_check_event(self.__th)
+    def check_events(self):
+        capi.team_check_events(self.__th)
 
     def change_handler_register(self, func, priv, evtype):
         if func in self.__change_handlers:
