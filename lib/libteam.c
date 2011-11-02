@@ -474,6 +474,9 @@ static int get_options_handler(struct nl_msg *msg, void *arg)
 			data_size = sizeof(char) * (strlen(str) + 1);
 			opt_type = TEAM_OPTION_TYPE_STRING;
 			break;
+		default:
+			printf("unknown nla_type received.\n");
+			continue;
 		}
 
 		option = create_option(name, opt_type, data, data_size, changed);
