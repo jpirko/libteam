@@ -1,7 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_INIT([libteam], [1.0], [jpirko@redhat.com])
+AC_INIT([libteam], [0.1], [jpirko@redhat.com])
 AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([-Wall foreign subdir-objects])
 #m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES(yes)], [])
