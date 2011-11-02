@@ -32,5 +32,6 @@ binding/Makefile \
 binding/python/Makefile \
 binding/python/setup.py \
 binding/python/team/Makefile \
-binding/python/team/capi.i])
+binding/python/team/capi.i \
+examples/Makefile])
 AC_OUTPUT
