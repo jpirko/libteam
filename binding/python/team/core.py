@@ -5,6 +5,15 @@ TEAM_ALL_CHANGE = capi.TEAM_ALL_CHANGE
 TEAM_PORT_CHANGE = capi.TEAM_PORT_CHANGE
 TEAM_OPTION_CHANGE = capi.TEAM_OPTION_CHANGE
 
+class TeamOptionGetFailed(Exception):
+    pass
+
+class TeamOptionSetFailed(Exception):
+    pass
+
+class TeamOptionUnknownType(Exception):
+    pass
+
 class team:
     def __init__(self, teamdev):
         self.__th = capi.team_alloc()
@@ -84,7 +93,6 @@ class team:
             raise Exception("Failed to set active port. Err = %d" % err)
 
     def port_list(self):
-        port = None
         port_list = []
         port = capi.team_get_next_port(self.__th, None)
         while port:
@@ -98,3 +106,45 @@ class team:
             port_list.append(port_item)
             port = capi.team_get_next_port(self.__th, port)
         return port_list
+
+    def __get_option_value(self, option):
+        if option.type == capi.TEAM_OPTION_TYPE_U32:
+            return capi.team_get_option_value_u32(option)
+        elif option.type == capi.TEAM_OPTION_TYPE_STRING:
+            return capi.team_get_option_value_string(option)
+        else:
+            raise TeamOptionUnknownType()
+
+    def get_option_value(self, opt_name):
+        option = capi.team_get_option_by_name(self.__th, opt_name)
+        if not option:
+            raise TeamOptionGetFailed()
+        return self.__get_option_value(option)
+
+    def set_option_value(self, opt_name, opt_value):
+        if isinstance(opt_value, int):
+            err = capi.team_set_option_value_by_name_u32(self.__th, opt_name,
+                                                         opt_value)
+        elif isinstance(opt_value, str):
+            err = capi.team_set_option_value_by_name_string(self.__th,
+                                                            opt_name,
+                                                            opt_value)
+        else:
+            raise TeamOptionUnknownType()
+        if err:
+            raise TeamOptionSetFailed()
+
+    def option_list(self):
+        option_list = {}
+        option = capi.team_get_next_option(self.__th, None)
+        while option:
+            option_item = {}
+            option_item["changed"] = option.changed
+            try:
+                option_item["value"] = self.__get_option_value(option)
+                option_list[option.name] = option_item
+            except TeamOptionUnknownType:
+                continue
+            finally:
+                option = capi.team_get_next_option(self.__th, option)
+        return option_list
