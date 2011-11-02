@@ -40,9 +40,14 @@ struct team_port {
 	int			linkup;
 };
 
+enum team_option_type {
+	TEAM_OPTION_TYPE_U32,
+	TEAM_OPTION_TYPE_STRING,
+};
+
 struct team_option {
 	struct list_head	list;
-	int			nla_type;
+	int			type;
 	int			changed;
 	char *			name;
 	void *			data;

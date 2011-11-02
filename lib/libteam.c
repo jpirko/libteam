@@ -151,7 +151,7 @@ static void flush_port_list(struct team_handle *th)
 	}
 }
 
-static struct team_option *create_option(char *name, int nla_type, void *data,
+static struct team_option *create_option(char *name, int opt_type, void *data,
 					 int data_size, int changed)
 {
 	struct team_option *option;
@@ -168,7 +168,7 @@ static struct team_option *create_option(char *name, int nla_type, void *data,
 	if (!option->data)
 		goto err_alloc_data;
 
-	option->nla_type = nla_type;
+	option->type = opt_type;
 	option->changed = changed;
 	strcpy(option->name, name);
 	memcpy(option->data, data, data_size);
@@ -261,11 +261,23 @@ static int send_and_recv(struct team_handle *th, struct nl_msg *msg,
 }
 
 static int set_option(struct team_handle *th, const char *opt_name,
-		      void *data, int nla_type)
+		      void *data, int opt_type)
 {
 	struct nl_msg *msg;
 	struct nlattr *option_list;
 	struct nlattr *option_item;
+	int nla_type;
+
+	switch (opt_type) {
+	case TEAM_OPTION_TYPE_U32:
+		nla_type = NLA_U32;
+		break;
+	case TEAM_OPTION_TYPE_STRING:
+		nla_type = NLA_STRING;
+		break;
+	default:
+		return -ENOENT;
+	}
 
 	msg = nlmsg_alloc();
 	if (!msg)
@@ -305,13 +317,13 @@ nla_put_failure:
 static int set_option_u32(struct team_handle *th, char *opt_name,
 			  __u32 val)
 {
-	return set_option(th, opt_name, &val, NLA_U32);
+	return set_option(th, opt_name, &val, TEAM_OPTION_TYPE_U32);
 }
 
 static int set_option_string(struct team_handle *th, char *opt_name,
 			     char *str)
 {
-	return set_option(th, opt_name, str, NLA_STRING);
+	return set_option(th, opt_name, str, TEAM_OPTION_TYPE_STRING);
 }
 
 static int get_port_list_handler(struct nl_msg *msg, void *arg)
@@ -426,6 +438,7 @@ static int get_options_handler(struct nl_msg *msg, void *arg)
 		int changed;
 		int nla_type;
 		__u32 arg;
+		int opt_type;
 		void *data;
 		int data_size;
 		char *str;
@@ -453,15 +466,17 @@ static int get_options_handler(struct nl_msg *msg, void *arg)
 			arg = nla_get_u32(option_attrs[TEAM_ATTR_OPTION_DATA]);
 			data = &arg;
 			data_size = sizeof(__u32);
+			opt_type = TEAM_OPTION_TYPE_U32;
 			break;
 		case NLA_STRING:
 			str = nla_get_string(option_attrs[TEAM_ATTR_OPTION_DATA]);
 			data = str;
 			data_size = sizeof(char) * (strlen(str) + 1);
+			opt_type = TEAM_OPTION_TYPE_STRING;
 			break;
 		}
 
-		option = create_option(name, nla_type, data, data_size, changed);
+		option = create_option(name, opt_type, data, data_size, changed);
 		list_add_tail(&option->list, &tmp_list);
 	}
 
