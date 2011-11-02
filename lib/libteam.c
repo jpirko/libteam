@@ -30,16 +30,17 @@
 #define LIST_HEAD_INIT(name) { &(name), &(name) }
 
 #define LIST_HEAD(name) \
-	struct list_head name = LIST_HEAD_INIT(name)
+	struct __team_list_head name = LIST_HEAD_INIT(name)
 
-static void INIT_LIST_HEAD(struct list_head *list)
+static void INIT_LIST_HEAD(struct __team_list_head *list)
 {
 	list->next = list;
 	list->prev = list;
 }
 
-static  void __list_add(struct list_head *new, struct list_head *prev,
-			struct list_head *next)
+static  void __list_add(struct __team_list_head *new,
+			struct __team_list_head *prev,
+			struct __team_list_head *next)
 {
 	next->prev = new;
 	new->next = next;
@@ -47,40 +48,43 @@ static  void __list_add(struct list_head *new, struct list_head *prev,
 	prev->next = new;
 }
 
-static void list_add(struct list_head *new, struct list_head *head)
+static void list_add(struct __team_list_head *new,
+		     struct __team_list_head *head)
 {
 	__list_add(new, head, head->next);
 }
 
-static void list_add_tail(struct list_head *new, struct list_head *head)
+static void list_add_tail(struct __team_list_head *new,
+			  struct __team_list_head *head)
 {
 	__list_add(new, head->prev, head);
 }
 
-static void __list_del(struct list_head * prev, struct list_head * next)
+static void __list_del(struct __team_list_head * prev,
+		       struct __team_list_head * next)
 {
 	next->prev = prev;
 	prev->next = next;
 }
 
-static void list_del(struct list_head *entry)
+static void list_del(struct __team_list_head *entry)
 {
 	__list_del(entry->prev, entry->next);
 	entry->next = LIST_POISON1;
 	entry->prev = LIST_POISON2;
 }
 
-static int list_empty(const struct list_head *head)
+static int list_empty(const struct __team_list_head *head)
 {
 	return head->next == head;
 }
 
-static void __list_splice(const struct list_head *list,
-				 struct list_head *prev,
-				 struct list_head *next)
+static void __list_splice(const struct __team_list_head *list,
+			  struct __team_list_head *prev,
+			  struct __team_list_head *next)
 {
-	struct list_head *first = list->next;
-	struct list_head *last = list->prev;
+	struct __team_list_head *first = list->next;
+	struct __team_list_head *last = list->prev;
 
 	first->prev = prev;
 	prev->next = first;
@@ -89,8 +93,8 @@ static void __list_splice(const struct list_head *list,
 	next->prev = last;
 }
 
-static void list_splice(const struct list_head *list,
-			struct list_head *head)
+static void list_splice(const struct __team_list_head *list,
+			struct __team_list_head *head)
 {
 	if (!list_empty(list))
 		__list_splice(list, head, head->next);
@@ -112,7 +116,7 @@ static void list_splice(const struct list_head *list,
 
 /* list extension */
 #define list_get_next_entry(entry, head, member) ({				\
-	struct list_head *next = (entry ? &entry->member : head)->next;		\
+	struct __team_list_head *next = (entry ? &entry->member : head)->next;	\
 	(next == head) ? NULL :	list_entry(next, typeof(*entry), member);})
 
 static void set_call_change_handlers(struct team_handle *th,
