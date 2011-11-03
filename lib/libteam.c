@@ -14,6 +14,7 @@
 #include <netlink/cli/utils.h>
 #include <netlink/cli/link.h>
 #include <linux/if_team.h>
+#include <linux/types.h>
 #include <team.h>
 
 /* Linked list section taken from kernel <linux/list.h> */
@@ -195,41 +196,15 @@ static void flush_option_list(struct team_handle *th)
 	}
 }
 
-static int get_option(struct team_handle *th, char *name, void **data)
+static struct team_option *__find_option(struct list_head *opt_list, char *name)
 {
 	struct team_option *option;
 
-	list_for_each_entry(option, &th->option_list, list) {
-		if (strcmp(option->name, name) == 0) {
-			*data = option->data;
-			return 0;
-		}
+	list_for_each_entry(option, opt_list, list) {
+		if (strcmp(option->name, name) == 0)
+			return option;
 	}
-	return -ENOENT;
-}
-
-static int get_option_u32(struct team_handle *th, char *name, __u32 *ptr)
-{
-	int err;
-	void *data;
-
-	err = get_option(th, name, &data);
-	if (err)
-		return err;
-	*ptr = *((__u32 *) data);
-	return 0;
-}
-
-static int get_option_string(struct team_handle *th, char *name, char **ptr)
-{
-	int err;
-	void *data;
-
-	err = get_option(th, name, &data);
-	if (err)
-		return err;
-	*ptr = data;
-	return 0;
+	return NULL;
 }
 
 static int send_and_recv(struct team_handle *th, struct nl_msg *msg,
@@ -259,8 +234,8 @@ static int send_and_recv(struct team_handle *th, struct nl_msg *msg,
 	return err;
 }
 
-static int set_option(struct team_handle *th, const char *opt_name,
-		      void *data, int opt_type)
+static int set_option_value(struct team_handle *th, const char *opt_name,
+			    void *data, int opt_type)
 {
 	struct nl_msg *msg;
 	struct nlattr *option_list;
@@ -311,18 +286,6 @@ static int set_option(struct team_handle *th, const char *opt_name,
 nla_put_failure:
 	nlmsg_free(msg);
 	return -ENOBUFS;
-}
-
-static int set_option_u32(struct team_handle *th, char *opt_name,
-			  __u32 val)
-{
-	return set_option(th, opt_name, &val, TEAM_OPTION_TYPE_U32);
-}
-
-static int set_option_string(struct team_handle *th, char *opt_name,
-			     char *str)
-{
-	return set_option(th, opt_name, str, TEAM_OPTION_TYPE_STRING);
 }
 
 static int get_port_list_handler(struct nl_msg *msg, void *arg)
@@ -454,6 +417,11 @@ static int get_options_handler(struct nl_msg *msg, void *arg)
 			return NL_SKIP;
 		}
 		name = nla_get_string(option_attrs[TEAM_ATTR_OPTION_NAME]);
+		if (__find_option(&tmp_list, name)) {
+			printf("option named \"%s\" is already in list.\n", name);
+			continue;
+		}
+
 		if (option_attrs[TEAM_ATTR_OPTION_CHANGED])
 			changed = 1;
 		else
@@ -740,24 +708,75 @@ void team_change_handler_unregister(struct team_handle *th,
 	list_del(&handler->list);
 }
 
+struct team_option *team_get_option_by_name(struct team_handle *th, char *name)
+{
+	return __find_option(&th->option_list, name);
+}
+
+uint32_t team_get_option_value_u32(struct team_option *option)
+{
+	return *((__u32 *) option->data);
+}
+
+char *team_get_option_value_string(struct team_option *option)
+{
+	return option->data;
+}
+
+int team_get_option_value_by_name_u32(struct team_handle *th,
+				      char *name, uint32_t *u32_ptr)
+{
+	struct team_option *option;
+
+	option = team_get_option_by_name(th, name);
+	if (!option)
+		return -ENOENT;
+	*u32_ptr = team_get_option_value_u32(option);
+	return 0;
+}
+
+int team_get_option_value_by_name_string(struct team_handle *th,
+					 char *name, char **str_ptr)
+{
+	struct team_option *option;
+
+	option = team_get_option_by_name(th, name);
+	if (!option)
+		return -ENOENT;
+	*str_ptr = team_get_option_value_string(option);
+	return 0;
+}
+
+int team_set_option_value_by_name_u32(struct team_handle *th,
+				      char *opt_name, uint32_t val)
+{
+	return set_option_value(th, opt_name, &val, TEAM_OPTION_TYPE_U32);
+}
+
+int team_set_option_value_by_name_string(struct team_handle *th,
+					 char *opt_name, char *str)
+{
+	return set_option_value(th, opt_name, str, TEAM_OPTION_TYPE_STRING);
+}
+
 int team_get_mode_name(struct team_handle *th, char **mode_name)
 {
-	return get_option_string(th, "mode", mode_name);
+	return team_get_option_value_by_name_string(th, "mode", mode_name);
 }
 
 int team_set_mode_name(struct team_handle *th, char *mode_name)
 {
-	return set_option_string(th, "mode", mode_name);
+	return team_set_option_value_by_name_string(th, "mode", mode_name);
 }
 
 int team_get_active_port(struct team_handle *th, uint32_t *ifindex)
 {
-	return get_option_u32(th, "activeport", ifindex);
+	return team_get_option_value_by_name_u32(th, "activeport", ifindex);
 }
 
 int team_set_active_port(struct team_handle *th, uint32_t ifindex)
 {
-	return set_option_u32(th, "activeport", ifindex);
+	return team_set_option_value_by_name_u32(th, "activeport", ifindex);
 }
 
 /* Route netlink helper function */

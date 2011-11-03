@@ -11,6 +11,7 @@
 #define _TEAM_H_
 
 #include <stdint.h>
+#include <linux/types.h>
 
 struct list_head {
 	struct list_head *next, *prev;
@@ -90,6 +91,17 @@ extern void team_change_handler_register(struct team_handle *th,
 					 struct team_change_handler *handler);
 extern void team_change_handler_unregister(struct team_handle *th,
 					   struct team_change_handler *handler);
+struct team_option *team_get_option_by_name(struct team_handle *th, char *name);
+uint32_t team_get_option_value_u32(struct team_option *option);
+char *team_get_option_value_string(struct team_option *option);
+int team_get_option_value_by_name_u32(struct team_handle *th,
+				      char *name, uint32_t *u32_ptr);
+int team_get_option_value_by_name_string(struct team_handle *th,
+					 char *name, char **str_ptr);
+int team_set_option_value_by_name_u32(struct team_handle *th,
+				      char *opt_name, uint32_t val);
+int team_set_option_value_by_name_string(struct team_handle *th,
+					 char *opt_name, char *str);
 extern int team_get_mode_name(struct team_handle *th, char **mode_name);
 extern int team_set_mode_name(struct team_handle *th, char *mode_name);
 extern int team_get_active_port(struct team_handle *th, uint32_t *ifindex);
