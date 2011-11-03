@@ -12,8 +12,8 @@
 
 #include <stdint.h>
 
-struct __team_list_head {
-	struct __team_list_head *next, *prev;
+struct list_head {
+	struct list_head *next, *prev;
 };
 
 struct team_handle {
@@ -22,9 +22,9 @@ struct team_handle {
 	struct nl_sock *	nl_sock_event;
 	int			family;
 	uint32_t		ifindex;
-	struct __team_list_head	port_list;
-	struct __team_list_head	option_list;
-	struct __team_list_head	change_handler_list;
+	struct list_head	port_list;
+	struct list_head	option_list;
+	struct list_head	change_handler_list;
 	struct {
 		struct nl_sock *	sock;
 		struct nl_cache *	link_cache;
@@ -32,7 +32,7 @@ struct team_handle {
 };
 
 struct team_port {
-	struct __team_list_head	list;
+	struct list_head	list;
 	uint32_t		ifindex;
 	uint32_t		speed;
 	uint8_t			duplex;
@@ -46,7 +46,7 @@ enum team_option_type {
 };
 
 struct team_option {
-	struct __team_list_head	list;
+	struct list_head	list;
 	int			type;
 	int			changed;
 	char *			name;
@@ -69,7 +69,7 @@ enum team_change_type {
 };
 
 struct team_change_handler {
-	struct __team_list_head	list;
+	struct list_head	list;
 	void			(*func)(struct team_handle *, void *);
 	void *			data;
 	enum team_change_type	type;
