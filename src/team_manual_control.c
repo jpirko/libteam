@@ -46,10 +46,15 @@ static int cmd_dumplist(struct team_handle *th, int argc, char **argv)
 		struct team_port *port;
 
 		team_for_each_port(port, th) {
+			uint32_t ifindex = team_get_port_ifindex(port);
+
 			printf("ifname %s, linkup %d, changed %d, speed %d, "
-			       "duplex %d\n", get_port_name(th, port->ifindex),
-			       port->linkup, port->changed, port->speed,
-			       port->duplex);
+			       "duplex %d\n",
+			       get_port_name(th, ifindex),
+			       team_is_port_link_up(port),
+			       team_is_port_changed(port),
+			       team_get_port_speed(port),
+			       team_get_port_duplex(port));
 		}
 	} else {
 		fprintf(stderr, "Unknown option name \"%s\"\n", opt);

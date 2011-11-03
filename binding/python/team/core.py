@@ -97,20 +97,22 @@ class team:
         port = capi.team_get_next_port(self.__th, None)
         while port:
             port_item = {}
-            port_item["ifindex"] = port.ifindex
-            port_item["ifname"] = self.__dev_ifname(port.ifindex)
-            port_item["speed"] = port.speed
-            port_item["duplex"] = port.duplex
-            port_item["changed"] = port.changed
-            port_item["linkup"] = port.linkup
+            ifindex = capi.team_get_port_ifindex(port)
+            port_item["ifindex"] = ifindex
+            port_item["ifname"] = self.__dev_ifname(ifindex)
+            port_item["speed"] = capi.team_get_port_speed(port)
+            port_item["duplex"] = capi.team_get_port_duplex(port)
+            port_item["changed"] = capi.team_is_port_changed(port)
+            port_item["linkup"] = capi.team_is_port_link_up(port)
             port_list.append(port_item)
             port = capi.team_get_next_port(self.__th, port)
         return port_list
 
     def __get_option_value(self, option):
-        if option.type == capi.TEAM_OPTION_TYPE_U32:
+        opt_type = capi.team_get_option_type(option)
+        if opt_type == capi.TEAM_OPTION_TYPE_U32:
             return capi.team_get_option_value_u32(option)
-        elif option.type == capi.TEAM_OPTION_TYPE_STRING:
+        elif opt_type == capi.TEAM_OPTION_TYPE_STRING:
             return capi.team_get_option_value_string(option)
         else:
             raise TeamOptionUnknownType()
@@ -139,10 +141,11 @@ class team:
         option = capi.team_get_next_option(self.__th, None)
         while option:
             option_item = {}
-            option_item["changed"] = option.changed
+            option_item["changed"] = capi.team_is_option_changed(option)
             try:
                 option_item["value"] = self.__get_option_value(option)
-                option_list[option.name] = option_item
+                option_name = capi.team_get_option_name(option)
+                option_list[option_name] = option_item
             except TeamOptionUnknownType:
                 continue
             finally:

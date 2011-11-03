@@ -8,6 +8,7 @@
  */
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <netlink/netlink.h>
 #include <netlink/genl/genl.h>
 #include <netlink/genl/ctrl.h>
@@ -18,6 +19,10 @@
 #include <team.h>
 
 /* Linked list section taken from kernel <linux/list.h> */
+
+struct list_head {
+	struct list_head *next, *prev;
+};
 
 #define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 
@@ -116,29 +121,85 @@ static void list_splice(const struct list_head *list,
 	struct list_head *next = (entry ? &entry->member : head)->next;		\
 	(next == head) ? NULL :	list_entry(next, typeof(*entry), member);})
 
+/* structures definitions */
+
+struct team_handle {
+	struct nl_sock *	nl_sock;
+	int			nl_sock_err;
+	struct nl_sock *	nl_sock_event;
+	int			family;
+	uint32_t		ifindex;
+	struct list_head	port_list;
+	struct list_head	option_list;
+	struct list_head	change_handler_list;
+	struct {
+		struct nl_sock *	sock;
+		struct nl_cache *	link_cache;
+	} nl_cli;
+};
+
+struct team_port {
+	struct list_head	list;
+	uint32_t		ifindex;
+	uint32_t		speed;
+	uint8_t			duplex;
+	bool			changed;
+	bool			linkup;
+};
+
+struct team_option {
+	struct list_head	list;
+	enum team_option_type	type;
+	bool			changed;
+	char *			name;
+	void *			data;
+};
+
+
+struct change_handler_item {
+	struct list_head		list;
+	bool				call_this;
+	struct team_change_handler *	handler;
+};
+
 static void set_call_change_handlers(struct team_handle *th,
 				     enum team_change_type type)
 {
-	struct team_change_handler *handler;
+	struct change_handler_item *handler_item;
 
-	list_for_each_entry(handler, &th->change_handler_list, list) {
-		if (type == TEAM_ALL_CHANGE || handler->type == type)
-			handler->call_this = 1;
+	list_for_each_entry(handler_item, &th->change_handler_list, list) {
+		if (type == TEAM_ALL_CHANGE ||
+		    handler_item->handler->type == type)
+			handler_item->call_this = true;
 	}
 }
 
 static void check_call_change_handlers(struct team_handle *th,
 				       enum team_change_type type)
 {
-	struct team_change_handler *handler;
+	struct change_handler_item *handler_item;
 
-	list_for_each_entry(handler, &th->change_handler_list, list) {
+	list_for_each_entry(handler_item, &th->change_handler_list, list) {
+		struct team_change_handler *handler = handler_item->handler;
+
 		if ((type == TEAM_ALL_CHANGE || handler->type == type) &&
-		    handler->call_this) {
-			handler->func(th, handler->data);
-			handler->call_this = 0;
+		    handler_item->call_this) {
+			handler->func(th, handler->func_priv);
+			handler_item->call_this = false;
 		}
 	}
+}
+
+static struct change_handler_item *
+find_change_handler(struct team_handle *th,
+		    struct team_change_handler *handler)
+{
+	struct change_handler_item *handler_item;
+
+	list_for_each_entry(handler_item, &th->change_handler_list, list)
+		if (handler_item->handler == handler)
+			return handler_item;
+	return NULL;
 }
 
 static void flush_port_list(struct team_handle *th)
@@ -152,7 +213,7 @@ static void flush_port_list(struct team_handle *th)
 }
 
 static struct team_option *create_option(char *name, int opt_type, void *data,
-					 int data_size, int changed)
+					 int data_size, bool changed)
 {
 	struct team_option *option;
 
@@ -330,9 +391,9 @@ static int get_port_list_handler(struct nl_msg *msg, void *arg)
 		memset(port, 0, sizeof(struct team_port));
 		port->ifindex = nla_get_u32(port_attrs[TEAM_ATTR_PORT_IFINDEX]);
 		if (port_attrs[TEAM_ATTR_PORT_CHANGED])
-			port->changed = 1;
+			port->changed = true;
 		if (port_attrs[TEAM_ATTR_PORT_LINKUP])
-			port->linkup = 1;
+			port->linkup = true;
 		if (port_attrs[TEAM_ATTR_PORT_SPEED])
 			port->speed = nla_get_u32(port_attrs[TEAM_ATTR_PORT_SPEED]);
 		if (port_attrs[TEAM_ATTR_PORT_DUPLEX])
@@ -397,7 +458,7 @@ static int get_options_handler(struct nl_msg *msg, void *arg)
 	nla_for_each_nested(nl_option, attrs[TEAM_ATTR_LIST_OPTION], i) {
 		struct team_option *option;
 		char *name;
-		int changed;
+		bool changed;
 		int nla_type;
 		__u32 arg;
 		int opt_type;
@@ -423,9 +484,9 @@ static int get_options_handler(struct nl_msg *msg, void *arg)
 		}
 
 		if (option_attrs[TEAM_ATTR_OPTION_CHANGED])
-			changed = 1;
+			changed = true;
 		else
-			changed = 0;
+			changed = false;
 
 		nla_type = nla_get_u32(option_attrs[TEAM_ATTR_OPTION_TYPE]);
 		switch (nla_type) {
@@ -670,7 +731,7 @@ void team_check_events(struct team_handle *th)
 	int fdmax = tfd + 1;
 	struct timeval tv;
 
-	while (1) {
+	while (true) {
 		tv.tv_sec = tv.tv_usec = 0;
 		FD_ZERO(&rfds);
 		FD_SET(tfd, &rfds);
@@ -696,16 +757,80 @@ struct team_option *team_get_next_option(struct team_handle *th,
 	return list_get_next_entry(option, &th->option_list, list);
 }
 
-void team_change_handler_register(struct team_handle *th,
-				  struct team_change_handler *handler)
+int team_change_handler_register(struct team_handle *th,
+				 struct team_change_handler *handler)
 {
-	list_add(&handler->list, &th->change_handler_list);
+	struct change_handler_item *handler_item;
+
+	if (find_change_handler(th, handler))
+		return -EEXIST;
+	handler_item = malloc(sizeof(struct change_handler_item));
+	if (!handler_item)
+		return -ENOMEM;
+	handler_item->handler = handler;
+	handler_item->call_this = false;
+	list_add(&handler_item->list, &th->change_handler_list);
+	return 0;
 }
 
 void team_change_handler_unregister(struct team_handle *th,
 				    struct team_change_handler *handler)
 {
-	list_del(&handler->list);
+	struct change_handler_item *handler_item;
+
+	handler_item = find_change_handler(th, handler);
+	if (!handler_item)
+		return;
+	list_del(&handler_item->list);
+	free(handler_item);
+}
+
+/*
+ * port getters
+ */
+
+uint32_t team_get_port_ifindex(struct team_port *port)
+{
+	return port->ifindex;
+}
+
+uint32_t team_get_port_speed(struct team_port *port)
+{
+	return port->speed;
+}
+
+uint8_t team_get_port_duplex(struct team_port *port)
+{
+	return port->duplex;
+}
+
+bool team_is_port_changed(struct team_port *port)
+{
+	return port->changed;
+}
+
+bool team_is_port_link_up(struct team_port *port)
+{
+	return port->linkup;
+}
+
+/*
+ * option getters/setters
+ */
+
+char *team_get_option_name(struct team_option *option)
+{
+	return option->name;
+}
+
+enum team_option_type team_get_option_type(struct team_option *option)
+{
+	return option->type;
+}
+
+bool team_is_option_changed(struct team_option *option)
+{
+	return option->changed;
 }
 
 struct team_option *team_get_option_by_name(struct team_handle *th, char *name)

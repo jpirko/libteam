@@ -67,9 +67,15 @@ static void port_change_handler_func(struct team_handle *th, void *arg)
 
 	printf("------------------\nport change\n\tport list:\n");
 	team_for_each_port(port, th) {
+		uint32_t ifindex = team_get_port_ifindex(port);
+
 		printf("\tifname %s, linkup %d, changed %d, speed %d, "
-		       "duplex %d\n", get_port_name(th, port->ifindex),
-		       port->linkup, port->changed, port->speed, port->duplex);
+		       "duplex %d\n",
+		       get_port_name(th, ifindex),
+		       team_is_port_link_up(port),
+		       team_is_port_changed(port),
+		       team_get_port_speed(port),
+		       team_get_port_duplex(port));
 	}
 }
 
@@ -85,7 +91,8 @@ static void option_change_handler_func(struct team_handle *th, void *arg)
 	printf("------------------\noption change\n\toption list:\n");
 	team_for_each_option(option, th) {
 		printf("\topt_name: %s, changed %d\n",
-		       option->name, option->changed);
+		       team_get_option_name(option),
+		       team_is_option_changed(option));
 	}
 }
 
@@ -123,19 +130,32 @@ int main(int argc, char *argv[])
 	if (err) {
 		fprintf(stderr, "team init failed\n");
 		err = 1;
-		goto out;
+		goto err_team_init;
 	}
 
-	team_change_handler_register(th, &port_change_handler);
-	team_change_handler_register(th, &option_change_handler);
+	err = team_change_handler_register(th, &port_change_handler);
+	if (err) {
+		fprintf(stderr, "port change handler register failed\n");
+		err = 1;
+		goto err_port_change_register;
+	}
+
+	err = team_change_handler_register(th, &option_change_handler);
+	if (err) {
+		fprintf(stderr, "option change handler register failed\n");
+		err = 1;
+		goto err_option_change_register;
+	}
 
 	signal(SIGINT, sigint_handler);
 
 	do_main_loop(th);
 
 	team_change_handler_unregister(th, &option_change_handler);
+err_option_change_register:
 	team_change_handler_unregister(th, &port_change_handler);
-out:
+err_port_change_register:
+err_team_init:
 	team_free(th);
 
 	return err;
