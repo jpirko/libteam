@@ -61,7 +61,6 @@ struct team_option {
 #define team_for_each_option(port, th)				\
 	for (option = team_get_next_option(th, NULL); option;	\
 	     option = team_get_next_option(th, option))
-#endif
 
 enum team_change_type {
 	TEAM_ALL_CHANGE,
@@ -110,3 +109,5 @@ extern uint32_t team_ifname2ifindex(struct team_handle *th,
 				    const char *ifname);
 extern char *team_ifindex2ifname(struct team_handle *th, uint32_t ifindex,
 				 char *ifname, unsigned int maxlen);
+
+#endif /* _TEAM_H_ */
