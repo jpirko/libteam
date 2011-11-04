@@ -18,6 +18,8 @@
 #include <linux/types.h>
 #include <team.h>
 
+#define TEAM_EXPORT __attribute__ ((visibility("default")))
+
 /* Linked list section taken from kernel <linux/list.h> */
 
 struct list_head {
@@ -586,6 +588,7 @@ static int cli_cache_refill(struct team_handle *th)
 	return nl_cache_refill(th->nl_cli.sock, th->nl_cli.link_cache);
 }
 
+TEAM_EXPORT
 struct team_handle *team_alloc(void)
 {
 	struct team_handle *th;
@@ -636,6 +639,7 @@ err_sk_alloc:
 	return NULL;
 }
 
+TEAM_EXPORT
 int team_init(struct team_handle *th, uint32_t ifindex)
 {
 	int err;
@@ -702,6 +706,7 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 	return 0;
 }
 
+TEAM_EXPORT
 void team_free(struct team_handle *th)
 {
 	flush_port_list(th);
@@ -712,17 +717,20 @@ void team_free(struct team_handle *th)
 	nl_socket_free(th->nl_sock);
 }
 
+TEAM_EXPORT
 int team_get_event_fd(struct team_handle *th)
 {
 	return nl_socket_get_fd(th->nl_sock_event);
 }
 
+TEAM_EXPORT
 void team_process_event(struct team_handle *th)
 {
 	nl_recvmsgs_default(th->nl_sock_event);
 	check_call_change_handlers(th, TEAM_ALL_CHANGE);
 }
 
+TEAM_EXPORT
 void team_check_events(struct team_handle *th)
 {
 	int err;
@@ -745,18 +753,21 @@ void team_check_events(struct team_handle *th)
 	}
 }
 
+TEAM_EXPORT
 struct team_port *team_get_next_port(struct team_handle *th,
 				     struct team_port *port)
 {
 	return list_get_next_entry(port, &th->port_list, list);
 }
 
+TEAM_EXPORT
 struct team_option *team_get_next_option(struct team_handle *th,
 					 struct team_option *option)
 {
 	return list_get_next_entry(option, &th->option_list, list);
 }
 
+TEAM_EXPORT
 int team_change_handler_register(struct team_handle *th,
 				 struct team_change_handler *handler)
 {
@@ -773,6 +784,7 @@ int team_change_handler_register(struct team_handle *th,
 	return 0;
 }
 
+TEAM_EXPORT
 void team_change_handler_unregister(struct team_handle *th,
 				    struct team_change_handler *handler)
 {
@@ -789,26 +801,31 @@ void team_change_handler_unregister(struct team_handle *th,
  * port getters
  */
 
+TEAM_EXPORT
 uint32_t team_get_port_ifindex(struct team_port *port)
 {
 	return port->ifindex;
 }
 
+TEAM_EXPORT
 uint32_t team_get_port_speed(struct team_port *port)
 {
 	return port->speed;
 }
 
+TEAM_EXPORT
 uint8_t team_get_port_duplex(struct team_port *port)
 {
 	return port->duplex;
 }
 
+TEAM_EXPORT
 bool team_is_port_changed(struct team_port *port)
 {
 	return port->changed;
 }
 
+TEAM_EXPORT
 bool team_is_port_link_up(struct team_port *port)
 {
 	return port->linkup;
@@ -818,36 +835,43 @@ bool team_is_port_link_up(struct team_port *port)
  * option getters/setters
  */
 
+TEAM_EXPORT
 char *team_get_option_name(struct team_option *option)
 {
 	return option->name;
 }
 
+TEAM_EXPORT
 enum team_option_type team_get_option_type(struct team_option *option)
 {
 	return option->type;
 }
 
+TEAM_EXPORT
 bool team_is_option_changed(struct team_option *option)
 {
 	return option->changed;
 }
 
+TEAM_EXPORT
 struct team_option *team_get_option_by_name(struct team_handle *th, char *name)
 {
 	return __find_option(&th->option_list, name);
 }
 
+TEAM_EXPORT
 uint32_t team_get_option_value_u32(struct team_option *option)
 {
 	return *((__u32 *) option->data);
 }
 
+TEAM_EXPORT
 char *team_get_option_value_string(struct team_option *option)
 {
 	return option->data;
 }
 
+TEAM_EXPORT
 int team_get_option_value_by_name_u32(struct team_handle *th,
 				      char *name, uint32_t *u32_ptr)
 {
@@ -860,6 +884,7 @@ int team_get_option_value_by_name_u32(struct team_handle *th,
 	return 0;
 }
 
+TEAM_EXPORT
 int team_get_option_value_by_name_string(struct team_handle *th,
 					 char *name, char **str_ptr)
 {
@@ -872,33 +897,39 @@ int team_get_option_value_by_name_string(struct team_handle *th,
 	return 0;
 }
 
+TEAM_EXPORT
 int team_set_option_value_by_name_u32(struct team_handle *th,
 				      char *opt_name, uint32_t val)
 {
 	return set_option_value(th, opt_name, &val, TEAM_OPTION_TYPE_U32);
 }
 
+TEAM_EXPORT
 int team_set_option_value_by_name_string(struct team_handle *th,
 					 char *opt_name, char *str)
 {
 	return set_option_value(th, opt_name, str, TEAM_OPTION_TYPE_STRING);
 }
 
+TEAM_EXPORT
 int team_get_mode_name(struct team_handle *th, char **mode_name)
 {
 	return team_get_option_value_by_name_string(th, "mode", mode_name);
 }
 
+TEAM_EXPORT
 int team_set_mode_name(struct team_handle *th, char *mode_name)
 {
 	return team_set_option_value_by_name_string(th, "mode", mode_name);
 }
 
+TEAM_EXPORT
 int team_get_active_port(struct team_handle *th, uint32_t *ifindex)
 {
 	return team_get_option_value_by_name_u32(th, "activeport", ifindex);
 }
 
+TEAM_EXPORT
 int team_set_active_port(struct team_handle *th, uint32_t ifindex)
 {
 	return team_set_option_value_by_name_u32(th, "activeport", ifindex);
@@ -906,6 +937,7 @@ int team_set_active_port(struct team_handle *th, uint32_t ifindex)
 
 /* Route netlink helper function */
 
+TEAM_EXPORT
 uint32_t team_ifname2ifindex(struct team_handle *th, const char *ifname)
 {
 	if (cli_cache_refill(th))
@@ -913,6 +945,7 @@ uint32_t team_ifname2ifindex(struct team_handle *th, const char *ifname)
 	return rtnl_link_name2i(th->nl_cli.link_cache, ifname);
 }
 
+TEAM_EXPORT
 char *team_ifindex2ifname(struct team_handle *th, uint32_t ifindex,
 			  char *ifname, unsigned int maxlen)
 {
