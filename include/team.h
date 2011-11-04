@@ -51,8 +51,8 @@ struct team_port *team_get_next_port(struct team_handle *th,
 uint32_t team_get_port_ifindex(struct team_port *port);
 uint32_t team_get_port_speed(struct team_port *port);
 uint8_t team_get_port_duplex(struct team_port *port);
-bool team_is_port_changed(struct team_port *port);
 bool team_is_port_link_up(struct team_port *port);
+bool team_is_port_changed(struct team_port *port);
 
 /*
  * team_option
@@ -77,18 +77,18 @@ struct team_option *team_get_next_option(struct team_handle *th,
 /* option getters */
 char *team_get_option_name(struct team_option *option);
 enum team_option_type team_get_option_type(struct team_option *option);
-bool team_is_option_changed(struct team_option *option);
 uint32_t team_get_option_value_u32(struct team_option *option);
 char *team_get_option_value_string(struct team_option *option);
+bool team_is_option_changed(struct team_option *option);
 int team_get_option_value_by_name_u32(struct team_handle *th,
 				      char *name, uint32_t *u32_ptr);
 int team_get_option_value_by_name_string(struct team_handle *th,
 					 char *name, char **str_ptr);
 /* option setters */
 int team_set_option_value_by_name_u32(struct team_handle *th,
-				      char *opt_name, uint32_t val);
+				      char *name, uint32_t val);
 int team_set_option_value_by_name_string(struct team_handle *th,
-					 char *opt_name, char *str);
+					 char *name, char *str);
 
 /*
  * team_change_handler

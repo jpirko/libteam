@@ -20,7 +20,10 @@
 
 #define TEAM_EXPORT __attribute__ ((visibility("default")))
 
-/* Linked list section taken from kernel <linux/list.h> */
+/**
+ * SECTION: lists
+ * @short_description: linked list implementation
+ */
 
 struct list_head {
 	struct list_head *next, *prev;
@@ -123,7 +126,10 @@ static void list_splice(const struct list_head *list,
 	struct list_head *next = (entry ? &entry->member : head)->next;		\
 	(next == head) ? NULL :	list_entry(next, typeof(*entry), member);})
 
-/* structures definitions */
+/**
+ * SECTION: team_handler
+ * @short_description: libteam context
+ */
 
 struct team_handle {
 	struct nl_sock *	nl_sock;
@@ -140,23 +146,72 @@ struct team_handle {
 	} nl_cli;
 };
 
-struct team_port {
-	struct list_head	list;
-	uint32_t		ifindex;
-	uint32_t		speed;
-	uint8_t			duplex;
-	bool			changed;
-	bool			linkup;
-};
+/**
+ * SECTION: Netlink helpers
+ * @short_description: Various netlink helpers
+ */
 
-struct team_option {
-	struct list_head	list;
-	enum team_option_type	type;
-	bool			changed;
-	char *			name;
-	void *			data;
-};
+static int send_and_recv(struct team_handle *th, struct nl_msg *msg,
+			 int (*valid_handler)(struct nl_msg *, void *),
+			 void *valid_data)
+{
+	struct nl_cb *cb;
+	int err = -ENOMEM;
 
+	err = nl_send_auto_complete(th->nl_sock, msg);
+	if (err < 0)
+		goto out;
+
+	th->nl_sock_err = 1;
+
+	if (valid_handler)
+		nl_socket_modify_cb(th->nl_sock, NL_CB_VALID, NL_CB_CUSTOM,
+				    valid_handler, valid_data);
+
+	while (th->nl_sock_err > 0)
+		nl_recvmsgs_default(th->nl_sock);
+
+	err = th->nl_sock_err;
+
+ out:
+	nlmsg_free(msg);
+	return err;
+}
+
+static int ack_handler(struct nl_msg *msg, void *arg)
+{
+	int *err = arg;
+
+	*err = 0;
+	return NL_STOP;
+}
+
+static int finish_handler(struct nl_msg *msg, void *arg)
+{
+	int *err = arg;
+
+	*err = 0;
+	return NL_SKIP;
+}
+
+static int error_handler(struct sockaddr_nl *nla, struct nlmsgerr *nl_err,
+			 void *arg)
+{
+	int *err = arg;
+
+	*err = nl_err->error;
+	return NL_SKIP;
+}
+
+static int cli_cache_refill(struct team_handle *th)
+{
+	return nl_cache_refill(th->nl_cli.sock, th->nl_cli.link_cache);
+}
+
+/**
+ * SECTION: Change handlers
+ * @short_description: event change handlers handling
+ */
 
 struct change_handler_item {
 	struct list_head		list;
@@ -204,6 +259,68 @@ find_change_handler(struct team_handle *th,
 	return NULL;
 }
 
+/**
+ * team_change_handler_register:
+ * @th: libteam library context
+ * @handler: event handler structure
+ *
+ * Registers custom @handler structure which defines a function which
+ * going to be called on defined events.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_change_handler_register(struct team_handle *th,
+				 struct team_change_handler *handler)
+{
+	struct change_handler_item *handler_item;
+
+	if (find_change_handler(th, handler))
+		return -EEXIST;
+	handler_item = malloc(sizeof(struct change_handler_item));
+	if (!handler_item)
+		return -ENOMEM;
+	handler_item->handler = handler;
+	handler_item->call_this = false;
+	list_add(&handler_item->list, &th->change_handler_list);
+	return 0;
+}
+
+/**
+ * team_change_handler_unregister:
+ * @th: libteam library context
+ * @handler: event handler structure
+ *
+ * Unregisters custom @handler structure.
+ *
+ **/
+TEAM_EXPORT
+void team_change_handler_unregister(struct team_handle *th,
+				    struct team_change_handler *handler)
+{
+	struct change_handler_item *handler_item;
+
+	handler_item = find_change_handler(th, handler);
+	if (!handler_item)
+		return;
+	list_del(&handler_item->list);
+	free(handler_item);
+}
+
+/**
+ * SECTION: Ports
+ * @short_description: port getters, port_list manipulators
+ */
+
+struct team_port {
+	struct list_head	list;
+	uint32_t		ifindex;
+	uint32_t		speed;
+	uint8_t			duplex;
+	bool			linkup;
+	bool			changed;
+};
+
 static void flush_port_list(struct team_handle *th)
 {
 	struct team_port *port, *tmp;
@@ -212,143 +329,6 @@ static void flush_port_list(struct team_handle *th)
 		list_del(&port->list);
 		free(port);
 	}
-}
-
-static struct team_option *create_option(char *name, int opt_type, void *data,
-					 int data_size, bool changed)
-{
-	struct team_option *option;
-
-	option = malloc(sizeof(struct team_option));
-	if (!option)
-		return NULL;
-
-	option->name = malloc(sizeof(char) * (strlen(name) + 1));
-	if (!option->name)
-		goto err_alloc_name;
-
-	option->data = malloc(data_size);
-	if (!option->data)
-		goto err_alloc_data;
-
-	option->type = opt_type;
-	option->changed = changed;
-	strcpy(option->name, name);
-	memcpy(option->data, data, data_size);
-
-	return option;
-
-err_alloc_data:
-	free(option->name);
-
-err_alloc_name:
-	free(option);
-
-	return NULL;
-}
-
-static void flush_option_list(struct team_handle *th)
-{
-	struct team_option *option, *tmp;
-
-	list_for_each_entry_safe(option, tmp, &th->option_list, list) {
-		list_del(&option->list);
-		free(option->name);
-		free(option->data);
-		free(option);
-	}
-}
-
-static struct team_option *__find_option(struct list_head *opt_list, char *name)
-{
-	struct team_option *option;
-
-	list_for_each_entry(option, opt_list, list) {
-		if (strcmp(option->name, name) == 0)
-			return option;
-	}
-	return NULL;
-}
-
-static int send_and_recv(struct team_handle *th, struct nl_msg *msg,
-			 int (*valid_handler)(struct nl_msg *, void *),
-			 void *valid_data)
-{
-	struct nl_cb *cb;
-	int err = -ENOMEM;
-
-	err = nl_send_auto_complete(th->nl_sock, msg);
-	if (err < 0)
-		goto out;
-
-	th->nl_sock_err = 1;
-
-	if (valid_handler)
-		nl_socket_modify_cb(th->nl_sock, NL_CB_VALID, NL_CB_CUSTOM,
-				    valid_handler, valid_data);
-
-	while (th->nl_sock_err > 0)
-		nl_recvmsgs_default(th->nl_sock);
-
-	err = th->nl_sock_err;
-
- out:
-	nlmsg_free(msg);
-	return err;
-}
-
-static int set_option_value(struct team_handle *th, const char *opt_name,
-			    void *data, int opt_type)
-{
-	struct nl_msg *msg;
-	struct nlattr *option_list;
-	struct nlattr *option_item;
-	int nla_type;
-
-	switch (opt_type) {
-	case TEAM_OPTION_TYPE_U32:
-		nla_type = NLA_U32;
-		break;
-	case TEAM_OPTION_TYPE_STRING:
-		nla_type = NLA_STRING;
-		break;
-	default:
-		return -ENOENT;
-	}
-
-	msg = nlmsg_alloc();
-	if (!msg)
-		return -ENOMEM;
-
-	genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, th->family, 0, 0,
-		    TEAM_CMD_OPTIONS_SET, 0);
-	NLA_PUT_U32(msg, TEAM_ATTR_TEAM_IFINDEX, th->ifindex);
-	option_list = nla_nest_start(msg, TEAM_ATTR_LIST_OPTION);
-	if (!option_list)
-		goto nla_put_failure;
-	option_item = nla_nest_start(msg, TEAM_ATTR_ITEM_OPTION);
-	if (!option_item)
-		goto nla_put_failure;
-	NLA_PUT_STRING(msg, TEAM_ATTR_OPTION_NAME, opt_name);
-	NLA_PUT_U32(msg, TEAM_ATTR_OPTION_TYPE, nla_type);
-	switch (nla_type) {
-		case NLA_U32:
-			NLA_PUT_U32(msg, TEAM_ATTR_OPTION_DATA, *((__u32 *) data));
-			break;
-		case NLA_STRING:
-			NLA_PUT_STRING(msg, TEAM_ATTR_OPTION_DATA, (char *) data);
-			break;
-		default:
-			goto nla_put_failure;
-	}
-	nla_nest_end(msg, option_item);
-	nla_nest_end(msg, option_list);
-
-	return send_and_recv(th, msg, NULL, NULL);
-
-nla_put_failure:
-	nlmsg_free(msg);
-	return -ENOBUFS;
 }
 
 static int get_port_list_handler(struct nl_msg *msg, void *arg)
@@ -434,6 +414,161 @@ static int get_port_list(struct team_handle *th)
 nla_put_failure:
 	nlmsg_free(msg);
 	return -ENOBUFS;
+}
+
+/**
+ * team_get_next_port:
+ * @th: libteam library context
+ * @port: port structure
+ *
+ * Get next port in list.
+ *
+ * Returns: port next to @port passed.
+ **/
+TEAM_EXPORT
+struct team_port *team_get_next_port(struct team_handle *th,
+				     struct team_port *port)
+{
+	return list_get_next_entry(port, &th->port_list, list);
+}
+
+/**
+ * team_get_port_ifindex:
+ * @port: port structure
+ *
+ * Get port interface index.
+ *
+ * Returns: port interface index as idenfified by in kernel.
+ **/
+TEAM_EXPORT
+uint32_t team_get_port_ifindex(struct team_port *port)
+{
+	return port->ifindex;
+}
+
+/**
+ * team_get_port_speed:
+ * @port: port structure
+ *
+ * Get port speed.
+ *
+ * Returns: port speed in Mbits/s.
+ **/
+TEAM_EXPORT
+uint32_t team_get_port_speed(struct team_port *port)
+{
+	return port->speed;
+}
+
+/**
+ * team_get_port_duplex:
+ * @port: port structure
+ *
+ * Get port duplex.
+ *
+ * Returns: 0 = half-duplex, 1 = full-duplex
+ **/
+TEAM_EXPORT
+uint8_t team_get_port_duplex(struct team_port *port)
+{
+	return port->duplex;
+}
+
+/**
+ * team_is_port_link_up:
+ * @port: port structure
+ *
+ * See if port link is up.
+ *
+ * Returns: true if port link is up.
+ **/
+TEAM_EXPORT
+bool team_is_port_link_up(struct team_port *port)
+{
+	return port->linkup;
+}
+
+/**
+ * team_is_port_changed:
+ * @port: port structure
+ *
+ * See if port values got changed.
+ *
+ * Returns: true if port got changed.
+ **/
+TEAM_EXPORT
+bool team_is_port_changed(struct team_port *port)
+{
+	return port->changed;
+}
+
+/**
+ * SECTION: Options
+ * @short_description: option getters/setters, option_list manipulators
+ */
+
+struct team_option {
+	struct list_head	list;
+	enum team_option_type	type;
+	char *			name;
+	void *			data;
+	bool			changed;
+};
+
+static void flush_option_list(struct team_handle *th)
+{
+	struct team_option *option, *tmp;
+
+	list_for_each_entry_safe(option, tmp, &th->option_list, list) {
+		list_del(&option->list);
+		free(option->name);
+		free(option->data);
+		free(option);
+	}
+}
+
+static struct team_option *create_option(char *name, int opt_type, void *data,
+					 int data_size, bool changed)
+{
+	struct team_option *option;
+
+	option = malloc(sizeof(struct team_option));
+	if (!option)
+		return NULL;
+
+	option->name = malloc(sizeof(char) * (strlen(name) + 1));
+	if (!option->name)
+		goto err_alloc_name;
+
+	option->data = malloc(data_size);
+	if (!option->data)
+		goto err_alloc_data;
+
+	option->type = opt_type;
+	option->changed = changed;
+	strcpy(option->name, name);
+	memcpy(option->data, data, data_size);
+
+	return option;
+
+err_alloc_data:
+	free(option->name);
+
+err_alloc_name:
+	free(option);
+
+	return NULL;
+}
+
+static struct team_option *__find_option(struct list_head *opt_list, char *name)
+{
+	struct team_option *option;
+
+	list_for_each_entry(option, opt_list, list) {
+		if (strcmp(option->name, name) == 0)
+			return option;
+	}
+	return NULL;
 }
 
 static int get_options_handler(struct nl_msg *msg, void *arg)
@@ -545,30 +680,247 @@ nla_put_failure:
 	return -ENOBUFS;
 }
 
-static int ack_handler(struct nl_msg *msg, void *arg)
+/**
+ * team_get_option_by_name:
+ * @th: libteam library context
+ * @name: option name
+ *
+ * Get option structure referred by option @name.
+ *
+ * Returns: pointer to option structure or NULL in case option is not found.
+ **/
+TEAM_EXPORT
+struct team_option *team_get_option_by_name(struct team_handle *th, char *name)
 {
-	int *err = arg;
-
-	*err = 0;
-	return NL_STOP;
+	return __find_option(&th->option_list, name);
 }
 
-static int finish_handler(struct nl_msg *msg, void *arg)
+/**
+ * team_get_next_option:
+ * @th: libteam library context
+ * @option: option structure
+ *
+ * Get next option in list.
+ *
+ * Returns: option next to @option passed.
+ **/
+TEAM_EXPORT
+struct team_option *team_get_next_option(struct team_handle *th,
+					 struct team_option *option)
 {
-	int *err = arg;
-
-	*err = 0;
-	return NL_SKIP;
+	return list_get_next_entry(option, &th->option_list, list);
 }
 
-static int error_handler(struct sockaddr_nl *nla, struct nlmsgerr *nl_err,
-			 void *arg)
+/**
+ * team_get_option_name:
+ * @option: option structure
+ *
+ * Get option name.
+ *
+ * Returns: pointer to string containing option name.
+ **/
+TEAM_EXPORT
+char *team_get_option_name(struct team_option *option)
 {
-	int *err = arg;
-
-	*err = nl_err->error;
-	return NL_SKIP;
+	return option->name;
 }
+
+/**
+ * team_get_option_type:
+ * @option: option structure
+ *
+ * Get option type.
+ *
+ * Returns: number identificating option type.
+ **/
+TEAM_EXPORT
+enum team_option_type team_get_option_type(struct team_option *option)
+{
+	return option->type;
+}
+
+/**
+ * team_get_option_value_u32:
+ * @option: option structure
+ *
+ * Get option value as unsigned 32-bit number.
+ *
+ * Returns: number.
+ **/
+TEAM_EXPORT
+uint32_t team_get_option_value_u32(struct team_option *option)
+{
+	return *((__u32 *) option->data);
+}
+
+/**
+ * team_get_option_value_string:
+ * @option: option structure
+ *
+ * Get option value as string.
+ *
+ * Returns: pointer to string.
+ **/
+TEAM_EXPORT
+char *team_get_option_value_string(struct team_option *option)
+{
+	return option->data;
+}
+
+/**
+ * team_is_option_changed:
+ * @option: option structure
+ *
+ * See if option values got changed.
+ *
+ * Returns: true if option got changed.
+ **/
+TEAM_EXPORT
+bool team_is_option_changed(struct team_option *option)
+{
+	return option->changed;
+}
+
+/**
+ * team_get_option_value_by_name_u32:
+ * @th: libteam library context
+ * @name: option name
+ * u32_ptr: where the value will be stored
+ *
+ * Get option referred by @name and store its value as unsigned 32-bit
+ * number into @u32_ptr.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_get_option_value_by_name_u32(struct team_handle *th,
+				      char *name, uint32_t *u32_ptr)
+{
+	struct team_option *option;
+
+	option = team_get_option_by_name(th, name);
+	if (!option)
+		return -ENOENT;
+	*u32_ptr = team_get_option_value_u32(option);
+	return 0;
+}
+
+/**
+ * team_get_option_value_by_name_string:
+ * @th: libteam library context
+ * @name: option name
+ * str_ptr: where the value will be stored
+ *
+ * Get option referred by @name and store its value as pointer to string
+ * into @srt_ptr.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_get_option_value_by_name_string(struct team_handle *th,
+					 char *name, char **str_ptr)
+{
+	struct team_option *option;
+
+	option = team_get_option_by_name(th, name);
+	if (!option)
+		return -ENOENT;
+	*str_ptr = team_get_option_value_string(option);
+	return 0;
+}
+
+static int set_option_value(struct team_handle *th, const char *opt_name,
+			    void *data, int opt_type)
+{
+	struct nl_msg *msg;
+	struct nlattr *option_list;
+	struct nlattr *option_item;
+	int nla_type;
+
+	switch (opt_type) {
+	case TEAM_OPTION_TYPE_U32:
+		nla_type = NLA_U32;
+		break;
+	case TEAM_OPTION_TYPE_STRING:
+		nla_type = NLA_STRING;
+		break;
+	default:
+		return -ENOENT;
+	}
+
+	msg = nlmsg_alloc();
+	if (!msg)
+		return -ENOMEM;
+
+	genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, th->family, 0, 0,
+		    TEAM_CMD_OPTIONS_SET, 0);
+	NLA_PUT_U32(msg, TEAM_ATTR_TEAM_IFINDEX, th->ifindex);
+	option_list = nla_nest_start(msg, TEAM_ATTR_LIST_OPTION);
+	if (!option_list)
+		goto nla_put_failure;
+	option_item = nla_nest_start(msg, TEAM_ATTR_ITEM_OPTION);
+	if (!option_item)
+		goto nla_put_failure;
+	NLA_PUT_STRING(msg, TEAM_ATTR_OPTION_NAME, opt_name);
+	NLA_PUT_U32(msg, TEAM_ATTR_OPTION_TYPE, nla_type);
+	switch (nla_type) {
+		case NLA_U32:
+			NLA_PUT_U32(msg, TEAM_ATTR_OPTION_DATA, *((__u32 *) data));
+			break;
+		case NLA_STRING:
+			NLA_PUT_STRING(msg, TEAM_ATTR_OPTION_DATA, (char *) data);
+			break;
+		default:
+			goto nla_put_failure;
+	}
+	nla_nest_end(msg, option_item);
+	nla_nest_end(msg, option_list);
+
+	return send_and_recv(th, msg, NULL, NULL);
+
+nla_put_failure:
+	nlmsg_free(msg);
+	return -ENOBUFS;
+}
+
+/**
+ * team_set_option_value_by_name_u32:
+ * @th: libteam library context
+ * @name: option name
+ * @val: value to be set
+ *
+ * Set 32-bit number type option.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_set_option_value_by_name_u32(struct team_handle *th,
+				      char *name, uint32_t val)
+{
+	return set_option_value(th, name, &val, TEAM_OPTION_TYPE_U32);
+}
+
+/**
+ * team_set_option_value_by_name_string:
+ * @th: libteam library context
+ * @name: option name
+ * @str: string to be set
+ *
+ * Set string type option.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_set_option_value_by_name_string(struct team_handle *th,
+					 char *name, char *str)
+{
+	return set_option_value(th, name, str, TEAM_OPTION_TYPE_STRING);
+}
+
+/**
+ * SECTION: Context functions
+ * @short_description: Core context functions
+ */
 
 static int event_handler(struct nl_msg *msg, void *arg)
 {
@@ -583,11 +935,13 @@ static int event_handler(struct nl_msg *msg, void *arg)
 	return NL_SKIP;
 }
 
-static int cli_cache_refill(struct team_handle *th)
-{
-	return nl_cache_refill(th->nl_cli.sock, th->nl_cli.link_cache);
-}
-
+/**
+ * team_alloc:
+ *
+ * Allocates library context, sockets, initializes rtnl netlink connection.
+ *
+ * Returns: new libteam library context
+ **/
 TEAM_EXPORT
 struct team_handle *team_alloc(void)
 {
@@ -639,6 +993,15 @@ err_sk_alloc:
 	return NULL;
 }
 
+/**
+ * team_init:
+ * @th: libteam library context
+ * @ifindex: team device interface index
+ *
+ * Do library context initialization. Sets up team generic netlink connection.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
 TEAM_EXPORT
 int team_init(struct team_handle *th, uint32_t ifindex)
 {
@@ -706,6 +1069,13 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 	return 0;
 }
 
+/**
+ * team_free:
+ * @th: libteam library context
+ *
+ * Do libraty context cleanup.
+ *
+ **/
 TEAM_EXPORT
 void team_free(struct team_handle *th)
 {
@@ -715,14 +1085,33 @@ void team_free(struct team_handle *th)
 	nl_socket_free(th->nl_cli.sock);
 	nl_socket_free(th->nl_sock_event);
 	nl_socket_free(th->nl_sock);
+	free(th);
 }
 
+/**
+ * team_get_event_fd:
+ * @th: libteam library context
+ *
+ * Get file descriptor of event socket. This allows library user
+ * to put the fd to poll for example.
+ *
+ * Returns: socket file descriptor.
+ **/
 TEAM_EXPORT
 int team_get_event_fd(struct team_handle *th)
 {
 	return nl_socket_get_fd(th->nl_sock_event);
 }
 
+/**
+ * team_process_event:
+ * @th: libteam library context
+ *
+ * Process event which happened on event socket. Beware this calls
+ * nl_recvmsgs_default() which blocks so be sure to call this only
+ * if there are some data to read on event socket file descriptor.
+ *
+ **/
 TEAM_EXPORT
 void team_process_event(struct team_handle *th)
 {
@@ -730,6 +1119,15 @@ void team_process_event(struct team_handle *th)
 	check_call_change_handlers(th, TEAM_ALL_CHANGE);
 }
 
+/**
+ * team_check_events:
+ * @th: libteam library context
+ *
+ * Check for events pending to be processed on event socket and process
+ * them one by one. This is safe to be called even if no data present
+ * on event socket file descriptor.
+ *
+ **/
 TEAM_EXPORT
 void team_check_events(struct team_handle *th)
 {
@@ -753,190 +1151,83 @@ void team_check_events(struct team_handle *th)
 	}
 }
 
-TEAM_EXPORT
-struct team_port *team_get_next_port(struct team_handle *th,
-				     struct team_port *port)
-{
-	return list_get_next_entry(port, &th->port_list, list);
-}
-
-TEAM_EXPORT
-struct team_option *team_get_next_option(struct team_handle *th,
-					 struct team_option *option)
-{
-	return list_get_next_entry(option, &th->option_list, list);
-}
-
-TEAM_EXPORT
-int team_change_handler_register(struct team_handle *th,
-				 struct team_change_handler *handler)
-{
-	struct change_handler_item *handler_item;
-
-	if (find_change_handler(th, handler))
-		return -EEXIST;
-	handler_item = malloc(sizeof(struct change_handler_item));
-	if (!handler_item)
-		return -ENOMEM;
-	handler_item->handler = handler;
-	handler_item->call_this = false;
-	list_add(&handler_item->list, &th->change_handler_list);
-	return 0;
-}
-
-TEAM_EXPORT
-void team_change_handler_unregister(struct team_handle *th,
-				    struct team_change_handler *handler)
-{
-	struct change_handler_item *handler_item;
-
-	handler_item = find_change_handler(th, handler);
-	if (!handler_item)
-		return;
-	list_del(&handler_item->list);
-	free(handler_item);
-}
-
-/*
- * port getters
- */
-
-TEAM_EXPORT
-uint32_t team_get_port_ifindex(struct team_port *port)
-{
-	return port->ifindex;
-}
-
-TEAM_EXPORT
-uint32_t team_get_port_speed(struct team_port *port)
-{
-	return port->speed;
-}
-
-TEAM_EXPORT
-uint8_t team_get_port_duplex(struct team_port *port)
-{
-	return port->duplex;
-}
-
-TEAM_EXPORT
-bool team_is_port_changed(struct team_port *port)
-{
-	return port->changed;
-}
-
-TEAM_EXPORT
-bool team_is_port_link_up(struct team_port *port)
-{
-	return port->linkup;
-}
-
-/*
- * option getters/setters
- */
-
-TEAM_EXPORT
-char *team_get_option_name(struct team_option *option)
-{
-	return option->name;
-}
-
-TEAM_EXPORT
-enum team_option_type team_get_option_type(struct team_option *option)
-{
-	return option->type;
-}
-
-TEAM_EXPORT
-bool team_is_option_changed(struct team_option *option)
-{
-	return option->changed;
-}
-
-TEAM_EXPORT
-struct team_option *team_get_option_by_name(struct team_handle *th, char *name)
-{
-	return __find_option(&th->option_list, name);
-}
-
-TEAM_EXPORT
-uint32_t team_get_option_value_u32(struct team_option *option)
-{
-	return *((__u32 *) option->data);
-}
-
-TEAM_EXPORT
-char *team_get_option_value_string(struct team_option *option)
-{
-	return option->data;
-}
-
-TEAM_EXPORT
-int team_get_option_value_by_name_u32(struct team_handle *th,
-				      char *name, uint32_t *u32_ptr)
-{
-	struct team_option *option;
-
-	option = team_get_option_by_name(th, name);
-	if (!option)
-		return -ENOENT;
-	*u32_ptr = team_get_option_value_u32(option);
-	return 0;
-}
-
-TEAM_EXPORT
-int team_get_option_value_by_name_string(struct team_handle *th,
-					 char *name, char **str_ptr)
-{
-	struct team_option *option;
-
-	option = team_get_option_by_name(th, name);
-	if (!option)
-		return -ENOENT;
-	*str_ptr = team_get_option_value_string(option);
-	return 0;
-}
-
-TEAM_EXPORT
-int team_set_option_value_by_name_u32(struct team_handle *th,
-				      char *opt_name, uint32_t val)
-{
-	return set_option_value(th, opt_name, &val, TEAM_OPTION_TYPE_U32);
-}
-
-TEAM_EXPORT
-int team_set_option_value_by_name_string(struct team_handle *th,
-					 char *opt_name, char *str)
-{
-	return set_option_value(th, opt_name, str, TEAM_OPTION_TYPE_STRING);
-}
-
+/**
+ * team_get_mode_name:
+ * @th: libteam library context
+ * @mode_name: where the mode name will be stored
+ *
+ * Get name of currect mode.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
 TEAM_EXPORT
 int team_get_mode_name(struct team_handle *th, char **mode_name)
 {
 	return team_get_option_value_by_name_string(th, "mode", mode_name);
 }
 
+/**
+ * team_set_mode_name:
+ * @th: libteam library context
+ * @mode_name: name of mode to be set
+ *
+ * Set team mode.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
 TEAM_EXPORT
 int team_set_mode_name(struct team_handle *th, char *mode_name)
 {
 	return team_set_option_value_by_name_string(th, "mode", mode_name);
 }
 
+/**
+ * team_get_active_port:
+ * @th: libteam library context
+ * @ifindex: where the port interface index will be stored
+ *
+ * Get interface index of active port. Note this is possible only if
+ * team is in "activebackup" mode.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
 TEAM_EXPORT
 int team_get_active_port(struct team_handle *th, uint32_t *ifindex)
 {
 	return team_get_option_value_by_name_u32(th, "activeport", ifindex);
 }
 
+/**
+ * team_set_active_port:
+ * @th: libteam library context
+ * @ifindex: interface index of new active port
+ *
+ * Set new active port by give @ifindex. Note this is possible only if
+ * team is in "activebackup" mode.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
 TEAM_EXPORT
 int team_set_active_port(struct team_handle *th, uint32_t ifindex)
 {
 	return team_set_option_value_by_name_u32(th, "activeport", ifindex);
 }
 
-/* Route netlink helper function */
+/**
+ * SECTION: RTNL helpers
+ * @short_description: Route netlink helper function
+ */
 
+/**
+ * team_ifname2ifindex:
+ * @th: libteam library context
+ * @ifname: interface name
+ *
+ * Looks up for interface of given name and gets its index.
+ *
+ * Returns: zero if interface is not found,
+ *	    interface index as reffered by in kernel otherwise.
+ **/
 TEAM_EXPORT
 uint32_t team_ifname2ifindex(struct team_handle *th, const char *ifname)
 {
@@ -945,6 +1236,18 @@ uint32_t team_ifname2ifindex(struct team_handle *th, const char *ifname)
 	return rtnl_link_name2i(th->nl_cli.link_cache, ifname);
 }
 
+/**
+ * team_ifindex2ifname:
+ * @th: libteam library context
+ * @ifindex: interface index
+ * @ifname: where the interface name will be stored
+ * @maxlen: length of ifname buffer
+ *
+ * Looks up for interface of given index and gets its name.
+ *
+ * Returns: NULL if interface is not found,
+ *	    @ifname otherwise.
+ **/
 TEAM_EXPORT
 char *team_ifindex2ifname(struct team_handle *th, uint32_t ifindex,
 			  char *ifname, unsigned int maxlen)
