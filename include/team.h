@@ -13,6 +13,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct team_handle;
 struct team_port;
 
@@ -90,5 +94,9 @@ int team_set_active_port(struct team_handle *th, uint32_t ifindex);
 uint32_t team_ifname2ifindex(struct team_handle *th, const char *ifname);
 char *team_ifindex2ifname(struct team_handle *th, uint32_t ifindex,
 			  char *ifname, unsigned int maxlen);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif /* _TEAM_H_ */
