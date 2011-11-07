@@ -118,6 +118,8 @@ void team_change_handler_unregister(struct team_handle *th,
 uint32_t team_ifname2ifindex(struct team_handle *th, const char *ifname);
 char *team_ifindex2ifname(struct team_handle *th, uint32_t ifindex,
 			  char *ifname, unsigned int maxlen);
+int team_port_add(struct team_handle *th, uint32_t port_ifindex);
+int team_port_remove(struct team_handle *th, uint32_t port_ifindex);
 
 #ifdef __cplusplus
 } /* extern "C" */

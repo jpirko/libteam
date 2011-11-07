@@ -1257,3 +1257,34 @@ char *team_ifindex2ifname(struct team_handle *th, uint32_t ifindex,
 	return rtnl_link_i2name(th->nl_cli.link_cache, ifindex,
 				ifname, maxlen);
 }
+
+/**
+ * team_port_add:
+ * @th: libteam library context
+ * @port_ifindex: port interface index
+ *
+ * Adds port into team.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_port_add(struct team_handle *th, uint32_t port_ifindex)
+{
+	return rtnl_link_enslave_ifindex(th->nl_cli.sock, th->ifindex,
+					 port_ifindex);
+}
+
+/**
+ * team_port_remove:
+ * @th: libteam library context
+ * @port_ifindex: port interface index
+ *
+ * Removes port from team.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_port_remove(struct team_handle *th, uint32_t port_ifindex)
+{
+	return rtnl_link_release_ifindex(th->nl_cli.sock, port_ifindex);
+}

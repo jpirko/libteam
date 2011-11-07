@@ -151,3 +151,13 @@ class team:
             finally:
                 option = capi.team_get_next_option(self.__th, option)
         return option_list
+
+    def port_add(self, port):
+        err = capi.team_port_add(self.__th, self.__dev_ifindex(port))
+        if err:
+            raise Exception("Failed to add port. Err = %d" % err)
+
+    def port_remove(self, port):
+        err = capi.team_port_remove(self.__th, self.__dev_ifindex(port))
+        if err:
+            raise Exception("Failed to remove port. Err = %d" % err)
