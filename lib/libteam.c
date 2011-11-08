@@ -1155,12 +1155,9 @@ int team_set_active_port(struct team_handle *th, uint32_t ifindex)
 TEAM_EXPORT
 uint32_t team_ifname2ifindex(struct team_handle *th, const char *ifname)
 {
-	int err;
-
 	if (cli_cache_refill(th))
 		return 0;
-	err = rtnl_link_name2i(th->nl_cli.link_cache, ifname);
-	return -nl2syserr(err);
+	return rtnl_link_name2i(th->nl_cli.link_cache, ifname);
 }
 
 /**
@@ -1179,12 +1176,9 @@ TEAM_EXPORT
 char *team_ifindex2ifname(struct team_handle *th, uint32_t ifindex,
 			  char *ifname, unsigned int maxlen)
 {
-	int err;
-
 	if (cli_cache_refill(th))
 		return NULL;
-	err = rtnl_link_i2name(th->nl_cli.link_cache, ifindex, ifname, maxlen);
-	return -nl2syserr(err);
+	return rtnl_link_i2name(th->nl_cli.link_cache, ifindex, ifname, maxlen);
 }
 
 /**
