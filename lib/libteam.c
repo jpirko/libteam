@@ -121,6 +121,7 @@ static int log_priority(const char *priority)
 static int nl2syserr(int nl_error)
 {
 	switch (abs(nl_error)) {
+	case 0:				return 0;
 	case NLE_EXIST:			return EEXIST;
 	case NLE_NOADDR:		return EADDRNOTAVAIL;
 	case NLE_OBJ_NOTFOUND:		return ENOENT;
