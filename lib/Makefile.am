@@ -10,3 +10,5 @@ libteam_la_LDFLAGS = -module
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libteam.pc
+
+EXTRA_DIST = list.h

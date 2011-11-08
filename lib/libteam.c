@@ -17,114 +17,9 @@
 #include <linux/if_team.h>
 #include <linux/types.h>
 #include <team.h>
+#include "list.h"
 
 #define TEAM_EXPORT __attribute__ ((visibility("default")))
-
-/**
- * SECTION: lists
- * @short_description: linked list implementation
- */
-
-struct list_head {
-	struct list_head *next, *prev;
-};
-
-#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
-
-#define container_of(ptr, type, member) ({			\
-	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
-	(type *)( (char *)__mptr - offsetof(type,member) );})
-
-#define LIST_POISON1  ((void *) 0x00100100)
-#define LIST_POISON2  ((void *) 0x00200200)
-
-#define LIST_HEAD_INIT(name) { &(name), &(name) }
-
-#define LIST_HEAD(name) \
-	struct list_head name = LIST_HEAD_INIT(name)
-
-static void INIT_LIST_HEAD(struct list_head *list)
-{
-	list->next = list;
-	list->prev = list;
-}
-
-static  void __list_add(struct list_head *new, struct list_head *prev,
-			struct list_head *next)
-{
-	next->prev = new;
-	new->next = next;
-	new->prev = prev;
-	prev->next = new;
-}
-
-static void list_add(struct list_head *new, struct list_head *head)
-{
-	__list_add(new, head, head->next);
-}
-
-static void list_add_tail(struct list_head *new, struct list_head *head)
-{
-	__list_add(new, head->prev, head);
-}
-
-static void __list_del(struct list_head * prev, struct list_head * next)
-{
-	next->prev = prev;
-	prev->next = next;
-}
-
-static void list_del(struct list_head *entry)
-{
-	__list_del(entry->prev, entry->next);
-	entry->next = LIST_POISON1;
-	entry->prev = LIST_POISON2;
-}
-
-static int list_empty(const struct list_head *head)
-{
-	return head->next == head;
-}
-
-static void __list_splice(const struct list_head *list,
-				 struct list_head *prev,
-				 struct list_head *next)
-{
-	struct list_head *first = list->next;
-	struct list_head *last = list->prev;
-
-	first->prev = prev;
-	prev->next = first;
-
-	last->next = next;
-	next->prev = last;
-}
-
-static void list_splice(const struct list_head *list,
-			struct list_head *head)
-{
-	if (!list_empty(list))
-		__list_splice(list, head, head->next);
-}
-
-#define list_entry(ptr, type, member) \
-	container_of(ptr, type, member)
-
-#define list_for_each_entry(pos, head, member)				\
-	for (pos = list_entry((head)->next, typeof(*pos), member);	\
-	     &pos->member != (head);					\
-	     pos = list_entry(pos->member.next, typeof(*pos), member))
-
-#define list_for_each_entry_safe(pos, n, head, member)			\
-	for (pos = list_entry((head)->next, typeof(*pos), member),	\
-		n = list_entry(pos->member.next, typeof(*pos), member);	\
-	     &pos->member != (head);					\
-	     pos = n, n = list_entry(n->member.next, typeof(*n), member))
-
-/* list extension */
-#define list_get_next_entry(entry, head, member) ({				\
-	struct list_head *next = (entry ? &entry->member : head)->next;		\
-	(next == head) ? NULL :	list_entry(next, typeof(*entry), member);})
 
 /**
  * SECTION: team_handler
@@ -137,9 +32,9 @@ struct team_handle {
 	struct nl_sock *	nl_sock_event;
 	int			family;
 	uint32_t		ifindex;
-	struct list_head	port_list;
-	struct list_head	option_list;
-	struct list_head	change_handler_list;
+	struct list_item	port_list;
+	struct list_item	option_list;
+	struct list_item	change_handler_list;
 	struct {
 		struct nl_sock *	sock;
 		struct nl_cache *	link_cache;
@@ -214,7 +109,7 @@ static int cli_cache_refill(struct team_handle *th)
  */
 
 struct change_handler_item {
-	struct list_head		list;
+	struct list_item		list;
 	bool				call_this;
 	struct team_change_handler *	handler;
 };
@@ -224,7 +119,7 @@ static void set_call_change_handlers(struct team_handle *th,
 {
 	struct change_handler_item *handler_item;
 
-	list_for_each_entry(handler_item, &th->change_handler_list, list) {
+	list_for_each_node_entry(handler_item, &th->change_handler_list, list) {
 		if (type == TEAM_ALL_CHANGE ||
 		    handler_item->handler->type == type)
 			handler_item->call_this = true;
@@ -236,7 +131,7 @@ static void check_call_change_handlers(struct team_handle *th,
 {
 	struct change_handler_item *handler_item;
 
-	list_for_each_entry(handler_item, &th->change_handler_list, list) {
+	list_for_each_node_entry(handler_item, &th->change_handler_list, list) {
 		struct team_change_handler *handler = handler_item->handler;
 
 		if ((type == TEAM_ALL_CHANGE || handler->type == type) &&
@@ -253,7 +148,7 @@ find_change_handler(struct team_handle *th,
 {
 	struct change_handler_item *handler_item;
 
-	list_for_each_entry(handler_item, &th->change_handler_list, list)
+	list_for_each_node_entry(handler_item, &th->change_handler_list, list)
 		if (handler_item->handler == handler)
 			return handler_item;
 	return NULL;
@@ -282,7 +177,7 @@ int team_change_handler_register(struct team_handle *th,
 		return -ENOMEM;
 	handler_item->handler = handler;
 	handler_item->call_this = false;
-	list_add(&handler_item->list, &th->change_handler_list);
+	list_add(&th->change_handler_list, &handler_item->list);
 	return 0;
 }
 
@@ -313,7 +208,7 @@ void team_change_handler_unregister(struct team_handle *th,
  */
 
 struct team_port {
-	struct list_head	list;
+	struct list_item	list;
 	uint32_t		ifindex;
 	uint32_t		speed;
 	uint8_t			duplex;
@@ -325,7 +220,7 @@ static void flush_port_list(struct team_handle *th)
 {
 	struct team_port *port, *tmp;
 
-	list_for_each_entry_safe(port, tmp, &th->port_list, list) {
+	list_for_each_node_entry_safe(port, tmp, &th->port_list, list) {
 		list_del(&port->list);
 		free(port);
 	}
@@ -340,8 +235,9 @@ static int get_port_list_handler(struct nl_msg *msg, void *arg)
 	struct nlattr *port_attrs[TEAM_ATTR_PORT_MAX + 1];
 	int i;
 	uint32_t team_ifindex;
-	LIST_HEAD(tmp_list);
+	struct list_item tmp_list;
 
+	list_init(&tmp_list);
 	genlmsg_parse(nlh, 0, attrs, TEAM_ATTR_MAX, NULL);
 	if (attrs[TEAM_ATTR_TEAM_IFINDEX])
 		team_ifindex = nla_get_u32(attrs[TEAM_ATTR_TEAM_IFINDEX]);
@@ -381,11 +277,11 @@ static int get_port_list_handler(struct nl_msg *msg, void *arg)
 		if (port_attrs[TEAM_ATTR_PORT_DUPLEX])
 			port->duplex = nla_get_u8(port_attrs[TEAM_ATTR_PORT_DUPLEX]);
 
-		list_add_tail(&port->list, &tmp_list);
+		list_add(&tmp_list, &port->list);
 	}
 
 	flush_port_list(th);
-	list_splice(&tmp_list, &th->port_list);
+	list_move_nodes(&th->port_list, &tmp_list);
 
 	set_call_change_handlers(th, TEAM_PORT_CHANGE);
 	return NL_SKIP;
@@ -429,7 +325,7 @@ TEAM_EXPORT
 struct team_port *team_get_next_port(struct team_handle *th,
 				     struct team_port *port)
 {
-	return list_get_next_entry(port, &th->port_list, list);
+	return list_get_next_node_entry(&th->port_list, port, list);
 }
 
 /**
@@ -508,7 +404,7 @@ bool team_is_port_changed(struct team_port *port)
  */
 
 struct team_option {
-	struct list_head	list;
+	struct list_item	list;
 	enum team_option_type	type;
 	char *			name;
 	void *			data;
@@ -519,7 +415,7 @@ static void flush_option_list(struct team_handle *th)
 {
 	struct team_option *option, *tmp;
 
-	list_for_each_entry_safe(option, tmp, &th->option_list, list) {
+	list_for_each_node_entry_safe(option, tmp, &th->option_list, list) {
 		list_del(&option->list);
 		free(option->name);
 		free(option->data);
@@ -560,11 +456,11 @@ err_alloc_name:
 	return NULL;
 }
 
-static struct team_option *__find_option(struct list_head *opt_list, char *name)
+static struct team_option *__find_option(struct list_item *opt_head, char *name)
 {
 	struct team_option *option;
 
-	list_for_each_entry(option, opt_list, list) {
+	list_for_each_node_entry(option, opt_head, list) {
 		if (strcmp(option->name, name) == 0)
 			return option;
 	}
@@ -580,8 +476,9 @@ static int get_options_handler(struct nl_msg *msg, void *arg)
 	struct nlattr *option_attrs[TEAM_ATTR_OPTION_MAX + 1];
 	int i;
 	uint32_t team_ifindex;
-	LIST_HEAD(tmp_list);
+	struct list_item tmp_list;
 
+	list_init(&tmp_list);
 	genlmsg_parse(nlh, 0, attrs, TEAM_ATTR_MAX, NULL);
 	if (attrs[TEAM_ATTR_TEAM_IFINDEX])
 		team_ifindex = nla_get_u32(attrs[TEAM_ATTR_TEAM_IFINDEX]);
@@ -645,11 +542,11 @@ static int get_options_handler(struct nl_msg *msg, void *arg)
 		}
 
 		option = create_option(name, opt_type, data, data_size, changed);
-		list_add_tail(&option->list, &tmp_list);
+		list_add(&tmp_list, &option->list);
 	}
 
 	flush_option_list(th);
-	list_splice(&tmp_list, &th->option_list);
+	list_move_nodes(&th->option_list, &tmp_list);
 
 	set_call_change_handlers(th, TEAM_OPTION_CHANGE);
 	return NL_SKIP;
@@ -708,7 +605,7 @@ TEAM_EXPORT
 struct team_option *team_get_next_option(struct team_handle *th,
 					 struct team_option *option)
 {
-	return list_get_next_entry(option, &th->option_list, list);
+	return list_get_next_node_entry(&th->option_list, option, list);
 }
 
 /**
@@ -953,9 +850,9 @@ struct team_handle *team_alloc(void)
 		return NULL;
 
 	memset(th, 0, sizeof(struct team_handle));
-	INIT_LIST_HEAD(&th->port_list);
-	INIT_LIST_HEAD(&th->option_list);
-	INIT_LIST_HEAD(&th->change_handler_list);
+	list_init(&th->port_list);
+	list_init(&th->option_list);
+	list_init(&th->change_handler_list);
 
 	th->nl_sock = nl_socket_alloc();
 	if (!th->nl_sock)
