@@ -9,6 +9,9 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <syslog.h>
 #include <netlink/netlink.h>
 #include <netlink/genl/genl.h>
 #include <netlink/genl/ctrl.h>
@@ -19,7 +22,101 @@
 #include <team.h>
 #include "list.h"
 
+/**
+ * SECTION: team_handler
+ * @short_description: libteam context
+ */
+
+struct team_handle {
+	struct nl_sock *	nl_sock;
+	int			nl_sock_err;
+	struct nl_sock *	nl_sock_event;
+	int			family;
+	uint32_t		ifindex;
+	struct list_item	port_list;
+	struct list_item	option_list;
+	struct list_item	change_handler_list;
+	struct {
+		struct nl_sock *	sock;
+		struct nl_cache *	link_cache;
+	} nl_cli;
+	void (*log_fn)(struct team_handle *th, int priority,
+		       const char *file, int line, const char *fn,
+		       const char *format, va_list args);
+	int log_priority;
+};
+
+/**
+ * SECTION: logging
+ * @short_description: libteam logging facility
+ */
+
+static inline void __attribute__((always_inline, format(printf, 2, 3)))
+team_log_null(struct team_handle *th, const char *format, ...) {}
+
+#define team_log_cond(th, prio, arg...)					\
+	do {								\
+		if (team_get_log_priority(th) >= prio)			\
+			team_log(th, prio, __FILE__, __LINE__,		\
+				 __FUNCTION__, ## arg);			\
+	} while (0)
+
+#ifdef ENABLE_LOGGING
+#  ifdef ENABLE_DEBUG
+#    define dbg(th, arg...) team_log_cond(th, LOG_DEBUG, ## arg)
+#  else
+#    define dbg(th, arg...) team_log_null(th, ## arg)
+#  endif
+#  define info(th, arg...) team_log_cond(th, LOG_INFO, ## arg)
+#  define err(th, arg...) team_log_cond(th, LOG_ERR, ## arg)
+#else
+#  define dbg(th, arg...) team_log_null(th, ## arg)
+#  define info(th, arg...) team_log_null(th, ## arg)
+#  define err(th, arg...) team_log_null(th, ## arg)
+#endif
+
 #define TEAM_EXPORT __attribute__ ((visibility("default")))
+
+static void team_log(struct team_handle *th, int priority,
+		     const char *file, int line, const char *fn,
+		     const char *format, ...)
+{
+	va_list args;
+
+	va_start(args, format);
+	th->log_fn(th, priority, file, line, fn, format, args);
+	va_end(args);
+}
+
+static void log_stderr(struct team_handle *th, int priority,
+		       const char *file, int line, const char *fn,
+		       const char *format, va_list args)
+{
+	fprintf(stderr, "libteam: %s: ", fn);
+	vfprintf(stderr, format, args);
+}
+
+static int log_priority(const char *priority)
+{
+	char *endptr;
+	int prio;
+
+	prio = strtol(priority, &endptr, 10);
+	if (endptr[0] == '\0' || isspace(endptr[0]))
+		return prio;
+	if (strncmp(priority, "err", 3) == 0)
+		return LOG_ERR;
+	if (strncmp(priority, "info", 4) == 0)
+		return LOG_INFO;
+	if (strncmp(priority, "debug", 5) == 0)
+		return LOG_DEBUG;
+	return 0;
+}
+
+/**
+ * SECTION: libnl helpers
+ * @short_description: various libnl helper functions
+ */
 
 static int nl2syserr(int nl_error)
 {
@@ -43,26 +140,6 @@ static int nl2syserr(int nl_error)
 	default:			return EINVAL;
 	}
 }
-
-/**
- * SECTION: team_handler
- * @short_description: libteam context
- */
-
-struct team_handle {
-	struct nl_sock *	nl_sock;
-	int			nl_sock_err;
-	struct nl_sock *	nl_sock_event;
-	int			family;
-	uint32_t		ifindex;
-	struct list_item	port_list;
-	struct list_item	option_list;
-	struct list_item	change_handler_list;
-	struct {
-		struct nl_sock *	sock;
-		struct nl_cache *	link_cache;
-	} nl_cli;
-};
 
 /**
  * SECTION: Netlink helpers
@@ -868,6 +945,7 @@ TEAM_EXPORT
 struct team_handle *team_alloc(void)
 {
 	struct team_handle *th;
+	const char *env;
 	int err;
 
 	th = malloc(sizeof(struct team_handle));
@@ -875,6 +953,17 @@ struct team_handle *team_alloc(void)
 		return NULL;
 
 	memset(th, 0, sizeof(struct team_handle));
+
+	th->log_fn = log_stderr;
+	th->log_priority = LOG_ERR;
+	/* environment overwrites config */
+	env = getenv("TEAM_LOG");
+	if (env != NULL)
+		team_set_log_priority(th, log_priority(env));
+
+	info(th, "team_handle %p created\n", th);
+	dbg(th, "log_priority=%d\n", th->log_priority);
+
 	list_init(&th->port_list);
 	list_init(&th->option_list);
 	list_init(&th->change_handler_list);
@@ -1010,6 +1099,52 @@ void team_free(struct team_handle *th)
 	nl_socket_free(th->nl_sock_event);
 	nl_socket_free(th->nl_sock);
 	free(th);
+}
+
+/**
+ * team_set_log_fn:
+ * @th: libteam library context
+ * @log_fn: function to be called for logging messages
+ *
+ * The built-in logging writes to stderr. It can be
+ * overridden by a custom function, to plug log messages
+ * into the user's logging functionality.
+ *
+ **/
+TEAM_EXPORT
+void team_set_log_fn(struct team_handle *th,
+		     void (*log_fn)(struct team_handle *th, int priority,
+				    const char *file, int line, const char *fn,
+				    const char *format, va_list args))
+{
+	th->log_fn = log_fn;
+	info(th, "custom logging function %p registered\n", log_fn);
+}
+
+/**
+ * team_get_log_priority:
+ * @th: libteam library context
+ *
+ * Returns: the current logging priority
+ **/
+TEAM_EXPORT
+int team_get_log_priority(struct team_handle *th)
+{
+	return th->log_priority;
+}
+
+/**
+ * team_set_log_priority:
+ * @th: libteam library context
+ * @priority: the new logging priority
+ *
+ * Set the current logging priority. The value controls which messages
+ * are logged.
+ **/
+TEAM_EXPORT
+void team_set_log_priority(struct team_handle *th, int priority)
+{
+	th->log_priority = priority;
 }
 
 /**

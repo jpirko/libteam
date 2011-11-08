@@ -27,6 +27,12 @@ struct team_handle;
 struct team_handle *team_alloc(void);
 int team_init(struct team_handle *th, uint32_t ifindex);
 void team_free(struct team_handle *th);
+void team_set_log_fn(struct team_handle *th,
+		     void (*log_fn)(struct team_handle *th, int priority,
+				    const char *file, int line, const char *fn,
+				    const char *format, va_list args));
+int team_get_log_priority(struct team_handle *th);
+void team_set_log_priority(struct team_handle *th, int priority);
 int team_get_event_fd(struct team_handle *th);
 void team_process_event(struct team_handle *th);
 void team_check_events(struct team_handle *th);
