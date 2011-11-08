@@ -21,6 +21,29 @@
 
 #define TEAM_EXPORT __attribute__ ((visibility("default")))
 
+static int nl2syserr(int nl_error)
+{
+	switch (abs(nl_error)) {
+	case NLE_EXIST:			return EEXIST;
+	case NLE_NOADDR:		return EADDRNOTAVAIL;
+	case NLE_OBJ_NOTFOUND:		return ENOENT;
+	case NLE_INTR:			return EINTR;
+	case NLE_AGAIN:			return EAGAIN;
+	case NLE_BAD_SOCK:		return ENOTSOCK;
+	case NLE_NOACCESS:		return EACCES;
+	case NLE_INVAL:			return EINVAL;
+	case NLE_NOMEM:			return ENOMEM;
+	case NLE_AF_NOSUPPORT:		return EAFNOSUPPORT;
+	case NLE_PROTO_MISMATCH:	return EPROTONOSUPPORT;
+	case NLE_OPNOTSUPP:		return EOPNOTSUPP;
+	case NLE_PERM:			return EPERM;
+	case NLE_BUSY:			return EBUSY;
+	case NLE_RANGE:			return ERANGE;
+	case NLE_NODEV:			return ENODEV;
+	default:			return EINVAL;
+	}
+}
+
 /**
  * SECTION: team_handler
  * @short_description: libteam context
@@ -54,8 +77,10 @@ static int send_and_recv(struct team_handle *th, struct nl_msg *msg,
 	int err = -ENOMEM;
 
 	err = nl_send_auto_complete(th->nl_sock, msg);
-	if (err < 0)
+	if (err < 0) {
+		err = -nl2syserr(err);
 		goto out;
+	}
 
 	th->nl_sock_err = 1;
 
@@ -66,7 +91,7 @@ static int send_and_recv(struct team_handle *th, struct nl_msg *msg,
 	while (th->nl_sock_err > 0)
 		nl_recvmsgs_default(th->nl_sock);
 
-	err = th->nl_sock_err;
+	err = -nl2syserr(th->nl_sock_err);
 
  out:
 	nlmsg_free(msg);
@@ -913,33 +938,35 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 
 	nl_socket_disable_seq_check(th->nl_sock_event);
 
-	if (genl_connect(th->nl_sock)) {
+	err = genl_connect(th->nl_sock);
+	if (err) {
 		printf("Failed to connect to netlink sock.\n");
-		return -ENOTSUP;
+		return -nl2syserr(err);
 	}
 
-	if (genl_connect(th->nl_sock_event)) {
+	err = genl_connect(th->nl_sock_event);
+	if (err) {
 		printf("Failed to connect to netlink event sock.\n");
-		return -ENOTSUP;
+		return -nl2syserr(err);
 	}
 
 	th->family = genl_ctrl_resolve(th->nl_sock, TEAM_GENL_NAME);
 	if (th->family < 0) {
 		printf("Failed to resolve netlink family.\n");
-		return -ENOENT;
+		return -nl2syserr(th->family);
 	}
 
 	grp_id = genl_ctrl_resolve_grp(th->nl_sock, TEAM_GENL_NAME,
 				       TEAM_GENL_CHANGE_EVENT_MC_GRP_NAME);
 	if (grp_id < 0) {
 		printf("Failed to resolve netlink multicast groups.\n");
-		return -ENOENT;
+		return -nl2syserr(grp_id);
 	}
 
 	err = nl_socket_add_membership(th->nl_sock_event, grp_id);
 	if (err < 0) {
 		printf("Failed to add netlink membership.\n");
-		return -EINVAL;
+		return -nl2syserr(err);
 	}
 
 	nl_socket_modify_err_cb(th->nl_sock,NL_CB_CUSTOM,
@@ -954,13 +981,13 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 	err = get_port_list(th);
 	if (err) {
 		printf("Failed to get port list.\n");
-		return -EINVAL;
+		return err;
 	}
 
 	err = get_options(th);
 	if (err) {
 		printf("Failed to get options.\n");
-		return -EINVAL;
+		return err;
 	}
 
 	return 0;
@@ -1128,9 +1155,12 @@ int team_set_active_port(struct team_handle *th, uint32_t ifindex)
 TEAM_EXPORT
 uint32_t team_ifname2ifindex(struct team_handle *th, const char *ifname)
 {
+	int err;
+
 	if (cli_cache_refill(th))
 		return 0;
-	return rtnl_link_name2i(th->nl_cli.link_cache, ifname);
+	err = rtnl_link_name2i(th->nl_cli.link_cache, ifname);
+	return -nl2syserr(err);
 }
 
 /**
@@ -1149,10 +1179,12 @@ TEAM_EXPORT
 char *team_ifindex2ifname(struct team_handle *th, uint32_t ifindex,
 			  char *ifname, unsigned int maxlen)
 {
+	int err;
+
 	if (cli_cache_refill(th))
 		return NULL;
-	return rtnl_link_i2name(th->nl_cli.link_cache, ifindex,
-				ifname, maxlen);
+	err = rtnl_link_i2name(th->nl_cli.link_cache, ifindex, ifname, maxlen);
+	return -nl2syserr(err);
 }
 
 /**
@@ -1167,8 +1199,11 @@ char *team_ifindex2ifname(struct team_handle *th, uint32_t ifindex,
 TEAM_EXPORT
 int team_port_add(struct team_handle *th, uint32_t port_ifindex)
 {
-	return rtnl_link_enslave_ifindex(th->nl_cli.sock, th->ifindex,
-					 port_ifindex);
+	int err;
+
+	err = rtnl_link_enslave_ifindex(th->nl_cli.sock, th->ifindex,
+					port_ifindex);
+	return -nl2syserr(err);
 }
 
 /**
@@ -1183,5 +1218,8 @@ int team_port_add(struct team_handle *th, uint32_t port_ifindex)
 TEAM_EXPORT
 int team_port_remove(struct team_handle *th, uint32_t port_ifindex)
 {
-	return rtnl_link_release_ifindex(th->nl_cli.sock, port_ifindex);
+	int err;
+
+	err = rtnl_link_release_ifindex(th->nl_cli.sock, port_ifindex);
+	return -nl2syserr(err);
 }
