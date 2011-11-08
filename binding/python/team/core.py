@@ -5,13 +5,18 @@ TEAM_ALL_CHANGE = capi.TEAM_ALL_CHANGE
 TEAM_PORT_CHANGE = capi.TEAM_PORT_CHANGE
 TEAM_OPTION_CHANGE = capi.TEAM_OPTION_CHANGE
 
-class TeamOptionGetFailed(Exception):
+class TeamError(Exception):
     pass
 
-class TeamOptionSetFailed(Exception):
-    pass
+class TeamLibError(TeamError):
+    def __init__(self, msg, err):
+        self.__msg = msg
+        self.__err = err
 
-class TeamOptionUnknownType(Exception):
+    def __str__(self):
+        return "%s Err=%d" % (self.__msg, self.__err)
+
+class TeamUnknownOptionTypeError(TeamError):
     pass
 
 class team:
@@ -19,7 +24,7 @@ class team:
         self.__th = capi.team_alloc()
         err = capi.team_init(self.__th, self.__dev_ifindex(teamdev))
         if err:
-            raise Exception("Failed to init team. Err = %d" % err)
+            raise TeamLibError("Failed to init team.", err)
         self.__change_handlers = {}
 
     def __del__(self):
@@ -58,14 +63,14 @@ class team:
 
     def change_handler_register(self, func, priv, evtype):
         if func in self.__change_handlers:
-            raise Exception("Failed to register change handler. Function is already registered.")
+            raise TeamError("Failed to register change handler. Function is already registered.")
         handler = capi.team_change_handler(func, priv, evtype)
         capi.py_team_change_handler_register(self.__th, handler)
         self.__change_handlers[func] = handler
 
     def change_handler_unregister(self, func):
         if not func in self.__change_handlers:
-            raise Exception("Failed to unregister change handler. Function is not registered.")
+            raise TeamError("Failed to unregister change handler. Function is not registered.")
         handler = self.__change_handlers[func]
         capi.py_team_change_handler_unregister(self.__th, handler)
         del(self.__change_handlers[func])
@@ -73,24 +78,24 @@ class team:
     def get_mode_name(self):
         err, name = capi.team_get_mode_name(self.__th)
         if err:
-            raise Exception("Failed to get mode name. Err = %d" % err)
+            raise TeamLibError("Failed to get mode name.", err)
         return name
 
     def set_mode_name(self, name):
         err = capi.team_set_mode_name(self.__th, name)
         if err:
-            raise Exception("Failed to set mode name. Err = %d" % err)
+            raise TeamLibError("Failed to set mode name.", err)
 
     def get_active_port(self):
         err, port_ifindex = capi.team_get_active_port(self.__th)
         if err:
-            raise Exception("Failed to get active port. Err = %d" % err)
+            raise TeamLibError("Failed to get active port.", err)
         return (port_ifindex, self.__dev_ifname(port_ifindex))
 
     def set_active_port(self, port):
         err = capi.team_set_active_port(self.__th, self.__dev_ifindex(port))
         if err:
-            raise Exception("Failed to set active port. Err = %d" % err)
+            raise TeamLibError("Failed to set active port.", err)
 
     def port_list(self):
         port_list = []
@@ -115,12 +120,12 @@ class team:
         elif opt_type == capi.TEAM_OPTION_TYPE_STRING:
             return capi.team_get_option_value_string(option)
         else:
-            raise TeamOptionUnknownType()
+            raise TeamUnknownOptionTypeError()
 
     def get_option_value(self, opt_name):
         option = capi.team_get_option_by_name(self.__th, opt_name)
         if not option:
-            raise TeamOptionGetFailed()
+            raise TeamLibError("Failed to get option")
         return self.__get_option_value(option)
 
     def set_option_value(self, opt_name, opt_value):
@@ -132,9 +137,9 @@ class team:
                                                             opt_name,
                                                             opt_value)
         else:
-            raise TeamOptionUnknownType()
+            raise TeamUnknownOptionTypeError()
         if err:
-            raise TeamOptionSetFailed()
+            raise TeamLibError("Failed to set option", err)
 
     def option_list(self):
         option_list = {}
@@ -146,7 +151,7 @@ class team:
                 option_item["value"] = self.__get_option_value(option)
                 option_name = capi.team_get_option_name(option)
                 option_list[option_name] = option_item
-            except TeamOptionUnknownType:
+            except TeamUnknownOptionTypeError:
                 continue
             finally:
                 option = capi.team_get_next_option(self.__th, option)
@@ -155,9 +160,9 @@ class team:
     def port_add(self, port):
         err = capi.team_port_add(self.__th, self.__dev_ifindex(port))
         if err:
-            raise Exception("Failed to add port. Err = %d" % err)
+            raise TeamLibError("Failed to add port.", err)
 
     def port_remove(self, port):
         err = capi.team_port_remove(self.__th, self.__dev_ifindex(port))
         if err:
-            raise Exception("Failed to remove port. Err = %d" % err)
+            raise TeamLibError("Failed to remove port.", err)
