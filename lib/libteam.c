@@ -169,7 +169,7 @@ static int send_and_recv(struct team_handle *th, struct nl_msg *msg,
 	while (th->nl_sock_err > 0)
 		nl_recvmsgs_default(th->nl_sock);
 
-	err = -nl2syserr(th->nl_sock_err);
+	err = th->nl_sock_err;
 
  out:
 	nlmsg_free(msg);
