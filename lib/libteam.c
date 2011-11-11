@@ -1005,6 +1005,69 @@ err_sk_alloc:
 	return NULL;
 }
 
+static int do_create(struct team_handle *th, const char *team_name, bool recreate)
+{
+	struct rtnl_link *link;
+	int err;
+
+	link = rtnl_link_alloc();
+	if (!link)
+		return -ENOMEM;
+
+	if (team_name) {
+		rtnl_link_set_name(link, team_name);
+
+		if (recreate && team_ifname2ifindex(th, team_name)) {
+			err = rtnl_link_delete(th->nl_cli.sock, link);
+			if (err)
+				goto errout;
+		}
+	}
+
+	err = rtnl_link_set_type(link, "team");
+	if (err)
+		goto errout;
+
+	err = rtnl_link_add(th->nl_cli.sock, link, NLM_F_CREATE | NLM_F_EXCL);
+
+errout:
+	rtnl_link_put(link);
+
+	return -nl2syserr(err);
+}
+
+/**
+ * team_create:
+ * @th: libteam library context
+ * @team_name: new team device name
+ *
+ * Create new team device by given name. If NULL is passed, name will be
+ * allocated automatically.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_create(struct team_handle *th, const char *team_name)
+{
+	return do_create(th, team_name, false);
+}
+
+/**
+ * team_recreate:
+ * @th: libteam library context
+ * @team_name: new team device name
+ *
+ * Does the same as team_create only if device with @team_name already
+ * exists it will be deleted first.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_recreate(struct team_handle *th, const char *team_name)
+{
+	return do_create(th, team_name, true);
+}
+
 /**
  * team_init:
  * @th: libteam library context
