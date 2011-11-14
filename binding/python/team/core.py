@@ -24,6 +24,7 @@ class TeamUnknownOptionTypeError(TeamError):
 
 class team:
     def __init__(self, teamdev, create = False, recreate = False, destroy = False):
+        self.__destroy = False
         self.__th = capi.team_alloc()
         if not self.__th:
             raise TeamLibError("Failed to allocate team handle.")
