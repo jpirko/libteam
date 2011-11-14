@@ -1084,7 +1084,7 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 	int grp_id;
 
 	if (!ifindex) {
-		printf("Passed interface index \% is not valid.\n", ifindex);
+		printf("Passed interface index %d is not valid.\n", ifindex);
 		return -ENOENT;
 	}
 	th->ifindex = ifindex;
