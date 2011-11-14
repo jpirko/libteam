@@ -9,20 +9,36 @@ class TeamError(Exception):
     pass
 
 class TeamLibError(TeamError):
-    def __init__(self, msg, err):
+    def __init__(self, msg, err = 0):
         self.__msg = msg
         self.__err = err
 
     def __str__(self):
-        return "%s Err=%d" % (self.__msg, self.__err)
+        msg = self.__msg
+        if self.__err:
+            msg += " Err=%d" % self.__err
+        return msg
 
 class TeamUnknownOptionTypeError(TeamError):
     pass
 
 class team:
-    def __init__(self, teamdev):
+    def __init__(self, teamdev, create = False, recreate = False):
         self.__th = capi.team_alloc()
-        err = capi.team_init(self.__th, self.__dev_ifindex(teamdev))
+        if not self.__th:
+            raise TeamLibError("Failed to allocate team handle.")
+
+        if isinstance(teamdev, str):
+            err = 0
+            if recreate:
+                err = capi.team_recreate(self.__th, teamdev)
+            elif create:
+                err = capi.team_create(self.__th, teamdev)
+            if err:
+                raise TeamLibError("Failed to create team.", err)
+
+        ifindex = self.__dev_ifindex(teamdev) if teamdev else 0
+        err = capi.team_init(self.__th, ifindex)
         if err:
             raise TeamLibError("Failed to init team.", err)
         self.__change_handlers = {}
