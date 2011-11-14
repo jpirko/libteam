@@ -23,7 +23,7 @@ class TeamUnknownOptionTypeError(TeamError):
     pass
 
 class team:
-    def __init__(self, teamdev, create = False, recreate = False):
+    def __init__(self, teamdev, create = False, recreate = False, destroy = False):
         self.__th = capi.team_alloc()
         if not self.__th:
             raise TeamLibError("Failed to allocate team handle.")
@@ -42,8 +42,13 @@ class team:
         if err:
             raise TeamLibError("Failed to init team.", err)
         self.__change_handlers = {}
+        self.__destroy = destroy
 
     def __del__(self):
+        if self.__destroy:
+            err = capi.team_destroy(self.__th)
+            if err:
+                raise TeamLibError("Failed to destroy team.", err)
         capi.team_free(self.__th)
 
     def __dev_ifindex(self, dev):

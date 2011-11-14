@@ -1069,6 +1069,31 @@ int team_recreate(struct team_handle *th, const char *team_name)
 }
 
 /**
+ * team_destroy:
+ * @th: libteam library context
+ *
+ * Destroys current initialized team device.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_destroy(struct team_handle *th)
+{
+	struct rtnl_link *link;
+	int err;
+
+	if (!th->ifindex)
+		return -ENODEV;
+	link = rtnl_link_alloc();
+	if (!link)
+		return -ENOMEM;
+	rtnl_link_set_ifindex(link, th->ifindex);
+	err = rtnl_link_delete(th->nl_cli.sock, link);
+	rtnl_link_put(link);
+	return -nl2syserr(err);
+}
+
+/**
  * team_init:
  * @th: libteam library context
  * @ifindex: team device interface index

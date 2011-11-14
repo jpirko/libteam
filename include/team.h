@@ -27,6 +27,7 @@ struct team_handle;
 struct team_handle *team_alloc(void);
 int team_create(struct team_handle *th, const char *team_name);
 int team_recreate(struct team_handle *th, const char *team_name);
+int team_destroy(struct team_handle *th);
 int team_init(struct team_handle *th, uint32_t ifindex);
 void team_free(struct team_handle *th);
 void team_set_log_fn(struct team_handle *th,
