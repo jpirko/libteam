@@ -129,6 +129,10 @@ char *team_ifindex2ifname(struct team_handle *th, uint32_t ifindex,
 			  char *ifname, unsigned int maxlen);
 int team_port_add(struct team_handle *th, uint32_t port_ifindex);
 int team_port_remove(struct team_handle *th, uint32_t port_ifindex);
+int team_hwaddr_set(struct team_handle *th, uint32_t ifindex,
+		    const char *addr, unsigned int addr_len);
+int team_hwaddr_get(struct team_handle *th, uint32_t ifindex,
+		    char *addr, unsigned int addr_len);
 
 #ifdef __cplusplus
 } /* extern "C" */

@@ -1441,3 +1441,87 @@ int team_port_remove(struct team_handle *th, uint32_t port_ifindex)
 	err = rtnl_link_release_ifindex(th->nl_cli.sock, port_ifindex);
 	return -nl2syserr(err);
 }
+
+/**
+ * team_hwaddr_set:
+ * @th: libteam library context
+ * @ifindex: interface index
+ * @addr: address to be set
+ * @addr_len: length of addr
+ *
+ * Sets given hardware address (MAC) for network interface by given
+ * interface index.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_hwaddr_set(struct team_handle *th, uint32_t ifindex,
+		    const char *addr, unsigned int addr_len)
+{
+	struct rtnl_link *link;
+	int err;
+	struct nl_addr *nl_addr;
+
+	link = rtnl_link_alloc();
+	if (!link)
+		return -ENOMEM;
+
+	nl_addr = nl_addr_build(AF_UNSPEC, (void *) addr, addr_len);
+	if (!nl_addr) {
+		err = -ENOMEM;
+		goto errout;
+	}
+
+	rtnl_link_set_ifindex(link, ifindex);
+	rtnl_link_set_addr(link, nl_addr);
+
+	err = rtnl_link_change(th->nl_cli.sock, link, link, 0);
+	err = -nl2syserr(err);
+
+	nl_addr_put(nl_addr);
+
+errout:
+	rtnl_link_put(link);
+	return err;
+}
+
+/**
+ * team_hwaddr_get:
+ * @th: libteam library context
+ * @ifindex: interface index
+ * @addr: address will be written here
+ * @addr_len: length of addr buffer
+ *
+ * Gets hardware address (MAC) of network interface by given
+ * interface index.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_hwaddr_get(struct team_handle *th, uint32_t ifindex,
+		    char *addr, unsigned int addr_len)
+{
+	struct rtnl_link *link;
+	int err;
+	struct nl_addr *nl_addr;
+
+	err = rtnl_link_get_kernel(th->nl_cli.sock, ifindex, NULL, &link);
+	if (err)
+		return -nl2syserr(err);
+	nl_addr = rtnl_link_get_addr(link);
+	if (!nl_addr) {
+		err = -ENOENT;
+		goto errout;
+	}
+
+	if (nl_addr_get_len(nl_addr) != addr_len) {
+		err = -EINVAL;
+		goto errout;
+	}
+
+	memcpy(addr, nl_addr_get_binary_addr(nl_addr), addr_len);
+
+errout:
+	rtnl_link_put(link);
+	return err;
+}

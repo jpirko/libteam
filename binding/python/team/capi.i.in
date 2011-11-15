@@ -26,6 +26,22 @@ void py_team_change_handler_unregister(struct team_handle *th,
     if ($1) free($1);
 }
 
+%apply (char *STRING, int LENGTH) { (const char *addr, unsigned int addr_len) };
+int team_hwaddr_set(struct team_handle *th, uint32_t ifindex, const char *addr, unsigned int addr_len);
+
+%typemap(in) (char *addr, unsigned int addr_len) {
+    $2 = PyInt_AsLong($input);
+    $1 = (char *) malloc(sizeof(char) * $2);
+}
+%typemap(freearg) (char *addr, unsigned int addr_len) {
+    if ($1) free($1);
+}
+%typemap(argout) (char *addr, unsigned int addr_len) {
+    $result = SWIG_Python_AppendOutput($result, PyString_FromStringAndSize($1,$2));
+}
+%apply char *OUTPUT {char *addr};
+int team_hwaddr_get(struct team_handle *th, uint32_t ifindex, char *addr, unsigned int addr_len);
+
 %typemap(python, in) PyObject *PyFunc {
   if (!PyCallable_Check($input)) {
       PyErr_SetString(PyExc_TypeError, "Need a callable object!");
