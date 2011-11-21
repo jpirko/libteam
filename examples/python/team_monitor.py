@@ -20,16 +20,14 @@ def port_change_handler(t):
     print "------------------\nport change\n\tport list:"
     for port in t.port_list():
         print ("\tifname %s, linkup %d, changed %d, speed %d, duplex %d" %
-                        (port["ifname"], port["linkup"], port["changed"],
-                         port["speed"], port["duplex"]))
+                        (port.ifname, port.linkup, port.changed,
+                         port.speed, port.duplex))
 
 def option_change_handler(t):
     print "------------------\noption change\n\toption list:"
-    options = t.option_list()
-    for option_name in options:
-        option = options[option_name]
-        print ("\t%s = %s (changed %d)" % (option_name, option["value"],
-                                           option["changed"]))
+    for option in t.option_list():
+        print ("\t%s = %s (changed %d)" % (option.name, option.value,
+                                           option.changed))
 
 def main():
     appname = sys.argv[0]
@@ -41,7 +39,7 @@ def main():
 
     ifname = args[0]
 
-    t = team.team(ifname)
+    t = team.Team(ifname)
 
     t.change_handler_register(port_change_handler, t,
                               team.TEAM_PORT_CHANGE)
