@@ -319,12 +319,9 @@ class Team(TeamNetDevice):
         create == True ... Create new team device if it does not already exist.
         recreate == True ... Same as create but in case device exists already,
                              it's removed first.
-        destroy == True ... Remove team device in class destructor.
+        destroy == True ... Remove team device in close function.
     """
     def __init__(self, teamdev, create = False, recreate = False, destroy = False):
-        self._destroy = False
-        self._change_handler = None
-
         th = capi.team_alloc()
         if not th:
             raise TeamLibError("Failed to allocate team handle.")
@@ -355,15 +352,17 @@ class Team(TeamNetDevice):
                                                         self, TEAM_ANY_CHANGE)
         capi.py_team_change_handler_register(self._th, self._change_handler)
 
-    def __del__(self):
+    def close(self):
+        """
+        Do class cleanup
+        """
         if self._destroy:
             err = capi.team_destroy(self._th)
             if err:
                 raise TeamLibError("Failed to destroy team.", err)
 
-        if self._change_handler:
-            capi.py_team_change_handler_unregister(self._th,
-                                                   self._change_handler)
+        capi.py_team_change_handler_unregister(self._th,
+                                               self._change_handler)
         capi.team_free(self._th)
 
     def loop_forever(self):
