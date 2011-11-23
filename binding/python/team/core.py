@@ -365,17 +365,25 @@ class Team(TeamNetDevice):
                                                self._change_handler)
         capi.team_free(self._th)
 
+    def kill_loop(self):
+        self._kill_loop = True
+
     def loop_forever(self):
+        self._kill_loop = False
         fd = self.get_event_fd()
-        try:
-            while True:
+        while True:
+            try:
                 ret = select.select([fd],[],[])
                 if fd in ret[0]:
                     self.process_event()
-        except KeyboardInterrupt:
-            pass
-        except:
-            raise
+            except KeyboardInterrupt:
+                return
+            except select.error as e:
+                if e[0] == 4:
+                    if self._kill_loop:
+                        return
+            except:
+                raise
 
     def get_event_fd(self):
         return capi.team_get_event_fd(self._th)
