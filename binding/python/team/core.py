@@ -2,7 +2,7 @@ import capi
 import select
 import struct
 
-TEAM_ALL_CHANGE = capi.TEAM_ALL_CHANGE
+TEAM_ANY_CHANGE = capi.TEAM_ANY_CHANGE
 TEAM_PORT_CHANGE = capi.TEAM_PORT_CHANGE
 TEAM_OPTION_CHANGE = capi.TEAM_OPTION_CHANGE
 
@@ -278,11 +278,39 @@ class TeamOptionList(object):
             if not opt_name in lib_option_name_list:
                 del self._options[opt_name]
 
-def _port_change_handler_func(t):
-    t._port_list.update()
+class TeamChangeHandler(object):
+    def __init__(self, func, func_priv, type_mask):
+        self._func = func
+        self._func_priv = func_priv
+        self._type_mask = type_mask
 
-def _option_change_handler_func(t):
-    t._option_list.update()
+    def call(self, curr_type_mask):
+        if self._type_mask & curr_type_mask:
+            self._func(self._func_priv)
+
+class TeamChangeHandlerList(object):
+    def __init__(self):
+        self._list = []
+
+    def add(self, handler):
+        if handler in self._list:
+            raise TeamError("Failed to register change handler. Handler is already registered.")
+        self._list.append(handler)
+
+    def remove(self, handler):
+        if not handler in self._list:
+            raise TeamError("Failed to unregister change handler. Handler is not registered.")
+        self._list.remove(handler)
+
+    def call(self, type_mask):
+        for handler in self._list:
+            handler.call(type_mask)
+
+"""
+This is ugly, change this to be in Team.
+"""
+def _change_handler_func(t, type_mask):
+    t._change_handler_func(type_mask)
 
 class Team(TeamNetDevice):
     """
@@ -295,8 +323,7 @@ class Team(TeamNetDevice):
     """
     def __init__(self, teamdev, create = False, recreate = False, destroy = False):
         self._destroy = False
-        self._port_change_handler = None
-        self._option_change_handler = None
+        self._change_handler = None
 
         th = capi.team_alloc()
         if not th:
@@ -319,20 +346,14 @@ class Team(TeamNetDevice):
             raise TeamLibError("Failed to init team.", err)
 
         self.ifindex = ifindex
-        self._change_handlers = {}
         self._destroy = destroy
+        self._change_handler_list = TeamChangeHandlerList()
         self._port_list = TeamPortList(th)
         self._option_list = TeamOptionList(th)
 
-        self._port_change_handler = capi.team_change_handler(
-                                            _port_change_handler_func,
-                                            self, TEAM_PORT_CHANGE)
-        capi.py_team_change_handler_register(self._th, self._port_change_handler)
-
-        self._option_change_handler = capi.team_change_handler(
-                                            _option_change_handler_func,
-                                            self, TEAM_OPTION_CHANGE)
-        capi.py_team_change_handler_register(self._th, self._option_change_handler)
+        self._change_handler = capi.team_change_handler(_change_handler_func,
+                                                        self, TEAM_ANY_CHANGE)
+        capi.py_team_change_handler_register(self._th, self._change_handler)
 
     def __del__(self):
         if self._destroy:
@@ -340,12 +361,9 @@ class Team(TeamNetDevice):
             if err:
                 raise TeamLibError("Failed to destroy team.", err)
 
-        if self._option_change_handler:
+        if self._change_handler:
             capi.py_team_change_handler_unregister(self._th,
-                                                   self._option_change_handler)
-        if self._port_change_handler:
-            capi.py_team_change_handler_unregister(self._th,
-                                                   self._port_change_handler)
+                                                   self._change_handler)
         capi.team_free(self._th)
 
     def loop_forever(self):
@@ -369,19 +387,18 @@ class Team(TeamNetDevice):
     def check_events(self):
         capi.team_check_events(self._th)
 
-    def change_handler_register(self, func, priv, evtype):
-        if func in self._change_handlers:
-            raise TeamError("Failed to register change handler. Function is already registered.")
-        handler = capi.team_change_handler(func, priv, evtype)
-        capi.py_team_change_handler_register(self._th, handler)
-        self._change_handlers[func] = handler
+    def _change_handler_func(self, type_mask):
+        if type_mask & TEAM_PORT_CHANGE:
+            self._port_list.update()
+        if type_mask & TEAM_OPTION_CHANGE:
+            self._option_list.update()
+        self._change_handler_list.call(type_mask)
 
-    def change_handler_unregister(self, func):
-        if not func in self._change_handlers:
-            raise TeamError("Failed to unregister change handler. Function is not registered.")
-        handler = self._change_handlers[func]
-        capi.py_team_change_handler_unregister(self._th, handler)
-        del(self._change_handlers[func])
+    def change_handler_register(self, change_handler):
+        self._change_handler_list.add(change_handler)
+
+    def change_handler_unregister(self, change_handler):
+        self._change_handler_list.remove(change_handler)
 
     def get_mode_name(self):
         err, name = capi.team_get_mode_name(self._th)

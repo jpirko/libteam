@@ -102,18 +102,25 @@ int team_set_option_value_by_name_string(struct team_handle *th,
 /*
  * team_change_handler
  *
- * define and register change handler frunctions
+ * define change event types and register change handler functions
  */
-enum team_change_type {
-	TEAM_ALL_CHANGE,
-	TEAM_PORT_CHANGE,
-	TEAM_OPTION_CHANGE,
+enum {
+	TEAM_PORT_CHANGE	= 0x1,
+	TEAM_OPTION_CHANGE	= 0x2,
+	TEAM_ANY_CHANGE		= TEAM_PORT_CHANGE | TEAM_OPTION_CHANGE,
 };
 
+typedef unsigned int team_change_type_mask_t;
+
 struct team_change_handler {
-	void			(*func)(struct team_handle *, void *);
+	void			(*func)(struct team_handle *th,
+					void *func_priv,
+					team_change_type_mask_t type_mask);
+					/* type_mask passed to function
+					 * represents types of events which
+					 * really happened. */
 	void *			func_priv;
-	enum team_change_type	type;
+	team_change_type_mask_t	type_mask;
 };
 
 int team_change_handler_register(struct team_handle *th,

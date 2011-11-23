@@ -3,7 +3,8 @@
 #include "@top_srcdir@/include/team.h"
 
 typedef struct _py_func_priv _py_func_priv;
-static void PythonCallBack(struct team_handle *th, void *func_priv);
+static void PythonCallBack(struct team_handle *th, void *func_priv,
+                           team_change_type_mask_t type_mask);
 void py_team_change_handler_register(struct team_handle *th,
                                      struct team_change_handler *handler);
 void py_team_change_handler_unregister(struct team_handle *th,
@@ -50,7 +51,8 @@ int team_hwaddr_get(struct team_handle *th, uint32_t ifindex, char *addr, unsign
   $1 = $input;
 }
 
-%typemap(in) void (*func)(struct team_handle *, void *) {
+%typemap(in) void (*func)(struct team_handle *, void *,
+                          team_change_type_mask_t) {
     $1 = (void *) $input;
 };
 
@@ -58,12 +60,12 @@ int team_hwaddr_get(struct team_handle *th, uint32_t ifindex, char *addr, unsign
 %extend team_change_handler {
     team_change_handler(PyObject *func,
                         PyObject *func_priv,
-                        enum team_change_type type) {
+                        team_change_type_mask_t type_mask) {
         struct team_change_handler* handler;
         handler = (struct team_change_handler *)
                                 malloc(sizeof(struct team_change_handler));
         handler->func = (void *) func;
-        handler->type = type;
+        handler->type_mask = type_mask;
         handler->func_priv = (void *) func_priv;
         return handler;
     }
@@ -92,14 +94,15 @@ typedef struct _py_func_priv{
     PyObject* func_priv;
 } _py_func_priv;
 
-static void PythonCallBack(struct team_handle *th, void *func_priv)
+static void PythonCallBack(struct team_handle *th, void *func_priv,
+                           team_change_type_mask_t type_mask)
 {
     PyObject *func, *arglist;
     PyObject *result;
     _py_func_priv *_func_priv = (_py_func_priv *) func_priv;
     func = _func_priv->py_func;     /* This is the function .... */
 
-    arglist = Py_BuildValue("(O)",_func_priv->func_priv);
+    arglist = Py_BuildValue("(Oi)", _func_priv->func_priv, type_mask);
     result =  PyEval_CallObject(func, arglist);
     if (arglist != NULL)
         Py_DECREF(arglist);

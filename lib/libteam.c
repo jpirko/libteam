@@ -35,7 +35,10 @@ struct team_handle {
 	uint32_t		ifindex;
 	struct list_item	port_list;
 	struct list_item	option_list;
-	struct list_item	change_handler_list;
+	struct {
+		struct list_item		list;
+		team_change_type_mask_t		pending_type_mask;
+	} change_handler;
 	struct {
 		struct nl_sock *	sock;
 		struct nl_cache *	link_cache;
@@ -213,36 +216,32 @@ static int cli_cache_refill(struct team_handle *th)
 
 struct change_handler_item {
 	struct list_item		list;
-	bool				call_this;
 	struct team_change_handler *	handler;
 };
 
 static void set_call_change_handlers(struct team_handle *th,
-				     enum team_change_type type)
+				     team_change_type_mask_t set_type_mask)
 {
-	struct change_handler_item *handler_item;
-
-	list_for_each_node_entry(handler_item, &th->change_handler_list, list) {
-		if (type == TEAM_ALL_CHANGE ||
-		    handler_item->handler->type == type)
-			handler_item->call_this = true;
-	}
+	th->change_handler.pending_type_mask |= set_type_mask;
 }
 
 static void check_call_change_handlers(struct team_handle *th,
-				       enum team_change_type type)
+				       team_change_type_mask_t call_type_mask)
 {
 	struct change_handler_item *handler_item;
+	team_change_type_mask_t to_call_type_mask =
+			th->change_handler.pending_type_mask & call_type_mask;
 
-	list_for_each_node_entry(handler_item, &th->change_handler_list, list) {
+	list_for_each_node_entry(handler_item, &th->change_handler.list, list) {
 		struct team_change_handler *handler = handler_item->handler;
+		team_change_type_mask_t item_type_mask =
+				handler->type_mask & to_call_type_mask;
 
-		if ((type == TEAM_ALL_CHANGE || handler->type == type) &&
-		    handler_item->call_this) {
-			handler->func(th, handler->func_priv);
-			handler_item->call_this = false;
+		if (item_type_mask) {
+			handler->func(th, handler->func_priv, item_type_mask);
 		}
 	}
+	th->change_handler.pending_type_mask &= ~call_type_mask;
 }
 
 static struct change_handler_item *
@@ -251,7 +250,7 @@ find_change_handler(struct team_handle *th,
 {
 	struct change_handler_item *handler_item;
 
-	list_for_each_node_entry(handler_item, &th->change_handler_list, list)
+	list_for_each_node_entry(handler_item, &th->change_handler.list, list)
 		if (handler_item->handler == handler)
 			return handler_item;
 	return NULL;
@@ -279,8 +278,7 @@ int team_change_handler_register(struct team_handle *th,
 	if (!handler_item)
 		return -ENOMEM;
 	handler_item->handler = handler;
-	handler_item->call_this = false;
-	list_add(&th->change_handler_list, &handler_item->list);
+	list_add(&th->change_handler.list, &handler_item->list);
 	return 0;
 }
 
@@ -967,7 +965,7 @@ struct team_handle *team_alloc(void)
 
 	list_init(&th->port_list);
 	list_init(&th->option_list);
-	list_init(&th->change_handler_list);
+	list_init(&th->change_handler.list);
 
 	th->nl_sock = nl_socket_alloc();
 	if (!th->nl_sock)
@@ -1264,7 +1262,7 @@ TEAM_EXPORT
 void team_process_event(struct team_handle *th)
 {
 	nl_recvmsgs_default(th->nl_sock_event);
-	check_call_change_handlers(th, TEAM_ALL_CHANGE);
+	check_call_change_handlers(th, TEAM_ANY_CHANGE);
 }
 
 /**

@@ -16,14 +16,14 @@ jpirko@redhat.com (Jiri Pirko)
 import sys
 import team
 
-def port_change_handler(t):
+def port_change_handler_func(t):
     print "------------------\nport change\n\tport list:"
     for port in t.port_list():
         print ("\tifname %s, linkup %d, changed %d, speed %d, duplex %d" %
                         (port.ifname, port.linkup, port.changed,
                          port.speed, port.duplex))
 
-def option_change_handler(t):
+def option_change_handler_func(t):
     print "------------------\noption change\n\toption list:"
     for option in t.option_list():
         print ("\t%s = %s (changed %d)" % (option.name, option.value,
@@ -41,10 +41,15 @@ def main():
 
     t = team.Team(ifname)
 
-    t.change_handler_register(port_change_handler, t,
-                              team.TEAM_PORT_CHANGE)
-    t.change_handler_register(option_change_handler, t,
-                              team.TEAM_OPTION_CHANGE)
+    port_change_handler = team.TeamChangeHandler(
+                                    port_change_handler_func, t,
+                                    team.TEAM_PORT_CHANGE)
+    t.change_handler_register(port_change_handler)
+    option_change_handler = team.TeamChangeHandler(
+                                    option_change_handler_func, t,
+                                    team.TEAM_OPTION_CHANGE)
+    t.change_handler_register(option_change_handler)
+
     t.loop_forever()
 
 if __name__ == "__main__":
