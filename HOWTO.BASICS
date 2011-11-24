@@ -1,5 +1,8 @@
-This is basic howto/ introduction to team. Used applications are part of this
+This is basic howto introduction to team. Used applications are part of this
 project but note that their main purpose is to act as examples.
+
+
+1) Using example c applications and ip util
 
 First create team device:
 # ip link add team0 type team
@@ -27,4 +30,17 @@ NONE
 eth1
 
 You can do link changes on ports and push some traffic through now to see
-what happens.
+what happens. Note you also need to alter mac addresses manualy!
+
+
+2) Using example python daemon
+
+To create and manage active backup team device:
+# ./examples/python/team_daemon.py --port eth1 --port eth2 -m activebackup --active-port eth2 --team-name team0
+
+Or simply just following command to create roundrobin team device with default name:
+# ./examples/python/team_daemon.py --port eth1 --port eth2 -m roundrobin
+
+And setup addr and bring team up:
+# ip addr add 192.168.252.2/24 dev team0
+# ip link set team0 up
