@@ -15,6 +15,7 @@ AC_PROG_CC
 LT_INIT
 
 PKG_CHECK_MODULES([LIBNL], [libnl-3.0 libnl-genl-3.0 libnl-cli-3.0])
+PKG_CHECK_MODULES([LIBDAEMON], [libdaemon])
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdint.h stdlib.h])
@@ -45,6 +46,7 @@ AC_CONFIG_FILES([Makefile
 include/Makefile \
 lib/Makefile \
 src/Makefile \
+teamd/Makefile \
 lib/libteam.pc \
 binding/Makefile \
 binding/python/Makefile \
