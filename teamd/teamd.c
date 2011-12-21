@@ -20,6 +20,7 @@
 #include <libdaemon/dsignal.h>
 #include <libdaemon/dlog.h>
 #include <libdaemon/dpid.h>
+#include <json/json.h>
 #include <team.h>
 
 #define teamd_log_err(args...) daemon_log(LOG_ERR, ##args)
@@ -40,11 +41,30 @@ struct daemon_context {
 	bool			daemonize;
 	bool			debug;
 	char *			config_file;
+	char *			config_text;
+	json_object *		config_jso;
 	char *			pid_file;
 	char *			argv0;
 };
 
 static struct daemon_context ctx;
+
+static const char *teamd_cfg_get_str(const char *query)
+{
+	json_object *jso;
+
+	jso = json_object_simple_query(ctx.config_jso, query);
+	if (!jso) {
+		teamd_log_err("Config string get failed. No such object (query: %s)", query);
+		return NULL;
+	}
+	if (json_object_get_type(jso) != json_type_string) {
+		teamd_log_err("Config string get failed. Object has different type (query: %s)", query);
+		return NULL;
+	}
+
+	return json_object_get_string(jso);
+}
 
 static void print_help(void) {
 	printf(
@@ -52,9 +72,11 @@ static void print_help(void) {
             "    -h --help                Show this help\n"
             "    -d --daemonize           Daemonize after startup (implies -s)\n"
             "    -k --kill                Kill a running daemon\n"
-            "    -c --check               Return 0 if a daemon is already running\n"
+            "    -e --check               Return 0 if a daemon is already running\n"
             "    -V --version             Show version\n"
             "    -f --config-file=FILE    Load the specified configuration file\n"
+            "    -c --config=TEXT         Use given config string (This causes configuration\n"
+	    "                             file will be ignored)\n"
             "    -p --pid-file=FILE       Use the specified PID file\n"
             "    -g --debug               Increase verbosity\n",
             ctx.argv0);
@@ -66,9 +88,10 @@ static int parse_command_line(int argc, char *argv[]) {
 		{ "help",		no_argument,		NULL, 'h' },
 		{ "daemonize",		no_argument,		NULL, 'd' },
 		{ "kill",		no_argument,		NULL, 'k' },
-		{ "check",		no_argument,		NULL, 'c' },
+		{ "check",		no_argument,		NULL, 'e' },
 		{ "version",		no_argument,		NULL, 'v' },
 		{ "config-file",	required_argument,	NULL, 'f' },
+		{ "config",		required_argument,	NULL, 'c' },
 		{ "pid-file",		required_argument,	NULL, 'p' },
 		{ "debug",		no_argument,		NULL, 'g' },
 		{ NULL, 0, NULL, 0 }
@@ -81,7 +104,7 @@ static int parse_command_line(int argc, char *argv[]) {
 		argv0 = strdup(argv[0]);
 	ctx.argv0 = argv0;
 
-	while ((opt = getopt_long(argc, argv, "hdkcvf:p:g",
+	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:g",
 				  long_options, NULL)) >= 0) {
 
 		switch(opt) {
@@ -94,7 +117,7 @@ static int parse_command_line(int argc, char *argv[]) {
 		case 'k':
 			ctx.cmd = DAEMON_CMD_KILL;
 			break;
-		case 'c':
+		case 'e':
 			ctx.cmd = DAEMON_CMD_CHECK;
 			break;
 		case 'v':
@@ -103,6 +126,10 @@ static int parse_command_line(int argc, char *argv[]) {
 		case 'f':
 			free(ctx.config_file);
 			ctx.config_file = strdup(optarg);
+			break;
+		case 'c':
+			free(ctx.config_text);
+			ctx.config_text = strdup(optarg);
 			break;
 		case 'p':
 			free(ctx.pid_file);
@@ -131,6 +158,7 @@ static void context_init(void)
 
 static void context_fini(void)
 {
+	free(ctx.config_text);
 	free(ctx.config_file);
 	free(ctx.pid_file);
 	free(ctx.argv0);
@@ -187,8 +215,47 @@ static int teamd_run()
 	return 0;
 }
 
+static int load_config()
+{
+	if (ctx.config_text) {
+		if (ctx.config_file)
+			teamd_log_warn("Command line configuration is present, ignoring give config file.");
+		ctx.config_jso = json_tokener_parse(ctx.config_text);
+		if (!ctx.config_jso) {
+			teamd_log_err("Failed to load configuration from command line.");
+			return -EIO;
+		}
+	} else if (ctx.config_file) {
+		ctx.config_jso = json_object_from_file(ctx.config_file);
+		if (!ctx.config_jso) {
+			teamd_log_err("Failed to load configuration from file \"%s\".", ctx.config_file);
+			return -EIO;
+		}
+	} else {
+		teamd_log_err("Either configuration file or command line configuration string must be present.");
+		return -ENOENT;
+	}
+	return 0;
+}
+
 static int teamd_init()
 {
+	int err;
+	const char *team_name;
+
+	err = load_config();
+	if (err) {
+		teamd_log_err("Failed to load config.");
+		return err;
+	}
+	team_name = teamd_cfg_get_str("['device']");
+	if (!team_name) {
+		teamd_log_err("Failed to get team device name.");
+		return -ENOENT;
+	}
+
+	teamd_log_dbg("Using team device \"%s\".", team_name);
+
 	return 0;
 }
 
