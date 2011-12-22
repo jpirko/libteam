@@ -204,20 +204,65 @@ static int teamd_run()
 	return 0;
 }
 
+static int load_file(char *filename, char **pstr)
+{
+	int err;
+	FILE *f;
+	char *str;
+	long size;
+
+	f = fopen(filename, "r");
+	if (!f)
+		return -errno;
+	err = fseek(f, 0, SEEK_END);
+	if (err) {
+		err = -errno;
+		goto fclose;
+	}
+	size = ftell(f);
+	if (errno) {
+		err = -errno;
+		goto fclose;
+	}
+	rewind(f);
+	str = malloc(sizeof(char) * (size + 1));
+	if (!str) {
+		err = -ENOMEM;
+		goto fclose;
+	}
+	if (size != fread(str, sizeof(char), size, f)) {
+		err = -errno;
+		goto free_str;
+	}
+	fclose(f);
+	*pstr = str;
+	return 0;
+free_str:
+	free(str);
+fclose:
+	fclose(f);
+	return err;
+}
+
 static int load_config(struct teamd_context *ctx)
 {
+	int err;
+
+	if (ctx->config_file) {
+		if (ctx->config_text) {
+			teamd_log_warn("Command line configuration is present, ignoring given config file.");
+		} else {
+			err = load_file(ctx->config_file, &ctx->config_text);
+			if (err) {
+				teamd_log_err("Failed to read file \"%s\".", ctx->config_file);
+				return err;
+			}
+		}
+	}
 	if (ctx->config_text) {
-		if (ctx->config_file)
-			teamd_log_warn("Command line configuration is present, ignoring give config file.");
 		ctx->config_jso = json_tokener_parse(ctx->config_text);
 		if (!ctx->config_jso) {
-			teamd_log_err("Failed to load configuration from command line.");
-			return -EIO;
-		}
-	} else if (ctx->config_file) {
-		ctx->config_jso = json_object_from_file(ctx->config_file);
-		if (!ctx->config_jso) {
-			teamd_log_err("Failed to load configuration from file \"%s\".", ctx->config_file);
+			teamd_log_err("Failed to parse configuration.");
 			return -EIO;
 		}
 	} else {
