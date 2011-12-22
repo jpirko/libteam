@@ -28,7 +28,7 @@
 #define teamd_log_info(args...) daemon_log(LOG_INFO, ##args)
 #define teamd_log_dbg(args...) daemon_log(LOG_DEBUG, ##args)
 
-enum daemon_command {
+enum teamd_command {
 	DAEMON_CMD_RUN,
 	DAEMON_CMD_KILL,
 	DAEMON_CMD_VERSION,
@@ -36,8 +36,8 @@ enum daemon_command {
 	DAEMON_CMD_CHECK
 };
 
-struct daemon_context {
-	enum daemon_command	cmd;
+struct teamd_context {
+	enum teamd_command	cmd;
 	bool			daemonize;
 	bool			debug;
 	char *			config_file;
@@ -47,13 +47,14 @@ struct daemon_context {
 	char *			argv0;
 };
 
-static struct daemon_context ctx;
+static char **__g_pid_file;
 
-static const char *teamd_cfg_get_str(const char *query)
+static const char *teamd_cfg_get_str(const struct teamd_context *ctx,
+				     const char *query)
 {
 	json_object *jso;
 
-	jso = json_object_simple_query(ctx.config_jso, query);
+	jso = json_object_simple_query(ctx->config_jso, query);
 	if (!jso) {
 		teamd_log_err("Config string get failed. No such object (query: %s)", query);
 		return NULL;
@@ -66,7 +67,7 @@ static const char *teamd_cfg_get_str(const char *query)
 	return json_object_get_string(jso);
 }
 
-static void print_help(void) {
+static void print_help(const struct teamd_context *ctx) {
 	printf(
             "%s [options]\n"
             "    -h --help                Show this help\n"
@@ -79,10 +80,11 @@ static void print_help(void) {
 	    "                             file will be ignored)\n"
             "    -p --pid-file=FILE       Use the specified PID file\n"
             "    -g --debug               Increase verbosity\n",
-            ctx.argv0);
+            ctx->argv0);
 }
 
-static int parse_command_line(int argc, char *argv[]) {
+static int parse_command_line(struct teamd_context *ctx,
+			      int argc, char *argv[]) {
 	int opt;
 	static const struct option long_options[] = {
 		{ "help",		no_argument,		NULL, 'h' },
@@ -102,41 +104,41 @@ static int parse_command_line(int argc, char *argv[]) {
 		argv0 = strdup(argv0 + 1);
 	else
 		argv0 = strdup(argv[0]);
-	ctx.argv0 = argv0;
+	ctx->argv0 = argv0;
 
 	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:g",
 				  long_options, NULL)) >= 0) {
 
 		switch(opt) {
 		case 'h':
-			ctx.cmd = DAEMON_CMD_HELP;
+			ctx->cmd = DAEMON_CMD_HELP;
 			break;
 		case 'd':
-			ctx.daemonize = true;
+			ctx->daemonize = true;
 			break;
 		case 'k':
-			ctx.cmd = DAEMON_CMD_KILL;
+			ctx->cmd = DAEMON_CMD_KILL;
 			break;
 		case 'e':
-			ctx.cmd = DAEMON_CMD_CHECK;
+			ctx->cmd = DAEMON_CMD_CHECK;
 			break;
 		case 'v':
-			ctx.cmd = DAEMON_CMD_VERSION;
+			ctx->cmd = DAEMON_CMD_VERSION;
 			break;
 		case 'f':
-			free(ctx.config_file);
-			ctx.config_file = strdup(optarg);
+			free(ctx->config_file);
+			ctx->config_file = strdup(optarg);
 			break;
 		case 'c':
-			free(ctx.config_text);
-			ctx.config_text = strdup(optarg);
+			free(ctx->config_text);
+			ctx->config_text = strdup(optarg);
 			break;
 		case 'p':
-			free(ctx.pid_file);
-			ctx.pid_file = strdup(optarg);
+			free(ctx->pid_file);
+			ctx->pid_file = strdup(optarg);
 			break;
 		case 'g':
-			ctx.debug = true;
+			ctx->debug = true;
 			break;
 		default:
 			return -1;
@@ -151,21 +153,8 @@ static int parse_command_line(int argc, char *argv[]) {
 	return 0;
 }
 
-static void context_init(void)
-{
-	memset(&ctx, sizeof(ctx), 0);
-}
-
-static void context_fini(void)
-{
-	free(ctx.config_text);
-	free(ctx.config_file);
-	free(ctx.pid_file);
-	free(ctx.argv0);
-}
-
 static const char *pid_file_proc(void) {
-	return ctx.pid_file;
+	return *__g_pid_file;
 }
 
 static int teamd_run()
@@ -215,20 +204,20 @@ static int teamd_run()
 	return 0;
 }
 
-static int load_config()
+static int load_config(struct teamd_context *ctx)
 {
-	if (ctx.config_text) {
-		if (ctx.config_file)
+	if (ctx->config_text) {
+		if (ctx->config_file)
 			teamd_log_warn("Command line configuration is present, ignoring give config file.");
-		ctx.config_jso = json_tokener_parse(ctx.config_text);
-		if (!ctx.config_jso) {
+		ctx->config_jso = json_tokener_parse(ctx->config_text);
+		if (!ctx->config_jso) {
 			teamd_log_err("Failed to load configuration from command line.");
 			return -EIO;
 		}
-	} else if (ctx.config_file) {
-		ctx.config_jso = json_object_from_file(ctx.config_file);
-		if (!ctx.config_jso) {
-			teamd_log_err("Failed to load configuration from file \"%s\".", ctx.config_file);
+	} else if (ctx->config_file) {
+		ctx->config_jso = json_object_from_file(ctx->config_file);
+		if (!ctx->config_jso) {
+			teamd_log_err("Failed to load configuration from file \"%s\".", ctx->config_file);
 			return -EIO;
 		}
 	} else {
@@ -238,17 +227,17 @@ static int load_config()
 	return 0;
 }
 
-static int teamd_init()
+static int teamd_init(struct teamd_context *ctx)
 {
 	int err;
 	const char *team_name;
 
-	err = load_config();
+	err = load_config(ctx);
 	if (err) {
 		teamd_log_err("Failed to load config.");
 		return err;
 	}
-	team_name = teamd_cfg_get_str("['device']");
+	team_name = teamd_cfg_get_str(ctx, "['device']");
 	if (!team_name) {
 		teamd_log_err("Failed to get team device name.");
 		return -ENOENT;
@@ -259,7 +248,7 @@ static int teamd_init()
 	return 0;
 }
 
-static int teamd_start()
+static int teamd_start(struct teamd_context *ctx)
 {
 	pid_t pid;
 	int err = 0;
@@ -285,7 +274,7 @@ static int teamd_start()
 		return -EEXIST;
 	}
 
-	if (ctx.daemonize) {
+	if (ctx->daemonize) {
 		daemon_retval_init();
 
 		pid = daemon_fork();
@@ -330,7 +319,7 @@ static int teamd_start()
 		goto pid_file_remove;
 	}
 
-	err = teamd_init();
+	err = teamd_init(ctx);
 	if (err) {
 		teamd_log_err("teamd_init() failed.");
 		daemon_retval_send(-err);
@@ -341,7 +330,7 @@ static int teamd_start()
 
         teamd_log_info(PACKAGE_VERSION" sucessfully started.");
 
-	err = teamd_run();
+	err = teamd_run(ctx);
 
         teamd_log_info("Exiting...");
 
@@ -354,35 +343,64 @@ pid_file_remove:
 	return err;
 }
 
+static int teamd_context_init(struct teamd_context **pctx)
+{
+	struct teamd_context *ctx;
+
+	ctx = malloc(sizeof(*ctx));
+	if (!ctx)
+		return -ENOMEM;
+	memset(ctx, 0, sizeof(*ctx));
+	*pctx = ctx;
+
+	__g_pid_file = &ctx->pid_file;
+
+	return 0;
+}
+
+static void teamd_context_fini(struct teamd_context *ctx)
+{
+	free(ctx->config_text);
+	free(ctx->config_file);
+	free(ctx->pid_file);
+	free(ctx->argv0);
+	free(ctx);
+}
+
 int main(int argc, char **argv)
 {
 	int ret = EXIT_FAILURE;
 	int err;
+	struct teamd_context *ctx;
 
-	context_init();
+	err = teamd_context_init(&ctx);
+	if (err) {
+		fprintf(stderr, "Failed to init daemon context\n");
+		return ret;
+	}
 
-	err = parse_command_line(argc, argv);
+	err = parse_command_line(ctx, argc, argv);
 	if (err)
 		goto finish;
 
-	if (ctx.debug)
+	if (ctx->debug)
 		daemon_set_verbosity(LOG_DEBUG);
 
-	daemon_log_ident = ctx.argv0;
-	daemon_pid_file_ident = ctx.argv0;
+	daemon_log_ident = ctx->argv0;
+	daemon_pid_file_ident = ctx->argv0;
 
-	if (ctx.pid_file)
+	if (ctx->pid_file)
 		daemon_pid_file_proc = pid_file_proc;
 
 	teamd_log_dbg("Using PID file \"%s\"", daemon_pid_file_proc());
 
-	switch (ctx.cmd) {
+	switch (ctx->cmd) {
 	case DAEMON_CMD_HELP:
-		print_help();
+		print_help(ctx);
 		ret = EXIT_SUCCESS;
 		break;
 	case DAEMON_CMD_VERSION:
-		printf("%s "PACKAGE_VERSION"\n", ctx.argv0);
+		printf("%s "PACKAGE_VERSION"\n", ctx->argv0);
 		ret = 0;
 		break;
 	case DAEMON_CMD_KILL:
@@ -396,7 +414,7 @@ int main(int argc, char **argv)
 		ret = (daemon_pid_file_is_running() >= 0) ? 0 : 1;
 		break;
 	case DAEMON_CMD_RUN:
-		err = teamd_start();
+		err = teamd_start(ctx);
 		if (err)
 			teamd_log_err("Failed to start daemon: %s", strerror(-err));
 		else
@@ -406,6 +424,6 @@ int main(int argc, char **argv)
 
 finish:
 
-	context_fini();
+	teamd_context_fini(ctx);
 	return ret;
 }
