@@ -356,7 +356,7 @@ pid_file_remove:
 
 int main(int argc, char **argv)
 {
-	int ret = 255;
+	int ret = EXIT_FAILURE;
 	int err;
 
 	context_init();
@@ -379,7 +379,7 @@ int main(int argc, char **argv)
 	switch (ctx.cmd) {
 	case DAEMON_CMD_HELP:
 		print_help();
-		ret = 0;
+		ret = EXIT_SUCCESS;
 		break;
 	case DAEMON_CMD_VERSION:
 		printf("%s "PACKAGE_VERSION"\n", ctx.argv0);
@@ -390,7 +390,7 @@ int main(int argc, char **argv)
 		if (err)
 			teamd_log_warn("Failed to kill daemon: %s", strerror(errno));
 		else
-			ret = 0;
+			ret = EXIT_SUCCESS;
 		break;
 	case DAEMON_CMD_CHECK:
 		ret = (daemon_pid_file_is_running() >= 0) ? 0 : 1;
@@ -400,7 +400,7 @@ int main(int argc, char **argv)
 		if (err)
 			teamd_log_err("Failed to start daemon: %s", strerror(-err));
 		else
-			ret = 0;
+			ret = EXIT_SUCCESS;
 		break;
 	}
 
