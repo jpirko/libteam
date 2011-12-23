@@ -28,6 +28,13 @@
 #define teamd_log_info(args...) daemon_log(LOG_INFO, ##args)
 #define teamd_log_dbg(args...) daemon_log(LOG_DEBUG, ##args)
 
+static void libteam_log_daemon(struct team_handle *th, int priority,
+			       const char *file, int line, const char *fn,
+			       const char *format, va_list args)
+{
+	daemon_logv(priority, format, args);
+}
+
 enum teamd_command {
 	DAEMON_CMD_RUN,
 	DAEMON_CMD_KILL,
@@ -40,11 +47,13 @@ struct teamd_context {
 	enum teamd_command	cmd;
 	bool			daemonize;
 	bool			debug;
+	bool			force_recreate;
 	char *			config_file;
 	char *			config_text;
 	json_object *		config_jso;
 	char *			pid_file;
 	char *			argv0;
+	struct team_handle *	th;
 };
 
 static char **__g_pid_file;
@@ -80,6 +89,8 @@ static void print_help(const struct teamd_context *ctx) {
 	    "                             file will be ignored)\n"
             "    -p --pid-file=FILE       Use the specified PID file\n"
             "    -g --debug               Increase verbosity\n",
+            "    -r --force-recreate      Force team device recreation in case it\n"
+            "                             already exists\n",
             ctx->argv0);
 }
 
@@ -96,6 +107,7 @@ static int parse_command_line(struct teamd_context *ctx,
 		{ "config",		required_argument,	NULL, 'c' },
 		{ "pid-file",		required_argument,	NULL, 'p' },
 		{ "debug",		no_argument,		NULL, 'g' },
+		{ "force-recreate",	no_argument,		NULL, 'r' },
 		{ NULL, 0, NULL, 0 }
 	};
 	char *argv0;
@@ -106,7 +118,7 @@ static int parse_command_line(struct teamd_context *ctx,
 		argv0 = strdup(argv[0]);
 	ctx->argv0 = argv0;
 
-	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:g",
+	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:gr",
 				  long_options, NULL)) >= 0) {
 
 		switch(opt) {
@@ -143,6 +155,9 @@ static int parse_command_line(struct teamd_context *ctx,
 		case 'g':
 			ctx->debug = true;
 			break;
+		case 'r':
+			ctx->force_recreate = true;
+			break;
 		default:
 			return -1;
 		}
@@ -160,17 +175,20 @@ static const char *pid_file_proc(void) {
 	return *__g_pid_file;
 }
 
-static int teamd_run()
+static int teamd_run(struct teamd_context *ctx)
 {
 	bool quit = false;
 	int sig_fd;
+	int team_event_fd;
         fd_set fds;
 	int fdmax;
 
 	FD_ZERO(&fds);
 	sig_fd = daemon_signal_fd();
 	FD_SET(sig_fd, &fds);
-	fdmax = sig_fd + 1;
+	team_event_fd = team_get_event_fd(ctx->th);
+	FD_SET(team_event_fd, &fds);
+	fdmax = (sig_fd > team_event_fd ? sig_fd : team_event_fd) + 1;
 
 	while (!quit) {
 		fd_set fds_tmp = fds;
@@ -203,6 +221,8 @@ static int teamd_run()
 
 			}
 		}
+		if (FD_ISSET(team_event_fd, &fds_tmp))
+			team_process_event(ctx->th);
 	}
 	return 0;
 }
@@ -279,6 +299,7 @@ static int teamd_init(struct teamd_context *ctx)
 {
 	int err;
 	const char *team_name;
+	uint32_t ifindex;
 
 	err = load_config(ctx);
 	if (err) {
@@ -290,10 +311,53 @@ static int teamd_init(struct teamd_context *ctx)
 		teamd_log_err("Failed to get team device name.");
 		return -ENOENT;
 	}
-
 	teamd_log_dbg("Using team device \"%s\".", team_name);
 
+	ctx->th = team_alloc();
+	if (!ctx->th) {
+		teamd_log_err("Team alloc failed.");
+		return -ENOMEM;
+	}
+	if (ctx->debug)
+		team_set_log_priority(ctx->th, LOG_DEBUG);
+
+	team_set_log_fn(ctx->th, libteam_log_daemon);
+
+	if (ctx->force_recreate)
+		err = team_recreate(ctx->th, team_name);
+	else
+		err = team_create(ctx->th, team_name);
+	if (err) {
+		teamd_log_err("Failed to create team device.");
+		goto team_free;
+	}
+
+	ifindex = team_ifname2ifindex(ctx->th, team_name);
+	if (!ifindex) {
+		teamd_log_err("Netdevice \"%s\" not found.", team_name);
+		err = -ENOENT;
+		goto team_destroy;
+	}
+
+	err = team_init(ctx->th, ifindex);
+	if (err) {
+		teamd_log_err("Team init failed.");
+		goto team_destroy;
+	}
+
 	return 0;
+
+team_destroy:
+	team_destroy(ctx->th);
+team_free:
+	team_free(ctx->th);
+	return err;
+}
+
+static void teamd_fini(struct teamd_context *ctx)
+{
+	team_destroy(ctx->th);
+	team_free(ctx->th);
 }
 
 static int teamd_start(struct teamd_context *ctx)
@@ -381,6 +445,8 @@ static int teamd_start(struct teamd_context *ctx)
 	err = teamd_run(ctx);
 
         teamd_log_info("Exiting...");
+
+	teamd_fini(ctx);
 
 signal_done:
 	daemon_signal_done();
