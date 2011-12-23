@@ -180,7 +180,7 @@ static int teamd_run(struct teamd_context *ctx)
 	bool quit = false;
 	int sig_fd;
 	int team_event_fd;
-        fd_set fds;
+	fd_set fds;
 	int fdmax;
 
 	FD_ZERO(&fds);
@@ -416,7 +416,7 @@ static int teamd_start(struct teamd_context *ctx)
 		teamd_log_err("Failed to close all file descriptors.");
 		daemon_retval_send(errno);
 		return -errno;
-        }
+	}
 
 	if (daemon_pid_file_create() < 0) {
 		teamd_log_err("Could not create PID file.");
@@ -438,13 +438,13 @@ static int teamd_start(struct teamd_context *ctx)
 		goto signal_done;
 	}
 
-        daemon_retval_send(0);
+	daemon_retval_send(0);
 
-        teamd_log_info(PACKAGE_VERSION" sucessfully started.");
+	teamd_log_info(PACKAGE_VERSION" sucessfully started.");
 
 	err = teamd_run(ctx);
 
-        teamd_log_info("Exiting...");
+	teamd_log_info("Exiting...");
 
 	teamd_fini(ctx);
 
