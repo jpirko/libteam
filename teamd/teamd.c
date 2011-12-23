@@ -127,7 +127,10 @@ static int parse_command_line(struct teamd_context *ctx,
 			break;
 		case 'f':
 			free(ctx->config_file);
-			ctx->config_file = strdup(optarg);
+			ctx->config_file = realpath(optarg, NULL);
+			if (!ctx->config_file)
+				fprintf(stderr, "Failed to get absolute path of \"%s\": %s\n",
+					optarg, strerror(errno));
 			break;
 		case 'c':
 			free(ctx->config_text);
@@ -438,6 +441,8 @@ int main(int argc, char **argv)
 		daemon_pid_file_proc = pid_file_proc;
 
 	teamd_log_dbg("Using PID file \"%s\"", daemon_pid_file_proc());
+	if (ctx->config_file)
+		teamd_log_dbg("Using config file \"%s\"", ctx->config_file);
 
 	switch (ctx->cmd) {
 	case DAEMON_CMD_HELP:
