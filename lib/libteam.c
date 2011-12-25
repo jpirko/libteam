@@ -354,17 +354,17 @@ static int get_port_list_handler(struct nl_msg *msg, void *arg)
 
 		if (nla_parse_nested(port_attrs, TEAM_ATTR_PORT_MAX,
 				     nl_port, NULL)) {
-			printf("failed to parse nested attributes.\n");
+			err(th, "failed to parse nested attributes.\n");
 			return NL_SKIP;
 		}
 
 		if (!port_attrs[TEAM_ATTR_PORT_IFINDEX]) {
-			printf("ifindex port attribute not found\n");
+			err(th, "ifindex port attribute not found\n");
 			return NL_SKIP;
 		}
 		port = malloc(sizeof(struct team_port));
 		if (!port) {
-			printf("malloc failed.\n");
+			err(th, "malloc failed.\n");
 			return NL_SKIP;
 		}
 		memset(port, 0, sizeof(struct team_port));
@@ -603,7 +603,7 @@ static int get_options_handler(struct nl_msg *msg, void *arg)
 
 		if (nla_parse_nested(option_attrs, TEAM_ATTR_OPTION_MAX,
 				     nl_option, NULL)) {
-			printf("failed to parse nested attributes.\n");
+			err(th, "failed to parse nested attributes.\n");
 			return NL_SKIP;
 		}
 
@@ -614,7 +614,7 @@ static int get_options_handler(struct nl_msg *msg, void *arg)
 		}
 		name = nla_get_string(option_attrs[TEAM_ATTR_OPTION_NAME]);
 		if (__find_option(&tmp_list, name)) {
-			printf("option named \"%s\" is already in list.\n", name);
+			err(th, "option named \"%s\" is already in list.\n", name);
 			continue;
 		}
 
@@ -638,7 +638,7 @@ static int get_options_handler(struct nl_msg *msg, void *arg)
 			opt_type = TEAM_OPTION_TYPE_STRING;
 			break;
 		default:
-			printf("unknown nla_type received.\n");
+			err(th, "unknown nla_type received.\n");
 			continue;
 		}
 
@@ -1107,7 +1107,7 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 	int grp_id;
 
 	if (!ifindex) {
-		printf("Passed interface index %d is not valid.\n", ifindex);
+		err(th, "Passed interface index %d is not valid.\n", ifindex);
 		return -ENOENT;
 	}
 	th->ifindex = ifindex;
@@ -1116,32 +1116,32 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 
 	err = genl_connect(th->nl_sock);
 	if (err) {
-		printf("Failed to connect to netlink sock.\n");
+		err(th, "Failed to connect to netlink sock.\n");
 		return -nl2syserr(err);
 	}
 
 	err = genl_connect(th->nl_sock_event);
 	if (err) {
-		printf("Failed to connect to netlink event sock.\n");
+		err(th, "Failed to connect to netlink event sock.\n");
 		return -nl2syserr(err);
 	}
 
 	th->family = genl_ctrl_resolve(th->nl_sock, TEAM_GENL_NAME);
 	if (th->family < 0) {
-		printf("Failed to resolve netlink family.\n");
+		err(th, "Failed to resolve netlink family.\n");
 		return -nl2syserr(th->family);
 	}
 
 	grp_id = genl_ctrl_resolve_grp(th->nl_sock, TEAM_GENL_NAME,
 				       TEAM_GENL_CHANGE_EVENT_MC_GRP_NAME);
 	if (grp_id < 0) {
-		printf("Failed to resolve netlink multicast groups.\n");
+		err(th, "Failed to resolve netlink multicast groups.\n");
 		return -nl2syserr(grp_id);
 	}
 
 	err = nl_socket_add_membership(th->nl_sock_event, grp_id);
 	if (err < 0) {
-		printf("Failed to add netlink membership.\n");
+		err(th, "Failed to add netlink membership.\n");
 		return -nl2syserr(err);
 	}
 
@@ -1156,13 +1156,13 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 
 	err = get_port_list(th);
 	if (err) {
-		printf("Failed to get port list.\n");
+		err(th, "Failed to get port list.\n");
 		return err;
 	}
 
 	err = get_options(th);
 	if (err) {
-		printf("Failed to get options.\n");
+		err(th, "Failed to get options.\n");
 		return err;
 	}
 
