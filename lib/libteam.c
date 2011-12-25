@@ -97,6 +97,7 @@ static void log_stderr(struct team_handle *th, int priority,
 {
 	fprintf(stderr, "libteam: %s: ", fn);
 	vfprintf(stderr, format, args);
+	fprintf(stderr, "\n");
 }
 
 static int log_priority(const char *priority)
@@ -354,17 +355,17 @@ static int get_port_list_handler(struct nl_msg *msg, void *arg)
 
 		if (nla_parse_nested(port_attrs, TEAM_ATTR_PORT_MAX,
 				     nl_port, NULL)) {
-			err(th, "failed to parse nested attributes.\n");
+			err(th, "Failed to parse nested attributes.");
 			return NL_SKIP;
 		}
 
 		if (!port_attrs[TEAM_ATTR_PORT_IFINDEX]) {
-			err(th, "ifindex port attribute not found\n");
+			err(th, "ifindex port attribute not found.");
 			return NL_SKIP;
 		}
 		port = malloc(sizeof(struct team_port));
 		if (!port) {
-			err(th, "malloc failed.\n");
+			err(th, "Malloc failed.");
 			return NL_SKIP;
 		}
 		memset(port, 0, sizeof(struct team_port));
@@ -603,7 +604,7 @@ static int get_options_handler(struct nl_msg *msg, void *arg)
 
 		if (nla_parse_nested(option_attrs, TEAM_ATTR_OPTION_MAX,
 				     nl_option, NULL)) {
-			err(th, "failed to parse nested attributes.\n");
+			err(th, "Failed to parse nested attributes.");
 			return NL_SKIP;
 		}
 
@@ -614,7 +615,7 @@ static int get_options_handler(struct nl_msg *msg, void *arg)
 		}
 		name = nla_get_string(option_attrs[TEAM_ATTR_OPTION_NAME]);
 		if (__find_option(&tmp_list, name)) {
-			err(th, "option named \"%s\" is already in list.\n", name);
+			err(th, "Option named \"%s\" is already in list.", name);
 			continue;
 		}
 
@@ -638,7 +639,7 @@ static int get_options_handler(struct nl_msg *msg, void *arg)
 			opt_type = TEAM_OPTION_TYPE_STRING;
 			break;
 		default:
-			err(th, "unknown nla_type received.\n");
+			err(th, "Unknown nla_type received.");
 			continue;
 		}
 
@@ -960,8 +961,8 @@ struct team_handle *team_alloc(void)
 	if (env != NULL)
 		team_set_log_priority(th, log_priority(env));
 
-	info(th, "team_handle %p created\n", th);
-	dbg(th, "log_priority=%d\n", th->log_priority);
+	info(th, "team_handle %p created.", th);
+	dbg(th, "log_priority=%d", th->log_priority);
 
 	list_init(&th->port_list);
 	list_init(&th->option_list);
@@ -1107,7 +1108,7 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 	int grp_id;
 
 	if (!ifindex) {
-		err(th, "Passed interface index %d is not valid.\n", ifindex);
+		err(th, "Passed interface index %d is not valid.", ifindex);
 		return -ENOENT;
 	}
 	th->ifindex = ifindex;
@@ -1116,32 +1117,32 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 
 	err = genl_connect(th->nl_sock);
 	if (err) {
-		err(th, "Failed to connect to netlink sock.\n");
+		err(th, "Failed to connect to netlink sock.");
 		return -nl2syserr(err);
 	}
 
 	err = genl_connect(th->nl_sock_event);
 	if (err) {
-		err(th, "Failed to connect to netlink event sock.\n");
+		err(th, "Failed to connect to netlink event sock.");
 		return -nl2syserr(err);
 	}
 
 	th->family = genl_ctrl_resolve(th->nl_sock, TEAM_GENL_NAME);
 	if (th->family < 0) {
-		err(th, "Failed to resolve netlink family.\n");
+		err(th, "Failed to resolve netlink family.");
 		return -nl2syserr(th->family);
 	}
 
 	grp_id = genl_ctrl_resolve_grp(th->nl_sock, TEAM_GENL_NAME,
 				       TEAM_GENL_CHANGE_EVENT_MC_GRP_NAME);
 	if (grp_id < 0) {
-		err(th, "Failed to resolve netlink multicast groups.\n");
+		err(th, "Failed to resolve netlink multicast groups.");
 		return -nl2syserr(grp_id);
 	}
 
 	err = nl_socket_add_membership(th->nl_sock_event, grp_id);
 	if (err < 0) {
-		err(th, "Failed to add netlink membership.\n");
+		err(th, "Failed to add netlink membership.");
 		return -nl2syserr(err);
 	}
 
@@ -1156,13 +1157,13 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 
 	err = get_port_list(th);
 	if (err) {
-		err(th, "Failed to get port list.\n");
+		err(th, "Failed to get port list.");
 		return err;
 	}
 
 	err = get_options(th);
 	if (err) {
-		err(th, "Failed to get options.\n");
+		err(th, "Failed to get options.");
 		return err;
 	}
 
@@ -1205,7 +1206,7 @@ void team_set_log_fn(struct team_handle *th,
 				    const char *format, va_list args))
 {
 	th->log_fn = log_fn;
-	info(th, "custom logging function %p registered\n", log_fn);
+	info(th, "Custom logging function %p registered.", log_fn);
 }
 
 /**
