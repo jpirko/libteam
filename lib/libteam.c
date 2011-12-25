@@ -961,7 +961,7 @@ struct team_handle *team_alloc(void)
 	if (env != NULL)
 		team_set_log_priority(th, log_priority(env));
 
-	info(th, "team_handle %p created.", th);
+	dbg(th, "team_handle %p created.", th);
 	dbg(th, "log_priority=%d", th->log_priority);
 
 	list_init(&th->port_list);
@@ -1206,7 +1206,7 @@ void team_set_log_fn(struct team_handle *th,
 				    const char *format, va_list args))
 {
 	th->log_fn = log_fn;
-	info(th, "Custom logging function %p registered.", log_fn);
+	dbg(th, "Custom logging function %p registered.", log_fn);
 }
 
 /**
