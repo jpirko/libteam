@@ -23,10 +23,7 @@
 #include <json/json.h>
 #include <team.h>
 
-#define teamd_log_err(args...) daemon_log(LOG_ERR, ##args)
-#define teamd_log_warn(args...) daemon_log(LOG_WARNING, ##args)
-#define teamd_log_info(args...) daemon_log(LOG_INFO, ##args)
-#define teamd_log_dbg(args...) daemon_log(LOG_DEBUG, ##args)
+#include "teamd.h"
 
 static void libteam_log_daemon(struct team_handle *th, int priority,
 			       const char *file, int line, const char *fn,
@@ -34,27 +31,6 @@ static void libteam_log_daemon(struct team_handle *th, int priority,
 {
 	daemon_logv(priority, format, args);
 }
-
-enum teamd_command {
-	DAEMON_CMD_RUN,
-	DAEMON_CMD_KILL,
-	DAEMON_CMD_VERSION,
-	DAEMON_CMD_HELP,
-	DAEMON_CMD_CHECK
-};
-
-struct teamd_context {
-	enum teamd_command	cmd;
-	bool			daemonize;
-	bool			debug;
-	bool			force_recreate;
-	char *			config_file;
-	char *			config_text;
-	json_object *		config_jso;
-	char *			pid_file;
-	char *			argv0;
-	struct team_handle *	th;
-};
 
 static char **__g_pid_file;
 
