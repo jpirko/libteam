@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <unistd.h>
 #include <getopt.h>
 #include <errno.h>
@@ -34,22 +35,35 @@ static void libteam_log_daemon(struct team_handle *th, int priority,
 
 static char **__g_pid_file;
 
-static const char *teamd_cfg_get_str(const struct teamd_context *ctx,
-				     const char *query)
+static int teamd_cfg_get_str(const struct teamd_context *ctx, const char **dst,
+			     const char *query, ...)
 {
 	json_object *jso;
+	va_list arglist;
+	char *qbuffer;
+	int err;
 
-	jso = json_object_simple_query(ctx->config_jso, query);
+	va_start(arglist, query);
+	err = vasprintf(&qbuffer, query, arglist);
+	va_end(arglist);
+	if (err == -1) {
+		free(qbuffer);
+		return -errno;
+	}
+	teamd_log_dbg("Query: \"%s\".", qbuffer);
+	jso = json_object_simple_query(ctx->config_jso, qbuffer);
+	free(qbuffer);
 	if (!jso) {
-		teamd_log_err("Config string get failed. No such object (query: %s)", query);
-		return NULL;
+		teamd_log_dbg("Config string get failed. No such object.");
+		return -ENOENT;
 	}
 	if (json_object_get_type(jso) != json_type_string) {
-		teamd_log_err("Config string get failed. Object has different type (query: %s)", query);
-		return NULL;
+		teamd_log_dbg("Config string get failed. Object has different type.");
+		return -EINVAL;
 	}
 
-	return json_object_get_string(jso);
+	*dst = json_object_get_string(jso);
+	return 0;
 }
 
 static void print_help(const struct teamd_context *ctx) {
@@ -282,10 +296,10 @@ static int teamd_init(struct teamd_context *ctx)
 		teamd_log_err("Failed to load config.");
 		return err;
 	}
-	team_name = teamd_cfg_get_str(ctx, "['device']");
-	if (!team_name) {
+	err = teamd_cfg_get_str(ctx, &team_name, "['device']");
+	if (err) {
 		teamd_log_err("Failed to get team device name.");
-		return -ENOENT;
+		return err;
 	}
 	teamd_log_dbg("Using team device \"%s\".", team_name);
 
