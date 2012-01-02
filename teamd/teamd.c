@@ -285,6 +285,27 @@ static int load_config(struct teamd_context *ctx)
 	return 0;
 }
 
+static int teamd_check_change_hwaddr(struct teamd_context *ctx,
+				     uint32_t ifindex)
+{
+	int err;
+	const char *hwaddr_str;
+	char hwaddr[6];
+
+	err = teamd_cfg_get_str(ctx, &hwaddr_str, "['hwaddr']");
+	if (err)
+		return 0; /* addr is not defined in config, no change needed */
+
+	teamd_log_dbg("Hwaddr string: \"%s\".", hwaddr_str);
+	err = sscanf(hwaddr_str, "%02x:%02x:%02x:%02x:%02x:%02x",
+		     &hwaddr[0], &hwaddr[1], &hwaddr[2],
+		     &hwaddr[3], &hwaddr[4], &hwaddr[5]);
+	if (err != 6)
+		return -EINVAL;
+
+	return team_hwaddr_set(ctx->th, ifindex, hwaddr, 6);
+}
+
 static int teamd_add_ports(struct teamd_context *ctx)
 {
 	int i;
@@ -355,6 +376,13 @@ static int teamd_init(struct teamd_context *ctx)
 		teamd_log_err("Team init failed.");
 		goto team_destroy;
 	}
+
+	err = teamd_check_change_hwaddr(ctx, ifindex);
+	if (err) {
+		teamd_log_err("Hardware address change failed.");
+		goto team_destroy;
+	}
+
 
 	err = teamd_add_ports(ctx);
 	if (err) {
