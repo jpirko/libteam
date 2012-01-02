@@ -41,4 +41,7 @@ struct teamd_context {
 	struct team_handle *	th;
 };
 
+#define teamd_for_each_port(i, cur, ctx)	\
+	for (i = 0; teamd_cfg_get_str(ctx, &cur, "['ports'][%d]", i) == 0; i++)
+
 #endif /* _TEAMD_H_ */

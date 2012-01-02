@@ -285,6 +285,27 @@ static int load_config(struct teamd_context *ctx)
 	return 0;
 }
 
+static int teamd_add_ports(struct teamd_context *ctx)
+{
+	int i;
+	const char *port_name;
+	int err;
+	uint32_t ifindex;
+
+	teamd_for_each_port(i, port_name, ctx) {
+		ifindex = team_ifname2ifindex(ctx->th, port_name);
+		teamd_log_dbg("Adding port \"%s\" (found ifindex \"%d\").",
+			      port_name, ifindex);
+		err = team_port_add(ctx->th, ifindex);
+		if (err) {
+			teamd_log_err("Failed to add port \"%s\".", port_name);
+			return err;
+		}
+	}
+
+	return 0;
+}
+
 static int teamd_init(struct teamd_context *ctx)
 {
 	int err;
@@ -332,6 +353,12 @@ static int teamd_init(struct teamd_context *ctx)
 	err = team_init(ctx->th, ifindex);
 	if (err) {
 		teamd_log_err("Team init failed.");
+		goto team_destroy;
+	}
+
+	err = teamd_add_ports(ctx);
+	if (err) {
+		teamd_log_err("Failed to add ports.");
 		goto team_destroy;
 	}
 
