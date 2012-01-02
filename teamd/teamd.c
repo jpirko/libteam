@@ -100,13 +100,6 @@ static int parse_command_line(struct teamd_context *ctx,
 		{ "force-recreate",	no_argument,		NULL, 'r' },
 		{ NULL, 0, NULL, 0 }
 	};
-	char *argv0;
-
-	if ((argv0 = strrchr(argv[0], '/')))
-		argv0 = strdup(argv0 + 1);
-	else
-		argv0 = strdup(argv[0]);
-	ctx->argv0 = argv0;
 
 	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:gr",
 				  long_options, NULL)) >= 0) {
@@ -522,7 +515,6 @@ static void teamd_context_fini(struct teamd_context *ctx)
 	free(ctx->config_text);
 	free(ctx->config_file);
 	free(ctx->pid_file);
-	free(ctx->argv0);
 	free(ctx);
 }
 
@@ -545,6 +537,7 @@ int main(int argc, char **argv)
 	if (ctx->debug)
 		daemon_set_verbosity(LOG_DEBUG);
 
+	ctx->argv0 = daemon_ident_from_argv0(argv[0]);
 	daemon_log_ident = ctx->argv0;
 	daemon_pid_file_ident = ctx->argv0;
 
