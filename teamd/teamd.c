@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <unistd.h>
+#include <ctype.h>
 #include <getopt.h>
 #include <errno.h>
 #include <signal.h>
@@ -306,25 +307,73 @@ static int load_config(struct teamd_context *ctx)
 	return 0;
 }
 
+static int parse_hwaddr(const char *hwaddr_str, char **phwaddr,
+			unsigned int *plen)
+{
+	const char *pos = hwaddr_str;
+	unsigned int byte_count = 0;
+	unsigned int tmp;
+	int err;
+	char *hwaddr = NULL;
+	char *new_hwaddr;
+	char *endptr;
+
+	while (true) {
+		errno = 0;
+		tmp = strtoul(pos, &endptr, 16);
+		if (errno != 0 || tmp > 0xFF) {
+			err = -EINVAL;
+			goto err_out;
+		}
+		byte_count++;
+		new_hwaddr = realloc(hwaddr, sizeof(char) * byte_count);
+		if (!new_hwaddr) {
+			err = -ENOMEM;
+			goto err_out;
+		}
+		hwaddr = new_hwaddr;
+		hwaddr[byte_count - 1] = (char) tmp;
+		while (isspace(endptr[0]) && endptr[0] != '\0')
+			endptr++;
+		if (endptr[0] == ':') {
+			pos = endptr + 1;
+		} else if (endptr[0] == '\0') {
+			break;
+		} else {
+			err = -EINVAL;
+			goto err_out;
+		}
+	}
+	*phwaddr = hwaddr;
+	*plen = byte_count;
+	return 0;
+err_out:
+	free(hwaddr);
+	return err;
+}
+
 static int teamd_check_change_hwaddr(struct teamd_context *ctx,
 				     uint32_t ifindex)
 {
 	int err;
 	const char *hwaddr_str;
-	char hwaddr[6];
+	char *hwaddr;
+	unsigned int hwaddr_len;
 
 	err = teamd_cfg_get_str(ctx, &hwaddr_str, "['hwaddr']");
 	if (err)
 		return 0; /* addr is not defined in config, no change needed */
 
 	teamd_log_dbg("Hwaddr string: \"%s\".", hwaddr_str);
-	err = sscanf(hwaddr_str, "%02x:%02x:%02x:%02x:%02x:%02x",
-		     &hwaddr[0], &hwaddr[1], &hwaddr[2],
-		     &hwaddr[3], &hwaddr[4], &hwaddr[5]);
-	if (err != 6)
-		return -EINVAL;
+	err = parse_hwaddr(hwaddr_str, &hwaddr, &hwaddr_len);
+	if (err) {
+		teamd_log_err("Failed to parse hardware address.");
+		return err;
+	}
 
-	return team_hwaddr_set(ctx->th, ifindex, hwaddr, 6);
+	err = team_hwaddr_set(ctx->th, ifindex, hwaddr, hwaddr_len);
+	free(hwaddr);
+	return err;
 }
 
 static int teamd_add_ports(struct teamd_context *ctx)
