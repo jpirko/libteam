@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <team.h>
 
 #define APPNAME "team_manual_control"
@@ -32,7 +33,6 @@ static char *get_port_name(struct team_handle *th, uint32_t ifindex)
 
 static int cmd_dumplist(struct team_handle *th, int argc, char **argv)
 {
-	int err;
 	char *opt;
 
 	if (argc == 1) {
@@ -205,6 +205,6 @@ int main(int argc, char **argv)
 		usage();
 	}
 
-out:
 	team_free(th);
+	return 0;
 }

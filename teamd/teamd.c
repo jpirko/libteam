@@ -100,7 +100,7 @@ static void print_help(const struct teamd_context *ctx) {
             "    -c --config=TEXT         Use given config string (This causes configuration\n"
 	    "                             file will be ignored)\n"
             "    -p --pid-file=FILE       Use the specified PID file\n"
-            "    -g --debug               Increase verbosity\n",
+            "    -g --debug               Increase verbosity\n"
             "    -r --force-recreate      Force team device recreation in case it\n"
             "                             already exists\n",
             ctx->argv0);

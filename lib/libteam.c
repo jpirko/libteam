@@ -155,7 +155,6 @@ static int send_and_recv(struct team_handle *th, struct nl_msg *msg,
 			 int (*valid_handler)(struct nl_msg *, void *),
 			 void *valid_data)
 {
-	struct nl_cb *cb;
 	int err = -ENOMEM;
 
 	err = nl_send_auto_complete(th->nl_sock, msg);
