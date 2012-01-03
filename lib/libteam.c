@@ -525,8 +525,9 @@ static void flush_option_list(struct team_handle *th)
 	}
 }
 
-static struct team_option *create_option(char *name, int opt_type, void *data,
-					 int data_size, bool changed)
+static struct team_option *create_option(char *name, int opt_type,
+					 void *data, int data_size,
+					 bool changed)
 {
 	struct team_option *option;
 
@@ -558,7 +559,8 @@ err_alloc_name:
 	return NULL;
 }
 
-static struct team_option *__find_option(struct list_item *opt_head, char *name)
+static struct team_option *__find_option(struct list_item *opt_head,
+					 const char *name)
 {
 	struct team_option *option;
 
@@ -689,7 +691,8 @@ nla_put_failure:
  * Returns: pointer to option structure or NULL in case option is not found.
  **/
 TEAM_EXPORT
-struct team_option *team_get_option_by_name(struct team_handle *th, char *name)
+struct team_option *team_get_option_by_name(struct team_handle *th,
+					    const char *name)
 {
 	return __find_option(&th->option_list, name);
 }
@@ -793,7 +796,7 @@ bool team_is_option_changed(struct team_option *option)
  **/
 TEAM_EXPORT
 int team_get_option_value_by_name_u32(struct team_handle *th,
-				      char *name, uint32_t *u32_ptr)
+				      const char *name, uint32_t *u32_ptr)
 {
 	struct team_option *option;
 
@@ -817,7 +820,7 @@ int team_get_option_value_by_name_u32(struct team_handle *th,
  **/
 TEAM_EXPORT
 int team_get_option_value_by_name_string(struct team_handle *th,
-					 char *name, char **str_ptr)
+					 const char *name, char **str_ptr)
 {
 	struct team_option *option;
 
@@ -829,7 +832,7 @@ int team_get_option_value_by_name_string(struct team_handle *th,
 }
 
 static int set_option_value(struct team_handle *th, const char *opt_name,
-			    void *data, int opt_type)
+			    const void *data, int opt_type)
 {
 	struct nl_msg *msg;
 	struct nlattr *option_list;
@@ -894,7 +897,7 @@ nla_put_failure:
  **/
 TEAM_EXPORT
 int team_set_option_value_by_name_u32(struct team_handle *th,
-				      char *name, uint32_t val)
+				      const char *name, uint32_t val)
 {
 	return set_option_value(th, name, &val, TEAM_OPTION_TYPE_U32);
 }
@@ -911,7 +914,7 @@ int team_set_option_value_by_name_u32(struct team_handle *th,
  **/
 TEAM_EXPORT
 int team_set_option_value_by_name_string(struct team_handle *th,
-					 char *name, char *str)
+					 const char *name, const char *str)
 {
 	return set_option_value(th, name, str, TEAM_OPTION_TYPE_STRING);
 }
@@ -1323,7 +1326,7 @@ int team_get_mode_name(struct team_handle *th, char **mode_name)
  * Returns: zero on success or negative number in case of an error.
  **/
 TEAM_EXPORT
-int team_set_mode_name(struct team_handle *th, char *mode_name)
+int team_set_mode_name(struct team_handle *th, const char *mode_name)
 {
 	return team_set_option_value_by_name_string(th, "mode", mode_name);
 }

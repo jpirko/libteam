@@ -40,7 +40,7 @@ int team_get_event_fd(struct team_handle *th);
 void team_process_event(struct team_handle *th);
 void team_check_events(struct team_handle *th);
 int team_get_mode_name(struct team_handle *th, char **mode_name);
-int team_set_mode_name(struct team_handle *th, char *mode_name);
+int team_set_mode_name(struct team_handle *th, const char *mode_name);
 int team_get_active_port(struct team_handle *th, uint32_t *ifindex);
 int team_set_active_port(struct team_handle *th, uint32_t ifindex);
 
@@ -77,7 +77,8 @@ enum team_option_type {
 
 struct team_option;
 
-struct team_option *team_get_option_by_name(struct team_handle *th, char *name);
+struct team_option *team_get_option_by_name(struct team_handle *th,
+					    const char *name);
 struct team_option *team_get_next_option(struct team_handle *th,
 					 struct team_option *option);
 #define team_for_each_option(port, th)				\
@@ -90,14 +91,14 @@ uint32_t team_get_option_value_u32(struct team_option *option);
 char *team_get_option_value_string(struct team_option *option);
 bool team_is_option_changed(struct team_option *option);
 int team_get_option_value_by_name_u32(struct team_handle *th,
-				      char *name, uint32_t *u32_ptr);
+				      const char *name, uint32_t *u32_ptr);
 int team_get_option_value_by_name_string(struct team_handle *th,
-					 char *name, char **str_ptr);
+					 const char *name, char **str_ptr);
 /* option setters */
 int team_set_option_value_by_name_u32(struct team_handle *th,
-				      char *name, uint32_t val);
+				      const char *name, uint32_t val);
 int team_set_option_value_by_name_string(struct team_handle *th,
-					 char *name, char *str);
+					 const char *name, const char *str);
 
 /*
  * team_change_handler
