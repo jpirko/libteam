@@ -12,6 +12,7 @@
 
 #include <stdbool.h>
 #include <libdaemon/dlog.h>
+#include <sys/types.h>
 #include <json/json.h>
 #include <team.h>
 
@@ -28,6 +29,8 @@ enum teamd_command {
 	DAEMON_CMD_CHECK
 };
 
+struct teamd_runner;
+
 struct teamd_context {
 	enum teamd_command	cmd;
 	bool			daemonize;
@@ -39,9 +42,22 @@ struct teamd_context {
 	char *			pid_file;
 	char *			argv0;
 	struct team_handle *	th;
+	const struct teamd_runner *	runner;
+	void *			runner_priv;
+};
+
+struct teamd_runner {
+	const char *name;
+	const char *team_mode_name;
+	size_t priv_size;
+	int (*init)(struct teamd_context *ctx);
+	void (*fini)(struct teamd_context *ctx);
 };
 
 #define teamd_for_each_port(i, cur, ctx)	\
 	for (i = 0; teamd_cfg_get_str(ctx, &cur, "['ports'][%d]", i) == 0; i++)
+
+/* Runner structures */
+const struct teamd_runner teamd_runner_dummy;
 
 #endif /* _TEAMD_H_ */

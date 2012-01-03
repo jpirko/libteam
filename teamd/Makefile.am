@@ -9,4 +9,4 @@ teamd_CFLAGS= $(LIBDAEMON_CFLAGS) $(LIBJSON_CFLAGS) -I${top_srcdir}/include -D_G
 teamd_LDADD = $(top_builddir)/lib/libteam.la $(LIBDAEMON_LIBS) $(LIBJSON_LIBS)
 
 bin_PROGRAMS=teamd
-teamd_SOURCES=teamd.c
+teamd_SOURCES=teamd.c teamd_runner_basic_ones.c

@@ -26,6 +26,25 @@
 
 #include "teamd.h"
 
+static const struct teamd_runner *teamd_runner_list[] = {
+	&teamd_runner_dummy,
+};
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+#define TEAMD_RUNNER_LIST_SIZE ARRAY_SIZE(teamd_runner_list)
+
+static const struct teamd_runner *teamd_find_runner(const char *runner_name)
+{
+	int i;
+
+	for (i = 0; i < TEAMD_RUNNER_LIST_SIZE; i++) {
+		if (strcmp(teamd_runner_list[i]->name, runner_name) == 0)
+			return teamd_runner_list[i];
+	}
+	return NULL;
+}
+
+
 static void libteam_log_daemon(struct team_handle *th, int priority,
 			       const char *file, int line, const char *fn,
 			       const char *format, va_list args)
@@ -67,6 +86,8 @@ static int teamd_cfg_get_str(const struct teamd_context *ctx, const char **dst,
 }
 
 static void print_help(const struct teamd_context *ctx) {
+	int i;
+
 	printf(
             "%s [options]\n"
             "    -h --help                Show this help\n"
@@ -82,6 +103,13 @@ static void print_help(const struct teamd_context *ctx) {
             "    -r --force-recreate      Force team device recreation in case it\n"
             "                             already exists\n",
             ctx->argv0);
+	printf("Available runners: ");
+	for (i = 0; i < TEAMD_RUNNER_LIST_SIZE; i++) {
+		if (i != 0)
+			printf(", ");
+		printf("%s", teamd_runner_list[i]->name);
+	}
+	printf("\n");
 }
 
 static int parse_command_line(struct teamd_context *ctx,
@@ -320,6 +348,58 @@ static int teamd_add_ports(struct teamd_context *ctx)
 	return 0;
 }
 
+static int teamd_runner_init(struct teamd_context *ctx)
+{
+	int err;
+	const char *runner_name;
+
+	err = teamd_cfg_get_str(ctx, &runner_name, "['runner']");
+	if (err) {
+		teamd_log_err("Failed to get team runner name from config.");
+		return err;
+	}
+	teamd_log_dbg("Using team runner \"%s\".", runner_name);
+	ctx->runner = teamd_find_runner(runner_name);
+	if (!ctx->runner) {
+		teamd_log_err("No runner named \"%s\" available.", runner_name);
+		return -ENOENT;
+	}
+
+	if (ctx->runner->team_mode_name) {
+		err = team_set_mode_name(ctx->th, ctx->runner->team_mode_name);
+		if (err) {
+			teamd_log_err("Failed to set team mode \"%s\".",
+				      ctx->runner->team_mode_name);
+			return err;
+		}
+	} else {
+		teamd_log_warn("Note \"%s\" runner does not select team mode resulting in no functionality!",
+			       runner_name);
+	}
+
+	if (ctx->runner->priv_size) {
+		ctx->runner_priv = malloc(ctx->runner->priv_size);
+		if (!ctx->runner_priv)
+			return -ENOMEM;
+	}
+
+	if (ctx->runner->init) {
+		err = ctx->runner->init(ctx);
+		if (err) {
+			free(ctx->runner_priv);
+			return err;
+		}
+	}
+	return 0;
+}
+
+static void teamd_runner_fini(struct teamd_context *ctx)
+{
+	if (ctx->runner->fini)
+		ctx->runner->fini(ctx);
+	free(ctx->runner_priv);
+}
+
 static int teamd_init(struct teamd_context *ctx)
 {
 	int err;
@@ -376,15 +456,22 @@ static int teamd_init(struct teamd_context *ctx)
 		goto team_destroy;
 	}
 
+	err = teamd_runner_init(ctx);
+	if (err) {
+		teamd_log_err("Failed to init runner.");
+		goto team_destroy;
+	}
 
 	err = teamd_add_ports(ctx);
 	if (err) {
 		teamd_log_err("Failed to add ports.");
-		goto team_destroy;
+		goto runner_fini;
 	}
 
 	return 0;
 
+runner_fini:
+	teamd_runner_fini(ctx);
 team_destroy:
 	team_destroy(ctx->th);
 team_free:
@@ -394,6 +481,7 @@ team_free:
 
 static void teamd_fini(struct teamd_context *ctx)
 {
+	teamd_runner_fini(ctx);
 	team_destroy(ctx->th);
 	team_free(ctx->th);
 }
