@@ -59,5 +59,6 @@ struct teamd_runner {
 
 /* Runner structures */
 const struct teamd_runner teamd_runner_dummy;
+const struct teamd_runner teamd_runner_roundrobin;
 
 #endif /* _TEAMD_H_ */

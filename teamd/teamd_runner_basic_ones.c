@@ -12,3 +12,8 @@
 const struct teamd_runner teamd_runner_dummy = {
 	.name = "dummy",
 };
+
+const struct teamd_runner teamd_runner_roundrobin = {
+	.name		= "roundrobin",
+	.team_mode_name	= "roundrobin",
+};

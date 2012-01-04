@@ -29,6 +29,7 @@
 
 static const struct teamd_runner *teamd_runner_list[] = {
 	&teamd_runner_dummy,
+	&teamd_runner_roundrobin,
 };
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
