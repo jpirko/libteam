@@ -62,5 +62,10 @@ struct teamd_runner {
 /* Runner structures */
 const struct teamd_runner teamd_runner_dummy;
 const struct teamd_runner teamd_runner_roundrobin;
+const struct teamd_runner teamd_runner_activebackup;
+
+/* Various helpers */
+char *dev_name(const struct teamd_context *ctx, uint32_t ifindex);
+char *dev_name_dup(const struct teamd_context *ctx, uint32_t ifindex);
 
 #endif /* _TEAMD_H_ */

@@ -17,6 +17,8 @@
 #include <errno.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <sys/socket.h>
+#include <linux/netdevice.h>
 #include <sys/syslog.h>
 #include <libdaemon/dfork.h>
 #include <libdaemon/dsignal.h>
@@ -27,9 +29,27 @@
 
 #include "teamd.h"
 
+/* For purpose of immediate use, e.g. print */
+char *dev_name(const struct teamd_context *ctx, uint32_t ifindex)
+{
+	static char ifname[IFNAMSIZ];
+
+	return team_ifindex2ifname(ctx->th, ifindex, ifname, sizeof(ifname));
+}
+
+char *dev_name_dup(const struct teamd_context *ctx, uint32_t ifindex)
+{
+	char *ifname = dev_name(ctx, ifindex);
+
+	if (!ifname)
+		return NULL;
+	return strdup(ifname);
+}
+
 static const struct teamd_runner *teamd_runner_list[] = {
 	&teamd_runner_dummy,
 	&teamd_runner_roundrobin,
+	&teamd_runner_activebackup,
 };
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
