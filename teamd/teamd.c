@@ -435,6 +435,7 @@ static int teamd_runner_init(struct teamd_context *ctx)
 		ctx->runner_priv = malloc(ctx->runner->priv_size);
 		if (!ctx->runner_priv)
 			return -ENOMEM;
+		memset(ctx->runner_priv, 0, ctx->runner->priv_size);
 	}
 
 	if (ctx->runner->init) {
