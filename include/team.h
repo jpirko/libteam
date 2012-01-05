@@ -142,6 +142,7 @@ int team_hwaddr_set(struct team_handle *th, uint32_t ifindex,
 		    const char *addr, unsigned int addr_len);
 int team_hwaddr_get(struct team_handle *th, uint32_t ifindex,
 		    char *addr, unsigned int addr_len);
+int team_hwaddr_len_get(struct team_handle *th, uint32_t ifindex);
 
 #ifdef __cplusplus
 } /* extern "C" */

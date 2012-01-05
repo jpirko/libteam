@@ -1526,3 +1526,36 @@ errout:
 	rtnl_link_put(link);
 	return err;
 }
+
+/**
+ * team_hwaddr_len_get:
+ * @th: libteam library context
+ * @ifindex: interface index
+ *
+ * Gets length of hardware address (MAC) of network interface by given
+ * interface index.
+ *
+ * Returns: number of bytes on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_hwaddr_len_get(struct team_handle *th, uint32_t ifindex)
+{
+	struct rtnl_link *link;
+	int err;
+	struct nl_addr *nl_addr;
+
+	err = rtnl_link_get_kernel(th->nl_cli.sock, ifindex, NULL, &link);
+	if (err)
+		return -nl2syserr(err);
+	nl_addr = rtnl_link_get_addr(link);
+	if (!nl_addr) {
+		err = -ENOENT;
+		goto errout;
+	}
+
+	err = nl_addr_get_len(nl_addr);
+
+errout:
+	rtnl_link_put(link);
+	return err;
+}
