@@ -353,8 +353,7 @@ err_out:
 	return err;
 }
 
-static int teamd_check_change_hwaddr(struct teamd_context *ctx,
-				     uint32_t ifindex)
+static int teamd_check_change_hwaddr(struct teamd_context *ctx)
 {
 	int err;
 	const char *hwaddr_str;
@@ -372,7 +371,7 @@ static int teamd_check_change_hwaddr(struct teamd_context *ctx,
 		return err;
 	}
 
-	err = team_hwaddr_set(ctx->th, ifindex, hwaddr, hwaddr_len);
+	err = team_hwaddr_set(ctx->th, ctx->ifindex, hwaddr, hwaddr_len);
 	free(hwaddr);
 	return err;
 }
@@ -454,7 +453,6 @@ static int teamd_init(struct teamd_context *ctx)
 {
 	int err;
 	const char *team_name;
-	uint32_t ifindex;
 
 	err = load_config(ctx);
 	if (err) {
@@ -487,20 +485,20 @@ static int teamd_init(struct teamd_context *ctx)
 		goto team_free;
 	}
 
-	ifindex = team_ifname2ifindex(ctx->th, team_name);
-	if (!ifindex) {
+	ctx->ifindex = team_ifname2ifindex(ctx->th, team_name);
+	if (!ctx->ifindex) {
 		teamd_log_err("Netdevice \"%s\" not found.", team_name);
 		err = -ENOENT;
 		goto team_destroy;
 	}
 
-	err = team_init(ctx->th, ifindex);
+	err = team_init(ctx->th, ctx->ifindex);
 	if (err) {
 		teamd_log_err("Team init failed.");
 		goto team_destroy;
 	}
 
-	err = teamd_check_change_hwaddr(ctx, ifindex);
+	err = teamd_check_change_hwaddr(ctx);
 	if (err) {
 		teamd_log_err("Hardware address change failed.");
 		goto team_destroy;
