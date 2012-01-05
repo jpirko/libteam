@@ -498,6 +498,13 @@ static int teamd_init(struct teamd_context *ctx)
 		goto team_destroy;
 	}
 
+	ctx->hwaddr_len = team_hwaddr_len_get(ctx->th, ctx->ifindex);
+	if (ctx->hwaddr_len < 0) {
+		teamd_log_err("Failed to get hardware address length.");
+		err = ctx->hwaddr_len;
+		goto team_destroy;
+	}
+
 	err = teamd_check_change_hwaddr(ctx);
 	if (err) {
 		teamd_log_err("Hardware address change failed.");

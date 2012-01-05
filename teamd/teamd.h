@@ -45,6 +45,7 @@ struct teamd_context {
 	const struct teamd_runner *	runner;
 	void *			runner_priv;
 	uint32_t		ifindex;
+	uint32_t		hwaddr_len;
 };
 
 struct teamd_runner {
