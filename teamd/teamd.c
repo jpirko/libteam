@@ -371,6 +371,11 @@ static int teamd_check_change_hwaddr(struct teamd_context *ctx)
 		return err;
 	}
 
+	if (hwaddr_len != ctx->hwaddr_len) {
+		teamd_log_err("Passed hardware address has different length (%d) than team device has (%d).",
+			      hwaddr_len, ctx->hwaddr_len);
+		return -EINVAL;
+	}
 	err = team_hwaddr_set(ctx->th, ctx->ifindex, hwaddr, hwaddr_len);
 	free(hwaddr);
 	return err;
