@@ -28,6 +28,7 @@
 #include <team.h>
 
 #include "teamd.h"
+#include "teamd_json_extras.h"
 
 /* For purpose of immediate use, e.g. print */
 char *dev_name(const struct teamd_context *ctx, uint32_t ifindex)
@@ -92,7 +93,7 @@ static int teamd_cfg_get_str(const struct teamd_context *ctx, const char **dst,
 		return -errno;
 	}
 	teamd_log_dbg("Query: \"%s\".", qbuffer);
-	jso = json_object_simple_query(ctx->config_jso, qbuffer);
+	jso = teamd_json_object_simple_query(ctx->config_jso, qbuffer);
 	free(qbuffer);
 	if (!jso) {
 		teamd_log_dbg("Config string get failed. No such object.");
