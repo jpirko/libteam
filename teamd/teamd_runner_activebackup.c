@@ -85,8 +85,8 @@ static void port_change_handler_func(struct team_handle *th, void *arg,
 	bool active_down = false;
 	uint32_t best_ifindex = 0;
 	char *best_ifname;
-	uint32_t best_speed;
-	uint8_t best_duplex;
+	uint32_t best_speed = 0;
+	uint8_t best_duplex = 0;
 	int err;
 
 	err = team_get_active_port(th, &active_ifindex);

@@ -345,7 +345,7 @@ static int get_port_list_handler(struct nl_msg *msg, void *arg)
 	struct nlattr *nl_port;
 	struct nlattr *port_attrs[TEAM_ATTR_PORT_MAX + 1];
 	int i;
-	uint32_t team_ifindex;
+	uint32_t team_ifindex = 0;
 	struct list_item tmp_list;
 
 	list_init(&tmp_list);
@@ -588,7 +588,7 @@ static int get_options_handler(struct nl_msg *msg, void *arg)
 	struct nlattr *nl_option;
 	struct nlattr *option_attrs[TEAM_ATTR_OPTION_MAX + 1];
 	int i;
-	uint32_t team_ifindex;
+	uint32_t team_ifindex = 0;
 	struct list_item tmp_list;
 
 	list_init(&tmp_list);
