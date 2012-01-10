@@ -10,3 +10,7 @@ teamd_LDADD = $(top_builddir)/lib/libteam.la $(LIBDAEMON_LIBS) $(LIBJSON_LIBS)
 
 bin_PROGRAMS=teamd
 teamd_SOURCES=teamd.c teamd_json_extras.c teamd_runner_basic_ones.c teamd_runner_activebackup.c
+
+EXTRA_DIST = example_configs
+
+noinst_HEADERS = teamd.h teamd_json_extras.h
