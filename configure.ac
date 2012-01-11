@@ -22,8 +22,6 @@ PKG_CHECK_MODULES([LIBJSON], [json])
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdint.h stdlib.h])
-AC_CHECK_HEADERS([linux/if_team.h], [], [AC_MSG_FAILURE( \
-[Kernel not support teaming or kernel-headers is not installed.])])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_INLINE
