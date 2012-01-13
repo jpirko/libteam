@@ -48,6 +48,7 @@ include/Makefile \
 lib/Makefile \
 src/Makefile \
 teamd/Makefile \
+man/Makefile \
 lib/libteam.pc \
 binding/Makefile \
 binding/python/Makefile \

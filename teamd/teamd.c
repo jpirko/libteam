@@ -124,8 +124,8 @@ static void print_help(const struct teamd_context *ctx) {
 	printf(
             "%s [options]\n"
             "    -h --help                Show this help\n"
-            "    -d --daemonize           Daemonize after startup (implies -s)\n"
-            "    -k --kill                Kill a running daemon\n"
+            "    -d --daemonize           Daemonize after startup\n"
+            "    -k --kill                Kill running daemon instance\n"
             "    -e --check               Return 0 if a daemon is already running\n"
             "    -V --version             Show version\n"
             "    -f --config-file=FILE    Load the specified configuration file\n"

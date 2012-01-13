@@ -2,4 +2,4 @@ MAINTAINERCLEANFILES = Makefile.in
 
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = include lib src binding examples teamd
+SUBDIRS = include lib src binding examples teamd man
