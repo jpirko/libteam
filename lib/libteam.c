@@ -30,69 +30,16 @@
 #include <linux/if_team.h>
 #include <linux/types.h>
 #include <team.h>
+#include "team_private.h"
 #include "list.h"
-
-/**
- * SECTION: team_handler
- * @short_description: libteam context
- */
-
-struct team_handle {
-	struct nl_sock *	nl_sock;
-	int			nl_sock_err;
-	struct nl_sock *	nl_sock_event;
-	int			family;
-	uint32_t		ifindex;
-	struct list_item	port_list;
-	struct list_item	option_list;
-	struct {
-		struct list_item		list;
-		team_change_type_mask_t		pending_type_mask;
-	} change_handler;
-	struct {
-		struct nl_sock *	sock;
-		struct nl_cache *	link_cache;
-	} nl_cli;
-	void (*log_fn)(struct team_handle *th, int priority,
-		       const char *file, int line, const char *fn,
-		       const char *format, va_list args);
-	int log_priority;
-};
 
 /**
  * SECTION: logging
  * @short_description: libteam logging facility
  */
-
-static inline void __attribute__((always_inline, format(printf, 2, 3)))
-team_log_null(struct team_handle *th, const char *format, ...) {}
-
-#define team_log_cond(th, prio, arg...)					\
-	do {								\
-		if (team_get_log_priority(th) >= prio)			\
-			team_log(th, prio, __FILE__, __LINE__,		\
-				 __FUNCTION__, ## arg);			\
-	} while (0)
-
-#ifdef ENABLE_LOGGING
-#  ifdef ENABLE_DEBUG
-#    define dbg(th, arg...) team_log_cond(th, LOG_DEBUG, ## arg)
-#  else
-#    define dbg(th, arg...) team_log_null(th, ## arg)
-#  endif
-#  define info(th, arg...) team_log_cond(th, LOG_INFO, ## arg)
-#  define err(th, arg...) team_log_cond(th, LOG_ERR, ## arg)
-#else
-#  define dbg(th, arg...) team_log_null(th, ## arg)
-#  define info(th, arg...) team_log_null(th, ## arg)
-#  define err(th, arg...) team_log_null(th, ## arg)
-#endif
-
-#define TEAM_EXPORT __attribute__ ((visibility("default")))
-
-static void team_log(struct team_handle *th, int priority,
-		     const char *file, int line, const char *fn,
-		     const char *format, ...)
+void team_log(struct team_handle *th, int priority,
+	      const char *file, int line, const char *fn,
+	      const char *format, ...)
 {
 	va_list args;
 
@@ -161,9 +108,9 @@ static int nl2syserr(int nl_error)
  * @short_description: Various netlink helpers
  */
 
-static int send_and_recv(struct team_handle *th, struct nl_msg *msg,
-			 int (*valid_handler)(struct nl_msg *, void *),
-			 void *valid_data)
+int send_and_recv(struct team_handle *th, struct nl_msg *msg,
+		  int (*valid_handler)(struct nl_msg *, void *),
+		  void *valid_data)
 {
 	int err = -ENOMEM;
 
@@ -229,14 +176,14 @@ struct change_handler_item {
 	struct team_change_handler *	handler;
 };
 
-static void set_call_change_handlers(struct team_handle *th,
-				     team_change_type_mask_t set_type_mask)
+void set_call_change_handlers(struct team_handle *th,
+			      team_change_type_mask_t set_type_mask)
 {
 	th->change_handler.pending_type_mask |= set_type_mask;
 }
 
-static void check_call_change_handlers(struct team_handle *th,
-				       team_change_type_mask_t call_type_mask)
+void check_call_change_handlers(struct team_handle *th,
+				team_change_type_mask_t call_type_mask)
 {
 	struct change_handler_item *handler_item;
 	team_change_type_mask_t to_call_type_mask =
@@ -311,202 +258,6 @@ void team_change_handler_unregister(struct team_handle *th,
 		return;
 	list_del(&handler_item->list);
 	free(handler_item);
-}
-
-/**
- * SECTION: Ports
- * @short_description: port getters, port_list manipulators
- */
-
-struct team_port {
-	struct list_item	list;
-	uint32_t		ifindex;
-	uint32_t		speed;
-	uint8_t			duplex;
-	bool			linkup;
-	bool			changed;
-};
-
-static void flush_port_list(struct team_handle *th)
-{
-	struct team_port *port, *tmp;
-
-	list_for_each_node_entry_safe(port, tmp, &th->port_list, list) {
-		list_del(&port->list);
-		free(port);
-	}
-}
-
-static int get_port_list_handler(struct nl_msg *msg, void *arg)
-{
-	struct nlmsghdr *nlh = nlmsg_hdr(msg);
-	struct team_handle *th = arg;
-	struct nlattr *attrs[TEAM_ATTR_MAX + 1];
-	struct nlattr *nl_port;
-	struct nlattr *port_attrs[TEAM_ATTR_PORT_MAX + 1];
-	int i;
-	uint32_t team_ifindex = 0;
-	struct list_item tmp_list;
-
-	list_init(&tmp_list);
-	genlmsg_parse(nlh, 0, attrs, TEAM_ATTR_MAX, NULL);
-	if (attrs[TEAM_ATTR_TEAM_IFINDEX])
-		team_ifindex = nla_get_u32(attrs[TEAM_ATTR_TEAM_IFINDEX]);
-
-	if (team_ifindex != th->ifindex)
-		return NL_SKIP;
-
-	if (!attrs[TEAM_ATTR_LIST_PORT])
-		return NL_SKIP;
-
-	nla_for_each_nested(nl_port, attrs[TEAM_ATTR_LIST_PORT], i) {
-		struct team_port *port;
-
-		if (nla_parse_nested(port_attrs, TEAM_ATTR_PORT_MAX,
-				     nl_port, NULL)) {
-			err(th, "Failed to parse nested attributes.");
-			return NL_SKIP;
-		}
-
-		if (!port_attrs[TEAM_ATTR_PORT_IFINDEX]) {
-			err(th, "ifindex port attribute not found.");
-			return NL_SKIP;
-		}
-		port = malloc(sizeof(struct team_port));
-		if (!port) {
-			err(th, "Malloc failed.");
-			return NL_SKIP;
-		}
-		memset(port, 0, sizeof(struct team_port));
-		port->ifindex = nla_get_u32(port_attrs[TEAM_ATTR_PORT_IFINDEX]);
-		if (port_attrs[TEAM_ATTR_PORT_CHANGED])
-			port->changed = true;
-		if (port_attrs[TEAM_ATTR_PORT_LINKUP])
-			port->linkup = true;
-		if (port_attrs[TEAM_ATTR_PORT_SPEED])
-			port->speed = nla_get_u32(port_attrs[TEAM_ATTR_PORT_SPEED]);
-		if (port_attrs[TEAM_ATTR_PORT_DUPLEX])
-			port->duplex = nla_get_u8(port_attrs[TEAM_ATTR_PORT_DUPLEX]);
-
-		list_add(&tmp_list, &port->list);
-	}
-
-	flush_port_list(th);
-	list_move_nodes(&th->port_list, &tmp_list);
-
-	set_call_change_handlers(th, TEAM_PORT_CHANGE);
-	return NL_SKIP;
-}
-
-static int get_port_list(struct team_handle *th)
-{
-	struct nl_msg *msg;
-	int err;
-
-	msg = nlmsg_alloc();
-	if (!msg)
-		return -ENOMEM;
-
-	genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, th->family, 0, 0,
-			 TEAM_CMD_PORT_LIST_GET, 0);
-	NLA_PUT_U32(msg, TEAM_ATTR_TEAM_IFINDEX, th->ifindex);
-
-	err = send_and_recv(th, msg, get_port_list_handler, th);
-	if (err)
-		return err;
-
-	check_call_change_handlers(th, TEAM_PORT_CHANGE);
-	return 0;
-
-nla_put_failure:
-	nlmsg_free(msg);
-	return -ENOBUFS;
-}
-
-/**
- * team_get_next_port:
- * @th: libteam library context
- * @port: port structure
- *
- * Get next port in list.
- *
- * Returns: port next to @port passed.
- **/
-TEAM_EXPORT
-struct team_port *team_get_next_port(struct team_handle *th,
-				     struct team_port *port)
-{
-	return list_get_next_node_entry(&th->port_list, port, list);
-}
-
-/**
- * team_get_port_ifindex:
- * @port: port structure
- *
- * Get port interface index.
- *
- * Returns: port interface index as idenfified by in kernel.
- **/
-TEAM_EXPORT
-uint32_t team_get_port_ifindex(struct team_port *port)
-{
-	return port->ifindex;
-}
-
-/**
- * team_get_port_speed:
- * @port: port structure
- *
- * Get port speed.
- *
- * Returns: port speed in Mbits/s.
- **/
-TEAM_EXPORT
-uint32_t team_get_port_speed(struct team_port *port)
-{
-	return port->speed;
-}
-
-/**
- * team_get_port_duplex:
- * @port: port structure
- *
- * Get port duplex.
- *
- * Returns: 0 = half-duplex, 1 = full-duplex
- **/
-TEAM_EXPORT
-uint8_t team_get_port_duplex(struct team_port *port)
-{
-	return port->duplex;
-}
-
-/**
- * team_is_port_link_up:
- * @port: port structure
- *
- * See if port link is up.
- *
- * Returns: true if port link is up.
- **/
-TEAM_EXPORT
-bool team_is_port_link_up(struct team_port *port)
-{
-	return port->linkup;
-}
-
-/**
- * team_is_port_changed:
- * @port: port structure
- *
- * See if port values got changed.
- *
- * Returns: true if port got changed.
- **/
-TEAM_EXPORT
-bool team_is_port_changed(struct team_port *port)
-{
-	return port->changed;
 }
 
 /**
@@ -975,10 +726,12 @@ struct team_handle *team_alloc(void)
 	dbg(th, "team_handle %p created.", th);
 	dbg(th, "log_priority=%d", th->log_priority);
 
-	list_init(&th->port_list);
 	list_init(&th->option_list);
 	list_init(&th->change_handler.list);
 
+	err = port_list_alloc(th);
+	if (err)
+		goto err_port_list_alloc_failed;
 	th->nl_sock = nl_socket_alloc();
 	if (!th->nl_sock)
 		goto err_sk_alloc;
@@ -1010,6 +763,9 @@ err_sk_event_alloc:
 	nl_socket_free(th->nl_sock);
 
 err_sk_alloc:
+	port_list_free(th);
+
+err_port_list_alloc_failed:
 	free(th);
 
 	return NULL;
@@ -1166,9 +922,9 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 	nl_socket_modify_cb(th->nl_sock_event, NL_CB_VALID, NL_CB_CUSTOM,
 			    event_handler, th);
 
-	err = get_port_list(th);
+	err = port_list_init(th);
 	if (err) {
-		err(th, "Failed to get port list.");
+		err(th, "Failed to init port list.");
 		return err;
 	}
 
@@ -1191,7 +947,7 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 TEAM_EXPORT
 void team_free(struct team_handle *th)
 {
-	flush_port_list(th);
+	port_list_free(th);
 	flush_option_list(th);
 	nl_cache_free(th->nl_cli.link_cache);
 	nl_socket_free(th->nl_cli.sock);

@@ -17,6 +17,9 @@
  *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+#ifndef _LIST_H_
+#define _LIST_H_
+
 #include <stdbool.h>
 
 struct list_item {
@@ -106,3 +109,5 @@ static inline struct list_item *list_get_next_node(struct list_item *head,
 	struct list_item *next = (entry ? &entry->struct_member : (head))->next;\
 	(next == (head)) ? NULL : list_get_node_entry(next, typeof(*entry),	\
 						      struct_member);})
+
+#endif /* _LIST_H_ */
