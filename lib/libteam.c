@@ -544,7 +544,7 @@ static struct team_option *create_option(char *name, int opt_type,
 	if (!option)
 		return NULL;
 
-	option->name = malloc(sizeof(char) * (strlen(name) + 1));
+	option->name = strdup(name);
 	if (!option->name)
 		goto err_alloc_name;
 
@@ -554,7 +554,6 @@ static struct team_option *create_option(char *name, int opt_type,
 
 	option->type = opt_type;
 	option->changed = changed;
-	strcpy(option->name, name);
 	memcpy(option->data, data, data_size);
 
 	return option;
