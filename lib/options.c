@@ -36,6 +36,7 @@ struct team_option {
 	char *			name;
 	void *			data;
 	bool			changed;
+	bool			changed_locally;
 };
 
 static void flush_option_list(struct team_handle *th)
@@ -50,39 +51,6 @@ static void flush_option_list(struct team_handle *th)
 	}
 }
 
-static struct team_option *create_option(char *name, int opt_type,
-					 void *data, int data_size,
-					 bool changed)
-{
-	struct team_option *option;
-
-	option = malloc(sizeof(struct team_option));
-	if (!option)
-		return NULL;
-
-	option->name = strdup(name);
-	if (!option->name)
-		goto err_alloc_name;
-
-	option->data = malloc(data_size);
-	if (!option->data)
-		goto err_alloc_data;
-
-	option->type = opt_type;
-	option->changed = changed;
-	memcpy(option->data, data, data_size);
-
-	return option;
-
-err_alloc_data:
-	free(option->name);
-
-err_alloc_name:
-	free(option);
-
-	return NULL;
-}
-
 static struct team_option *__find_option(struct list_item *opt_head,
 					 const char *name)
 {
@@ -95,6 +63,71 @@ static struct team_option *__find_option(struct list_item *opt_head,
 	return NULL;
 }
 
+static int __update_option(struct team_option *option, int opt_type,
+			   const void *data, bool changed, bool changed_locally)
+{
+	void *tmp_data;
+	int data_size;
+
+	switch (opt_type) {
+	case TEAM_OPTION_TYPE_U32:
+		data_size = sizeof(__u32);
+		break;
+	case TEAM_OPTION_TYPE_STRING:
+		data_size = sizeof(char) * (strlen((char *) data) + 1);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	tmp_data = malloc(data_size);
+	if (!tmp_data)
+		return -ENOMEM;
+
+	memcpy(tmp_data, data, data_size);
+	free(option->data);
+	option->data = tmp_data;
+	option->type = opt_type;
+	option->changed = changed;
+	option->changed_locally = changed_locally;
+
+	return 0;
+}
+
+static int create_option(struct team_option **poption,
+			 char *name, int opt_type,
+			 void *data, bool changed)
+{
+	struct team_option *option;
+	int err;
+
+	option = malloc(sizeof(struct team_option));
+	if (!option)
+		return -ENOMEM;
+	memset(option, 0, sizeof(*option));
+
+	option->name = strdup(name);
+	if (!option->name) {
+		err = -ENOMEM;
+		goto err_alloc_name;
+	}
+
+	err = __update_option(option, opt_type, data, changed, false);
+	if (err)
+		goto err_update_option;
+
+	*poption = option;
+	return 0;
+
+err_update_option:
+	free(option->name);
+
+err_alloc_name:
+	free(option);
+
+	return err;
+}
+
 int get_options_handler(struct nl_msg *msg, void *arg)
 {
 	struct nlmsghdr *nlh = nlmsg_hdr(msg);
@@ -105,6 +138,7 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 	int i;
 	uint32_t team_ifindex = 0;
 	struct list_item tmp_list;
+	int err;
 
 	list_init(&tmp_list);
 	genlmsg_parse(nlh, 0, attrs, TEAM_ATTR_MAX, NULL);
@@ -125,7 +159,6 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 		__u32 arg;
 		int opt_type;
 		void *data;
-		int data_size;
 		char *str;
 
 		if (nla_parse_nested(option_attrs, TEAM_ATTR_OPTION_MAX,
@@ -155,13 +188,11 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 		case NLA_U32:
 			arg = nla_get_u32(option_attrs[TEAM_ATTR_OPTION_DATA]);
 			data = &arg;
-			data_size = sizeof(__u32);
 			opt_type = TEAM_OPTION_TYPE_U32;
 			break;
 		case NLA_STRING:
 			str = nla_get_string(option_attrs[TEAM_ATTR_OPTION_DATA]);
 			data = str;
-			data_size = sizeof(char) * (strlen(str) + 1);
 			opt_type = TEAM_OPTION_TYPE_STRING;
 			break;
 		default:
@@ -169,8 +200,11 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 			continue;
 		}
 
-		option = create_option(name, opt_type, data, data_size, changed);
-		list_add(&tmp_list, &option->list);
+		err = create_option(&option, name, opt_type, data, changed);
+		if (err)
+			err(th, "Failed to create option: %s", strerror(-err));
+		else
+			list_add(&tmp_list, &option->list);
 	}
 
 	flush_option_list(th);
@@ -380,6 +414,25 @@ int team_get_option_value_by_name_string(struct team_handle *th,
 	return 0;
 }
 
+static int local_set_option_value(struct team_handle *th, const char *opt_name,
+				  const void *data, int opt_type)
+{
+	struct team_option *option;
+	int err;
+
+	option = __find_option(&th->option_list, opt_name);
+	if (!option) {
+		err(th, "Option not found on local set attempt.");
+		return -ENOENT;
+	}
+	err = __update_option(option, opt_type, data, true, true);
+	if (err) {
+		err(th, "Failed update option locally: %s", strerror(-err));
+		return err;
+	}
+	return 0;
+}
+
 static int set_option_value(struct team_handle *th, const char *opt_name,
 			    const void *data, int opt_type)
 {
@@ -387,6 +440,7 @@ static int set_option_value(struct team_handle *th, const char *opt_name,
 	struct nlattr *option_list;
 	struct nlattr *option_item;
 	int nla_type;
+	int err;
 
 	switch (opt_type) {
 	case TEAM_OPTION_TYPE_U32:
@@ -427,7 +481,14 @@ static int set_option_value(struct team_handle *th, const char *opt_name,
 	nla_nest_end(msg, option_item);
 	nla_nest_end(msg, option_list);
 
-	return send_and_recv(th, msg, NULL, NULL);
+	err = send_and_recv(th, msg, NULL, NULL);
+	if (err) {
+		return err;
+	}
+
+	err = local_set_option_value(th, opt_name, data, opt_type);
+
+	return err;
 
 nla_put_failure:
 	nlmsg_free(msg);
