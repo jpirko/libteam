@@ -37,6 +37,7 @@ struct team_port {
 	uint8_t			duplex;
 	bool			linkup;
 	bool			changed;
+	bool			removed;
 };
 
 static void flush_port_list(struct team_handle *th)
@@ -49,6 +50,30 @@ static void flush_port_list(struct team_handle *th)
 	}
 }
 
+static void port_list_cleanup_last_state(struct team_handle *th)
+{
+	struct team_port *port;
+
+	list_for_each_node_entry(port, &th->port_list, list) {
+		port->changed = false;
+		if (port->removed) {
+			list_del(&port->list);
+			free(port);
+		}
+	}
+}
+
+static struct team_port *find_port(struct team_handle *th, uint32_t ifindex)
+{
+	struct team_port *port;
+
+	list_for_each_node_entry(port, &th->port_list, list)
+		if (port->ifindex == ifindex)
+			return port;
+	return NULL;
+}
+
+
 int get_port_list_handler(struct nl_msg *msg, void *arg)
 {
 	struct nlmsghdr *nlh = nlmsg_hdr(msg);
@@ -58,9 +83,7 @@ int get_port_list_handler(struct nl_msg *msg, void *arg)
 	struct nlattr *port_attrs[TEAM_ATTR_PORT_MAX + 1];
 	int i;
 	uint32_t team_ifindex = 0;
-	struct list_item tmp_list;
 
-	list_init(&tmp_list);
 	genlmsg_parse(nlh, 0, attrs, TEAM_ATTR_MAX, NULL);
 	if (attrs[TEAM_ATTR_TEAM_IFINDEX])
 		team_ifindex = nla_get_u32(attrs[TEAM_ATTR_TEAM_IFINDEX]);
@@ -71,8 +94,10 @@ int get_port_list_handler(struct nl_msg *msg, void *arg)
 	if (!attrs[TEAM_ATTR_LIST_PORT])
 		return NL_SKIP;
 
+	port_list_cleanup_last_state(th);
 	nla_for_each_nested(nl_port, attrs[TEAM_ATTR_LIST_PORT], i) {
 		struct team_port *port;
+		uint32_t ifindex;
 
 		if (nla_parse_nested(port_attrs, TEAM_ATTR_PORT_MAX,
 				     nl_port, NULL)) {
@@ -84,27 +109,28 @@ int get_port_list_handler(struct nl_msg *msg, void *arg)
 			err(th, "ifindex port attribute not found.");
 			return NL_SKIP;
 		}
-		port = malloc(sizeof(struct team_port));
+
+		ifindex = nla_get_u32(port_attrs[TEAM_ATTR_PORT_IFINDEX]);
+		port = find_port(th, ifindex);
 		if (!port) {
-			err(th, "Malloc failed.");
-			return NL_SKIP;
+			port = malloc(sizeof(struct team_port));
+			if (!port) {
+				err(th, "Malloc failed.");
+				return NL_SKIP;
+			}
+			memset(port, 0, sizeof(struct team_port));
+			port->ifindex = ifindex;
+			list_add(&th->port_list, &port->list);
 		}
-		memset(port, 0, sizeof(struct team_port));
-		port->ifindex = nla_get_u32(port_attrs[TEAM_ATTR_PORT_IFINDEX]);
-		if (port_attrs[TEAM_ATTR_PORT_CHANGED])
-			port->changed = true;
-		if (port_attrs[TEAM_ATTR_PORT_LINKUP])
-			port->linkup = true;
+		port->changed = port_attrs[TEAM_ATTR_PORT_CHANGED] ? true : false;
+		port->linkup = port_attrs[TEAM_ATTR_PORT_LINKUP] ? true : false;
 		if (port_attrs[TEAM_ATTR_PORT_SPEED])
 			port->speed = nla_get_u32(port_attrs[TEAM_ATTR_PORT_SPEED]);
 		if (port_attrs[TEAM_ATTR_PORT_DUPLEX])
 			port->duplex = nla_get_u8(port_attrs[TEAM_ATTR_PORT_DUPLEX]);
-
-		list_add(&tmp_list, &port->list);
+		if (port_attrs[TEAM_ATTR_PORT_REMOVED])
+			port->removed = true;
 	}
-
-	flush_port_list(th);
-	list_move_nodes(&th->port_list, &tmp_list);
 
 	set_call_change_handlers(th, TEAM_PORT_CHANGE);
 	return NL_SKIP;
@@ -245,3 +271,16 @@ bool team_is_port_changed(struct team_port *port)
 	return port->changed;
 }
 
+/**
+ * team_is_port_removed:
+ * @port: port structure
+ *
+ * See if port was removed.
+ *
+ * Returns: true if port was removed.
+ **/
+TEAM_EXPORT
+bool team_is_port_removed(struct team_port *port)
+{
+	return port->removed;
+}

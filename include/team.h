@@ -73,6 +73,7 @@ uint32_t team_get_port_speed(struct team_port *port);
 uint8_t team_get_port_duplex(struct team_port *port);
 bool team_is_port_link_up(struct team_port *port);
 bool team_is_port_changed(struct team_port *port);
+bool team_is_port_removed(struct team_port *port);
 
 /*
  * team_option
