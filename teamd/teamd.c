@@ -486,6 +486,83 @@ static void teamd_runner_fini(struct teamd_context *ctx)
 	free(ctx->runner_priv);
 }
 
+static void debug_log_port_list(struct teamd_context *ctx)
+{
+	struct team_port *port;
+
+	teamd_log_dbg("<port_list>");
+	team_for_each_port(port, ctx->th) {
+		uint32_t ifindex = team_get_port_ifindex(port);
+
+		teamd_log_dbg("%d: %s: %s %u %s%s%s", ifindex,
+			      dev_name(ctx, ifindex),
+			      team_is_port_link_up(port) ? "up": "down",
+			      team_get_port_speed(port),
+			      team_get_port_duplex(port) ? "fullduplex" : "halfduplex",
+			      team_is_port_changed(port) ? " changed" : "",
+			      team_is_port_removed(port) ? " removed" : "");
+	}
+	teamd_log_dbg("</port_list>");
+}
+
+static void debug_log_option_list(struct teamd_context *ctx)
+{
+	struct team_option *option;
+
+	teamd_log_dbg("<option_list>");
+	team_for_each_option(option, ctx->th) {
+		char *name = team_get_option_name(option);
+		bool changed = team_is_option_changed(option);
+
+		switch (team_get_option_type(option)) {
+		case TEAM_OPTION_TYPE_U32:
+			teamd_log_dbg("%s: \"%d\" <int>%s", name,
+				      team_get_option_value_u32(option),
+				      changed ? " changed" : "");
+			break;
+		case TEAM_OPTION_TYPE_STRING:
+			teamd_log_dbg("%s: \"%s\" <str>%s", name,
+				      team_get_option_value_string(option),
+				      changed ? " changed" : "");
+			break;
+		default:
+			teamd_log_dbg("%s: <unknown>%s", name,
+				      changed ? " changed" : "");
+		}
+	}
+	teamd_log_dbg("</option_list>");
+}
+
+static void debug_change_handler_func(struct team_handle *th, void *arg,
+				      team_change_type_mask_t type_mask)
+{
+	struct teamd_context *ctx = arg;
+
+	if (type_mask & TEAM_PORT_CHANGE)
+		debug_log_port_list(ctx);
+	if (type_mask & TEAM_OPTION_CHANGE)
+		debug_log_option_list(ctx);
+}
+
+static int teamd_register_debug_handlers(struct teamd_context *ctx)
+{
+	if (!ctx->debug)
+		return 0;
+	ctx->debug_change_handler.func = debug_change_handler_func;
+	ctx->debug_change_handler.type_mask =
+				TEAM_PORT_CHANGE | TEAM_OPTION_CHANGE;
+	ctx->debug_change_handler.func_priv = ctx;
+	return team_change_handler_register(ctx->th,
+					    &ctx->debug_change_handler);
+}
+
+static void teamd_unregister_debug_handlers(struct teamd_context *ctx)
+{
+	if (!ctx->debug)
+		return;
+	team_change_handler_unregister(ctx->th, &ctx->debug_change_handler);
+}
+
 static int teamd_init(struct teamd_context *ctx)
 {
 	int err;
@@ -548,10 +625,16 @@ static int teamd_init(struct teamd_context *ctx)
 		goto team_destroy;
 	}
 
+	err = teamd_register_debug_handlers(ctx);
+	if (err) {
+		teamd_log_err("Failed to register debug event handlers.");
+		goto team_destroy;
+	}
+
 	err = teamd_runner_init(ctx);
 	if (err) {
 		teamd_log_err("Failed to init runner.");
-		goto team_destroy;
+		goto team_unreg_debug_handlers;
 	}
 
 	err = teamd_add_ports(ctx);
@@ -564,6 +647,8 @@ static int teamd_init(struct teamd_context *ctx)
 
 runner_fini:
 	teamd_runner_fini(ctx);
+team_unreg_debug_handlers:
+	teamd_unregister_debug_handlers(ctx);
 team_destroy:
 	team_destroy(ctx->th);
 team_free:
@@ -574,6 +659,7 @@ team_free:
 static void teamd_fini(struct teamd_context *ctx)
 {
 	teamd_runner_fini(ctx);
+	teamd_unregister_debug_handlers(ctx);
 	team_destroy(ctx->th);
 	team_free(ctx->th);
 }
