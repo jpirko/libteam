@@ -30,6 +30,7 @@
 struct abl_priv {
 	char		old_active_hwaddr[MAX_ADDR_LEN];
 	char		tmp_hwaddr[MAX_ADDR_LEN];
+	struct team_change_handler	port_change_handler;
 };
 
 static struct abl_priv *abl_priv(struct teamd_context *ctx)
@@ -130,20 +131,19 @@ static void port_change_handler_func(struct team_handle *th, void *arg,
 	free(best_ifname);
 }
 
-static struct team_change_handler port_change_handler = {
-	.func		= port_change_handler_func,
-	.type_mask	= TEAM_PORT_CHANGE,
-};
-
 static int abl_init(struct teamd_context *ctx)
 {
-	port_change_handler.func_priv = ctx;
-	return team_change_handler_register(ctx->th, &port_change_handler);
+	abl_priv(ctx)->port_change_handler.func = port_change_handler_func;
+	abl_priv(ctx)->port_change_handler.type_mask = TEAM_PORT_CHANGE;
+	abl_priv(ctx)->port_change_handler.func_priv = ctx;
+	return team_change_handler_register(ctx->th,
+				&abl_priv(ctx)->port_change_handler);
 }
 
 static void abl_fini(struct teamd_context *ctx)
 {
-	team_change_handler_unregister(ctx->th, &port_change_handler);
+	team_change_handler_unregister(ctx->th,
+				&abl_priv(ctx)->port_change_handler);
 }
 
 const struct teamd_runner teamd_runner_activebackup = {
