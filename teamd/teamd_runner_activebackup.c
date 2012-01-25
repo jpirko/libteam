@@ -120,12 +120,14 @@ static void port_change_handler_func(struct team_handle *th, void *arg,
 
 	best_ifname = dev_name_dup(ctx, best_ifindex);
 	teamd_log_dbg("Found best port: \"%s\" (ifindex \"%d\").",
-		      dev_name(ctx, best_ifindex), best_ifindex);
+		      best_ifname, best_ifindex);
 	if ((active_down || !active_ifindex) && best_ifindex) {
 		teamd_log_info("Changing active port to from \"%s\" to \"%s\".",
 			       active_ifname, best_ifname);
 		change_active_port(ctx, active_ifindex, best_ifindex);
 	}
+	free(active_ifname);
+	free(best_ifname);
 }
 
 static struct team_change_handler port_change_handler = {
