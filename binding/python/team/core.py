@@ -127,6 +127,7 @@ class TeamPort(TeamNetDevice):
         self.duplex = capi.team_get_port_duplex(lib_port)
         self.changed = capi.team_is_port_changed(lib_port)
         self.linkup = capi.team_is_port_link_up(lib_port)
+        self.removed = capi.team_is_port_removed(lib_port)
 
 class TeamPortListIterator(object):
     """

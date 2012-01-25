@@ -29,9 +29,9 @@ import team
 def port_change_handler_func(t):
     print "------------------\nport change\n\tport list:"
     for port in t.port_list():
-        print ("\tifname %s, linkup %d, changed %d, speed %d, duplex %d" %
+        print ("\tifname %s, linkup %d, changed %d, speed %d, duplex %d, removed %d" %
                         (port.ifname, port.linkup, port.changed,
-                         port.speed, port.duplex))
+                         port.speed, port.duplex, port.removed))
 
 def option_change_handler_func(t):
     print "------------------\noption change\n\toption list:"
