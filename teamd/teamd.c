@@ -102,7 +102,8 @@ static void print_help(const struct teamd_context *ctx) {
             "    -p --pid-file=FILE       Use the specified PID file\n"
             "    -g --debug               Increase verbosity\n"
             "    -r --force-recreate      Force team device recreation in case it\n"
-            "                             already exists\n",
+            "                             already exists\n"
+            "    -t --team-dev=DEVNAME    Use the specified team device\n",
             ctx->argv0);
 	printf("Available runners: ");
 	for (i = 0; i < TEAMD_RUNNER_LIST_SIZE; i++) {
@@ -127,10 +128,11 @@ static int parse_command_line(struct teamd_context *ctx,
 		{ "pid-file",		required_argument,	NULL, 'p' },
 		{ "debug",		no_argument,		NULL, 'g' },
 		{ "force-recreate",	no_argument,		NULL, 'r' },
+		{ "team-dev",		required_argument,	NULL, 't' },
 		{ NULL, 0, NULL, 0 }
 	};
 
-	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:gr",
+	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:grt:",
 				  long_options, NULL)) >= 0) {
 
 		switch(opt) {
@@ -169,6 +171,10 @@ static int parse_command_line(struct teamd_context *ctx,
 			break;
 		case 'r':
 			ctx->force_recreate = true;
+			break;
+		case 't':
+			free(ctx->team_devname);
+			ctx->team_devname = strdup(optarg);
 			break;
 		default:
 			return -1;
@@ -261,6 +267,7 @@ static int config_load(struct teamd_context *ctx)
 			      jerror.text, jerror.line, jerror.column);
 		return -EIO;
 	}
+
 	return 0;
 }
 
@@ -520,11 +527,15 @@ static int teamd_init(struct teamd_context *ctx)
 		return err;
 	}
 
-	err = json_unpack(ctx->config_json, "{s:s}", "device", &team_name);
-	if (err) {
-		teamd_log_err("Failed to get team device name.");
-		err = -EINVAL;
-		goto config_free;
+	if (!ctx->team_devname) {
+		err = json_unpack(ctx->config_json, "{s:s}", "device", &team_name);
+		if (err) {
+			teamd_log_err("Failed to get team device name.");
+			err = -EINVAL;
+			goto config_free;
+		}
+	} else {
+		team_name = ctx->team_devname;
 	}
 	teamd_log_dbg("Using team device \"%s\".", team_name);
 

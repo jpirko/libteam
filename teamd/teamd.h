@@ -50,6 +50,7 @@ struct teamd_context {
 	char *			config_text;
 	json_t *		config_json;
 	char *			pid_file;
+	char *			team_devname;
 	char *			argv0;
 	struct team_handle *	th;
 	const struct teamd_runner *	runner;
