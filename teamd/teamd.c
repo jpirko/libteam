@@ -34,11 +34,10 @@
 #include <libdaemon/dsignal.h>
 #include <libdaemon/dlog.h>
 #include <libdaemon/dpid.h>
-#include <json/json.h>
+#include <jansson.h>
 #include <team.h>
 
 #include "teamd.h"
-#include "teamd_json_extras.h"
 
 /* For purpose of immediate use, e.g. print */
 char *dev_name(const struct teamd_context *ctx, uint32_t ifindex)
@@ -86,37 +85,6 @@ static void libteam_log_daemon(struct team_handle *th, int priority,
 }
 
 static char **__g_pid_file;
-
-static int teamd_cfg_get_str(const struct teamd_context *ctx, const char **dst,
-			     const char *query, ...)
-{
-	json_object *jso;
-	va_list arglist;
-	char *qbuffer;
-	int err;
-
-	va_start(arglist, query);
-	err = vasprintf(&qbuffer, query, arglist);
-	va_end(arglist);
-	if (err == -1) {
-		free(qbuffer);
-		return -errno;
-	}
-	teamd_log_dbg("Query: \"%s\".", qbuffer);
-	jso = teamd_json_object_simple_query(ctx->config_jso, qbuffer);
-	free(qbuffer);
-	if (!jso) {
-		teamd_log_dbg("Config string get failed. No such object.");
-		return -ENOENT;
-	}
-	if (json_object_get_type(jso) != json_type_string) {
-		teamd_log_dbg("Config string get failed. Object has different type.");
-		return -EINVAL;
-	}
-
-	*dst = json_object_get_string(jso);
-	return 0;
-}
 
 static void print_help(const struct teamd_context *ctx) {
 	int i;
@@ -271,72 +239,34 @@ static int teamd_run(struct teamd_context *ctx)
 	return 0;
 }
 
-static int load_file(char *filename, char **pstr)
+static int config_load(struct teamd_context *ctx)
 {
-	int err;
-	FILE *f;
-	char *str;
-	long size;
+	json_error_t jerror;
+	size_t jflags = JSON_REJECT_DUPLICATES;
 
-	f = fopen(filename, "r");
-	if (!f)
-		return -errno;
-	err = fseek(f, 0, SEEK_END);
-	if (err) {
-		err = -errno;
-		goto fclose;
-	}
-	size = ftell(f);
-	if (errno) {
-		err = -errno;
-		goto fclose;
-	}
-	rewind(f);
-	str = malloc(sizeof(char) * (size + 1));
-	if (!str) {
-		err = -ENOMEM;
-		goto fclose;
-	}
-	if (size != fread(str, sizeof(char), size, f)) {
-		err = -errno;
-		goto free_str;
-	}
-	fclose(f);
-	*pstr = str;
-	return 0;
-free_str:
-	free(str);
-fclose:
-	fclose(f);
-	return err;
-}
-
-static int load_config(struct teamd_context *ctx)
-{
-	int err;
-
-	if (ctx->config_file) {
-		if (ctx->config_text) {
-			teamd_log_warn("Command line configuration is present, ignoring given config file.");
-		} else {
-			err = load_file(ctx->config_file, &ctx->config_text);
-			if (err) {
-				teamd_log_err("Failed to read file \"%s\".", ctx->config_file);
-				return err;
-			}
-		}
-	}
 	if (ctx->config_text) {
-		ctx->config_jso = json_tokener_parse(ctx->config_text);
-		if (!ctx->config_jso) {
-			teamd_log_err("Failed to parse configuration.");
-			return -EIO;
-		}
+		if (ctx->config_file)
+			teamd_log_warn("Command line config string is present, ignoring given config file.");
+		ctx->config_json = json_loads(ctx->config_text, jflags,
+					      &jerror);
+	} else if (ctx->config_file) {
+		ctx->config_json = json_load_file(ctx->config_file, jflags,
+						  &jerror);
 	} else {
-		teamd_log_err("Either configuration file or command line configuration string must be present.");
+		teamd_log_err("Either config file or command line config string must be present.");
 		return -ENOENT;
 	}
+	if (!ctx->config_json) {
+		teamd_log_err("Failed to parse config: %s on line %d, column %d",
+			      jerror.text, jerror.line, jerror.column);
+		return -EIO;
+	}
 	return 0;
+}
+
+static void config_free(struct teamd_context *ctx)
+{
+	json_decref(ctx->config_json);
 }
 
 static int parse_hwaddr(const char *hwaddr_str, char **phwaddr,
@@ -391,7 +321,7 @@ static int teamd_check_change_hwaddr(struct teamd_context *ctx)
 	char *hwaddr;
 	unsigned int hwaddr_len;
 
-	err = teamd_cfg_get_str(ctx, &hwaddr_str, "['hwaddr']");
+	err = json_unpack(ctx->config_json, "{s:s}", "hwaddr", &hwaddr_str);
 	if (err)
 		return 0; /* addr is not defined in config, no change needed */
 
@@ -414,12 +344,29 @@ static int teamd_check_change_hwaddr(struct teamd_context *ctx)
 
 static int teamd_add_ports(struct teamd_context *ctx)
 {
-	int i;
-	const char *port_name;
-	int err;
-	uint32_t ifindex;
 
-	teamd_for_each_port(i, port_name, ctx) {
+	int i;
+	int err;
+	json_t *ports_obj;
+
+	err = json_unpack(ctx->config_json, "{s:o}", "ports", &ports_obj);
+	if (err) {
+		teamd_log_dbg("No ports found in config.");
+		return 0;
+	}
+	if (!json_is_array(ports_obj)) {
+		teamd_log_err("\"ports\" key must be array.");
+		return -EINVAL;
+	}
+	for (i = 0; i < json_array_size(ports_obj); i++) {
+		json_t *port_obj;
+		const char *port_name;
+		uint32_t ifindex;
+
+		port_obj = json_array_get(ports_obj, i);
+		if (!json_is_string(port_obj))
+			continue;
+		port_name = json_string_value(port_obj);
 		ifindex = team_ifname2ifindex(ctx->th, port_name);
 		teamd_log_dbg("Adding port \"%s\" (found ifindex \"%d\").",
 			      port_name, ifindex);
@@ -429,7 +376,6 @@ static int teamd_add_ports(struct teamd_context *ctx)
 			return err;
 		}
 	}
-
 	return 0;
 }
 
@@ -438,7 +384,7 @@ static int teamd_runner_init(struct teamd_context *ctx)
 	int err;
 	const char *runner_name;
 
-	err = teamd_cfg_get_str(ctx, &runner_name, "['runner']");
+	err = json_unpack(ctx->config_json, "{s:s}", "runner", &runner_name);
 	if (err) {
 		teamd_log_err("Failed to get team runner name from config.");
 		return err;
@@ -568,22 +514,25 @@ static int teamd_init(struct teamd_context *ctx)
 	int err;
 	const char *team_name;
 
-	err = load_config(ctx);
+	err = config_load(ctx);
 	if (err) {
 		teamd_log_err("Failed to load config.");
 		return err;
 	}
-	err = teamd_cfg_get_str(ctx, &team_name, "['device']");
+
+	err = json_unpack(ctx->config_json, "{s:s}", "device", &team_name);
 	if (err) {
 		teamd_log_err("Failed to get team device name.");
-		return err;
+		err = -EINVAL;
+		goto config_free;
 	}
 	teamd_log_dbg("Using team device \"%s\".", team_name);
 
 	ctx->th = team_alloc();
 	if (!ctx->th) {
 		teamd_log_err("Team alloc failed.");
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto config_free;
 	}
 	if (ctx->debug)
 		team_set_log_priority(ctx->th, LOG_DEBUG);
@@ -653,6 +602,8 @@ team_destroy:
 	team_destroy(ctx->th);
 team_free:
 	team_free(ctx->th);
+config_free:
+	config_free(ctx);
 	return err;
 }
 
@@ -662,6 +613,7 @@ static void teamd_fini(struct teamd_context *ctx)
 	teamd_unregister_debug_handlers(ctx);
 	team_destroy(ctx->th);
 	team_free(ctx->th);
+	config_free(ctx);
 }
 
 static int teamd_start(struct teamd_context *ctx)

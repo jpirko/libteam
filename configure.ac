@@ -18,7 +18,7 @@ LT_INIT
 
 PKG_CHECK_MODULES([LIBNL], [libnl-3.0 libnl-genl-3.0 libnl-cli-3.0])
 PKG_CHECK_MODULES([LIBDAEMON], [libdaemon])
-PKG_CHECK_MODULES([LIBJSON], [json])
+PKG_CHECK_MODULES([JANSSON], [jansson])
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdint.h stdlib.h])

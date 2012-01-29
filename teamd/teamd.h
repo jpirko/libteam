@@ -23,7 +23,7 @@
 #include <stdbool.h>
 #include <libdaemon/dlog.h>
 #include <sys/types.h>
-#include <json/json.h>
+#include <jansson.h>
 #include <team.h>
 
 #define teamd_log_err(args...) daemon_log(LOG_ERR, ##args)
@@ -48,7 +48,7 @@ struct teamd_context {
 	bool			force_recreate;
 	char *			config_file;
 	char *			config_text;
-	json_object *		config_jso;
+	json_t *		config_json;
 	char *			pid_file;
 	char *			argv0;
 	struct team_handle *	th;
@@ -66,9 +66,6 @@ struct teamd_runner {
 	int (*init)(struct teamd_context *ctx);
 	void (*fini)(struct teamd_context *ctx);
 };
-
-#define teamd_for_each_port(i, cur, ctx)	\
-	for (i = 0; teamd_cfg_get_str(ctx, &cur, "['ports'][%d]", i) == 0; i++)
 
 /* Runner structures */
 const struct teamd_runner teamd_runner_dummy;
