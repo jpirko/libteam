@@ -351,29 +351,20 @@ static int teamd_check_change_hwaddr(struct teamd_context *ctx)
 
 static int teamd_add_ports(struct teamd_context *ctx)
 {
-
-	int i;
 	int err;
 	json_t *ports_obj;
+	void *iter;
 
 	err = json_unpack(ctx->config_json, "{s:o}", "ports", &ports_obj);
 	if (err) {
 		teamd_log_dbg("No ports found in config.");
 		return 0;
 	}
-	if (!json_is_array(ports_obj)) {
-		teamd_log_err("\"ports\" key must be array.");
-		return -EINVAL;
-	}
-	for (i = 0; i < json_array_size(ports_obj); i++) {
-		json_t *port_obj;
-		const char *port_name;
+	for (iter = json_object_iter(ports_obj); iter;
+	     iter = json_object_iter_next(ports_obj, iter)) {
+		const char *port_name = json_object_iter_key(iter);
 		uint32_t ifindex;
 
-		port_obj = json_array_get(ports_obj, i);
-		if (!json_is_string(port_obj))
-			continue;
-		port_name = json_string_value(port_obj);
 		ifindex = team_ifname2ifindex(ctx->th, port_name);
 		teamd_log_dbg("Adding port \"%s\" (found ifindex \"%d\").",
 			      port_name, ifindex);
