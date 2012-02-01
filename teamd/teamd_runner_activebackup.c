@@ -54,6 +54,20 @@ static int get_port_prio(struct teamd_context *ctx, const char *port_name)
 	return prio;
 }
 
+static bool is_port_sticky(struct teamd_context *ctx, const char *port_name)
+{
+	int sticky;
+	int err;
+
+	err = json_unpack(ctx->config_json, "{s:{s:{s:b}}}", "ports", port_name,
+							     "sticky", &sticky);
+	if (err) {
+		teamd_log_dbg("Using default stickiness for \"%s\".", port_name);
+		return false; /* return default stickiness */
+	}
+	return sticky;
+}
+
 static void change_active_port(struct teamd_context *ctx,
 			       uint32_t old_active_ifindex,
 			       uint32_t new_active_ifindex)
@@ -141,16 +155,22 @@ static void port_change_handler_func(struct team_handle *th, void *arg,
 		}
 	}
 
+	if (!best_ifindex || best_ifindex == active_ifindex)
+		goto nochange;
+
 	best_ifname = dev_name_dup(ctx, best_ifindex);
 	teamd_log_dbg("Found best port: \"%s\" (ifindex \"%d\", prio \"%d\").",
 		      best_ifname, best_ifindex, best_prio);
-	if ((active_down || !active_ifindex) && best_ifindex) {
+	if ((active_down || !active_ifindex ||
+	     !is_port_sticky(ctx, active_ifname))) {
 		teamd_log_info("Changing active port to from \"%s\" to \"%s\".",
 			       active_ifname, best_ifname);
 		change_active_port(ctx, active_ifindex, best_ifindex);
 	}
-	free(active_ifname);
 	free(best_ifname);
+
+nochange:
+	free(active_ifname);
 }
 
 static int abl_init(struct teamd_context *ctx)
