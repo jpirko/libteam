@@ -23,6 +23,8 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <linux/netdevice.h>
+#include <jansson.h>
+#include <limits.h>
 #include <team.h>
 
 #include "teamd.h"
@@ -36,6 +38,20 @@ struct abl_priv {
 static struct abl_priv *abl_priv(struct teamd_context *ctx)
 {
 	return (struct abl_priv *) ctx->runner_priv;
+}
+
+static int get_port_prio(struct teamd_context *ctx, const char *port_name)
+{
+	int prio;
+	int err;
+
+	err = json_unpack(ctx->config_json, "{s:{s:{s:i}}}", "ports", port_name,
+							     "prio", &prio);
+	if (err) {
+		teamd_log_dbg("Using default priority for \"%s\".", port_name);
+		return 0; /* return default priority */
+	}
+	return prio;
 }
 
 static void change_active_port(struct teamd_context *ctx,
@@ -88,6 +104,7 @@ static void port_change_handler_func(struct team_handle *th, void *arg,
 	char *best_ifname;
 	uint32_t best_speed = 0;
 	uint8_t best_duplex = 0;
+	int best_prio = INT_MIN;
 	int err;
 
 	err = team_get_active_port(th, &active_ifindex);
@@ -97,8 +114,9 @@ static void port_change_handler_func(struct team_handle *th, void *arg,
 	}
 
 	active_ifname = dev_name_dup(ctx, active_ifindex);
-	teamd_log_dbg("Current active port: \"%s\" (ifindex \"%d\").",
-		      active_ifname, active_ifindex);
+	teamd_log_dbg("Current active port: \"%s\" (ifindex \"%d\", prio \"%d\").",
+		      active_ifname, active_ifindex,
+		      get_port_prio(ctx, active_ifname));
 
 	team_for_each_port(port, th) {
 		uint32_t ifindex = team_get_port_ifindex(port);
@@ -106,10 +124,14 @@ static void port_change_handler_func(struct team_handle *th, void *arg,
 		if (team_is_port_link_up(port)) {
 			uint32_t speed = team_get_port_speed(port);
 			uint8_t duplex = team_get_port_duplex(port);
+			char *ifname = dev_name(ctx, ifindex);
+			int prio = get_port_prio(ctx, ifname);
 
 			if (!best_ifindex ||
+			    (prio > best_prio) ||
 			    (speed > best_speed) ||
 			    (speed == best_speed && duplex > best_duplex)) {
+				best_prio = prio;
 				best_ifindex = ifindex;
 				best_speed = speed;
 				best_duplex = duplex;
@@ -120,8 +142,8 @@ static void port_change_handler_func(struct team_handle *th, void *arg,
 	}
 
 	best_ifname = dev_name_dup(ctx, best_ifindex);
-	teamd_log_dbg("Found best port: \"%s\" (ifindex \"%d\").",
-		      best_ifname, best_ifindex);
+	teamd_log_dbg("Found best port: \"%s\" (ifindex \"%d\", prio \"%d\").",
+		      best_ifname, best_ifindex, best_prio);
 	if ((active_down || !active_ifindex) && best_ifindex) {
 		teamd_log_info("Changing active port to from \"%s\" to \"%s\".",
 			       active_ifname, best_ifname);
