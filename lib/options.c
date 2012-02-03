@@ -27,8 +27,8 @@
 #include <linux/if_team.h>
 #include <linux/types.h>
 #include <team.h>
+#include <private/list.h>
 #include "team_private.h"
-#include "list.h"
 
 struct team_option {
 	struct list_item	list;

@@ -24,7 +24,7 @@
 #include <syslog.h>
 #include <netlink/netlink.h>
 #include <team.h>
-#include "list.h"
+#include <private/list.h>
 
 #define TEAM_EXPORT __attribute__ ((visibility("default")))
 

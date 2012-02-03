@@ -11,4 +11,4 @@ libteam_la_LDFLAGS = -version-info @LIBTEAM_CURRENT@:@LIBTEAM_REVISION@:@LIBTEAM
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libteam.pc
 
-EXTRA_DIST = list.h team_private.h
+EXTRA_DIST = team_private.h
