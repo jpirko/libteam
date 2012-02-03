@@ -28,8 +28,10 @@
 #include <signal.h>
 #include <stdbool.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <linux/netdevice.h>
 #include <sys/syslog.h>
+#include <sys/timerfd.h>
 #include <libdaemon/dfork.h>
 #include <libdaemon/dsignal.h>
 #include <libdaemon/dlog.h>
@@ -193,25 +195,51 @@ static const char *pid_file_proc(void) {
 	return *__g_pid_file;
 }
 
-static int teamd_run(struct teamd_context *ctx)
+static void handle_period_fd(int fd)
 {
-	bool quit = false;
-	int sig_fd;
-	int team_event_fd;
+	ssize_t ret;
+	uint64_t exp;
+
+	ret = read(fd, &exp, sizeof(uint64_t));
+	if (ret == -1) {
+		if (errno == EINTR || errno == EAGAIN)
+			return;
+		teamd_log_err("read() failed.");
+		return;
+	}
+	if (ret != sizeof(uint64_t)) {
+		teamd_log_err("read() returned unexpected number of bytes.");
+		return;
+	}
+	if (exp > 1)
+		teamd_log_warn("some periodic function calls missed (%lu)",
+			       exp - 1);
+}
+
+static int teamd_run_loop_run(struct teamd_context *ctx)
+{
+	int err;
+	int ctrl_fd = ctx->run_loop.ctrl_pipe_r;
 	fd_set fds;
 	int fdmax;
+	struct list_item *lcb_list = &ctx->run_loop.callback_list;
+	struct teamd_loop_callback *lcb;
+	char ctrl_byte;
 
-	FD_ZERO(&fds);
-	sig_fd = daemon_signal_fd();
-	FD_SET(sig_fd, &fds);
-	team_event_fd = team_get_event_fd(ctx->th);
-	FD_SET(team_event_fd, &fds);
-	fdmax = (sig_fd > team_event_fd ? sig_fd : team_event_fd) + 1;
+	while (true) {
+		FD_ZERO(&fds);
+		FD_SET(ctrl_fd, &fds);
+		fdmax = ctrl_fd;
+		list_for_each_node_entry(lcb, lcb_list, list) {
+			if (lcb->fd) {
+				FD_SET(lcb->fd, &fds);
+				if (lcb->fd > fdmax)
+					fdmax = lcb->fd;
+			}
+		}
+		fdmax++;
 
-	while (!quit) {
-		fd_set fds_tmp = fds;
-
-		if (select(fdmax, &fds_tmp, NULL, NULL, NULL) < 0) {
+		while (select(fdmax, &fds, NULL, NULL, NULL) < 0) {
 			if (errno == EINTR)
 				continue;
 
@@ -219,30 +247,206 @@ static int teamd_run(struct teamd_context *ctx)
 			return -errno;
 		}
 
-		if (FD_ISSET(sig_fd, &fds_tmp)) {
-			int sig;
-
-			/* Get signal */
-			if ((sig = daemon_signal_next()) <= 0) {
-				teamd_log_err("daemon_signal_next() failed.");
+		if (FD_ISSET(ctrl_fd, &fds)) {
+			err = read(ctrl_fd, &ctrl_byte, 1);
+			if (err != -1) {
+				switch(ctrl_byte) {
+				case 'q':
+					return ctx->run_loop.err;
+				case 'r':
+					continue;
+				}
+			} else if (errno == EINTR || errno == EAGAIN) {
+				continue;
+			} else {
+				teamd_log_err("read() failed.");
 				return -errno;
 			}
+		}
 
-			/* Dispatch signal */
-			switch (sig) {
-			case SIGINT:
-			case SIGQUIT:
-			case SIGTERM:
-				teamd_log_warn("Got SIGINT, SIGQUIT or SIGTERM.");
-				quit = true;
-				break;
-
+		list_for_each_node_entry(lcb, lcb_list, list) {
+			if (lcb->fd && FD_ISSET(lcb->fd, &fds)) {
+				if (lcb->is_period)
+					handle_period_fd(lcb->fd);
+				lcb->func(lcb->func_priv);
 			}
 		}
-		if (FD_ISSET(team_event_fd, &fds_tmp))
-			team_process_event(ctx->th);
 	}
 	return 0;
+}
+
+static void teamd_run_loop_sent_ctrl_byte(struct teamd_context *ctx,
+					  const char ctrl_byte)
+{
+	int err;
+
+retry:
+	err = write(ctx->run_loop.ctrl_pipe_w, &ctrl_byte, 1);
+	if (err == -1 && errno == EINTR)
+		goto retry;
+}
+
+static void teamd_run_loop_quit(struct teamd_context *ctx, int err)
+{
+	ctx->run_loop.err = err;
+	teamd_run_loop_sent_ctrl_byte(ctx, 'q');
+}
+
+static void teamd_run_loop_restart(struct teamd_context *ctx)
+{
+	teamd_run_loop_sent_ctrl_byte(ctx, 'r');
+}
+
+static int get_timerfd(int *pfd, time_t sec, long nsec)
+{
+	int fd;
+	struct itimerspec its;
+
+	its.it_interval.tv_sec = sec;
+	its.it_interval.tv_nsec = nsec;
+	its.it_value.tv_sec = sec;
+	its.it_value.tv_nsec = nsec;
+
+	fd = timerfd_create(CLOCK_MONOTONIC, 0);
+	if (fd < 0) {
+		teamd_log_err("Failed to create timerfd.");
+		return -errno;
+	}
+	*pfd = fd;
+	if (timerfd_settime(fd, 0, &its, NULL) < 0) {
+		teamd_log_err("Failed to set timerfd.");
+		close(fd);
+		return -errno;
+	}
+	return 0;
+}
+
+int teamd_loop_callback_fd_add(struct teamd_context *ctx,
+			       struct teamd_loop_callback **plcb, int fd,
+			       void (*func)(void *func_priv), void *func_priv)
+{
+	struct teamd_loop_callback *lcb;
+
+	lcb = malloc(sizeof(*lcb));
+	if (!lcb) {
+		teamd_log_err("Failed alloc memory for callback.");
+		return -ENOMEM;
+	}
+	memset(lcb, 0, sizeof(*lcb));
+	lcb->fd = fd;
+	lcb->func = func;
+	lcb->func_priv = func_priv;
+	list_add(&ctx->run_loop.callback_list, &lcb->list);
+	teamd_run_loop_restart(ctx);
+	*plcb = lcb;
+	return 0;
+}
+
+int teamd_loop_callback_period_add(struct teamd_context *ctx,
+				   struct teamd_loop_callback **plcb,
+				   time_t sec, long nsec,
+				   void (*func)(void *func_priv),
+				   void *func_priv)
+{
+	int err;
+	int fd;
+
+	err = get_timerfd(&fd, sec, nsec);
+	if (err)
+		return err;
+	err = teamd_loop_callback_fd_add(ctx, plcb, fd, func, func_priv);
+	if (err) {
+		close(fd);
+		return err;
+	}
+	(*plcb)->is_period = true;
+	return 0;
+}
+
+void teamd_loop_callback_del(struct teamd_context *ctx,
+			     struct teamd_loop_callback *lcb)
+{
+	list_del(&lcb->list);
+	teamd_run_loop_restart(ctx);
+	if (lcb->is_period)
+		close(lcb->fd);
+	free(lcb);
+}
+
+static void callback_daemon_signal(void *func_priv)
+{
+	struct teamd_context *ctx = func_priv;
+	int sig;
+
+	/* Get signal */
+	if ((sig = daemon_signal_next()) <= 0) {
+		teamd_log_err("daemon_signal_next() failed.");
+		teamd_run_loop_quit(ctx, -errno);
+		return;
+	}
+
+	/* Dispatch signal */
+	switch (sig) {
+	case SIGINT:
+	case SIGQUIT:
+	case SIGTERM:
+		teamd_log_warn("Got SIGINT, SIGQUIT or SIGTERM.");
+		teamd_run_loop_quit(ctx, 0);
+		break;
+	}
+}
+
+static void callback_libteam_event(void *func_priv)
+{
+	struct teamd_context *ctx = func_priv;
+
+	team_process_event(ctx->th);
+}
+
+static int teamd_run_loop_init(struct teamd_context *ctx)
+{
+	int fds[2];
+	int err;
+
+	list_init(&ctx->run_loop.callback_list);
+	err = pipe(fds);
+	if (err)
+		return err;
+	ctx->run_loop.ctrl_pipe_r = fds[0];
+	ctx->run_loop.ctrl_pipe_w = fds[1];
+
+	err = teamd_loop_callback_fd_add(ctx, &ctx->run_loop.daemon_lcb,
+					 daemon_signal_fd(),
+					 callback_daemon_signal, ctx);
+	if (err) {
+		teamd_log_err("Failed to add daemon loop callback");
+		goto close_pipe;
+	}
+
+	err = teamd_loop_callback_fd_add(ctx, &ctx->run_loop.libteam_event_lcb,
+					 team_get_event_fd(ctx->th),
+					 callback_libteam_event, ctx);
+	if (err) {
+		teamd_log_err("Failed to add libteam event loop callback");
+		goto del_daemon_cb;
+	}
+
+	return 0;
+
+del_daemon_cb:
+	teamd_loop_callback_del(ctx, ctx->run_loop.daemon_lcb);
+close_pipe:
+	close(ctx->run_loop.ctrl_pipe_r);
+	close(ctx->run_loop.ctrl_pipe_w);
+	return err;
+}
+
+static void teamd_run_loop_fini(struct teamd_context *ctx)
+{
+	teamd_loop_callback_del(ctx, ctx->run_loop.libteam_event_lcb);
+	teamd_loop_callback_del(ctx, ctx->run_loop.daemon_lcb);
+	close(ctx->run_loop.ctrl_pipe_r);
+	close(ctx->run_loop.ctrl_pipe_w);
 }
 
 static int config_load(struct teamd_context *ctx)
@@ -576,10 +780,16 @@ static int teamd_init(struct teamd_context *ctx)
 		goto team_destroy;
 	}
 
+	err = teamd_run_loop_init(ctx);
+	if (err) {
+		teamd_log_err("Failed to init run loop.");
+		goto team_destroy;
+	}
+
 	err = teamd_register_debug_handlers(ctx);
 	if (err) {
 		teamd_log_err("Failed to register debug event handlers.");
-		goto team_destroy;
+		goto run_loop_fini;
 	}
 
 	err = teamd_runner_init(ctx);
@@ -600,6 +810,8 @@ runner_fini:
 	teamd_runner_fini(ctx);
 team_unreg_debug_handlers:
 	teamd_unregister_debug_handlers(ctx);
+run_loop_fini:
+	teamd_run_loop_fini(ctx);
 team_destroy:
 	team_destroy(ctx->th);
 team_free:
@@ -613,6 +825,7 @@ static void teamd_fini(struct teamd_context *ctx)
 {
 	teamd_runner_fini(ctx);
 	teamd_unregister_debug_handlers(ctx);
+	teamd_run_loop_fini(ctx);
 	team_destroy(ctx->th);
 	team_free(ctx->th);
 	config_free(ctx);
@@ -700,7 +913,7 @@ static int teamd_start(struct teamd_context *ctx)
 
 	teamd_log_info(PACKAGE_VERSION" sucessfully started.");
 
-	err = teamd_run(ctx);
+	err = teamd_run_loop_run(ctx);
 
 	teamd_log_info("Exiting...");
 

@@ -23,8 +23,10 @@
 #include <stdbool.h>
 #include <libdaemon/dlog.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <jansson.h>
 #include <team.h>
+#include <private/list.h>
 
 #define teamd_log_err(args...) daemon_log(LOG_ERR, ##args)
 #define teamd_log_warn(args...) daemon_log(LOG_WARNING, ##args)
@@ -40,6 +42,14 @@ enum teamd_command {
 };
 
 struct teamd_runner;
+
+struct teamd_loop_callback {
+	struct list_item list;
+	void (*func)(void *func_priv);
+	void *func_priv;
+	int fd;
+	bool is_period;
+};
 
 struct teamd_context {
 	enum teamd_command	cmd;
@@ -58,6 +68,14 @@ struct teamd_context {
 	uint32_t		ifindex;
 	uint32_t		hwaddr_len;
 	struct team_change_handler	debug_change_handler;
+	struct {
+		struct list_item		callback_list;
+		int				ctrl_pipe_r;
+		int				ctrl_pipe_w;
+		int				err;
+		struct teamd_loop_callback *	daemon_lcb;
+		struct teamd_loop_callback *	libteam_event_lcb;
+	} run_loop;
 };
 
 struct teamd_runner {
@@ -72,6 +90,17 @@ struct teamd_runner {
 const struct teamd_runner teamd_runner_dummy;
 const struct teamd_runner teamd_runner_roundrobin;
 const struct teamd_runner teamd_runner_activebackup;
+
+int teamd_loop_callback_fd_add(struct teamd_context *ctx,
+			       struct teamd_loop_callback **plcb, int fd,
+			       void (*func)(void *func_priv), void *func_priv);
+int teamd_loop_callback_period_add(struct teamd_context *ctx,
+				   struct teamd_loop_callback **plcb,
+				   time_t sec, long nsec,
+				   void (*func)(void *func_priv),
+				   void *func_priv);
+void teamd_loop_callback_del(struct teamd_context *ctx,
+			     struct teamd_loop_callback *lcb);
 
 /* Various helpers */
 char *dev_name(const struct teamd_context *ctx, uint32_t ifindex);
