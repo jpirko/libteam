@@ -47,6 +47,8 @@ void team_set_log_fn(struct team_handle *th,
 				    const char *format, va_list args));
 int team_get_log_priority(struct team_handle *th);
 void team_set_log_priority(struct team_handle *th, int priority);
+void *team_get_user_priv(struct team_handle *th);
+void team_set_user_priv(struct team_handle *th, void *priv);
 int team_get_event_fd(struct team_handle *th);
 void team_process_event(struct team_handle *th);
 void team_check_events(struct team_handle *th);

@@ -591,6 +591,31 @@ void team_set_log_priority(struct team_handle *th, int priority)
 }
 
 /**
+ * team_get_user_priv:
+ * @th: libteam library context
+ *
+ * Returns: pointer to user private data
+ **/
+TEAM_EXPORT
+void *team_get_user_priv(struct team_handle *th)
+{
+	return th->user_priv;
+}
+
+/**
+ * team_set_user_priv:
+ * @th: libteam library context
+ * @priv: the new pointer to user private data
+ *
+ * Set pointer to user private data.
+ **/
+TEAM_EXPORT
+void team_set_user_priv(struct team_handle *th, void *priv)
+{
+	th->user_priv = priv;
+}
+
+/**
  * team_get_event_fd:
  * @th: libteam library context
  *
