@@ -67,7 +67,6 @@ struct teamd_context {
 	void *			runner_priv;
 	uint32_t		ifindex;
 	uint32_t		hwaddr_len;
-	struct team_change_handler	debug_change_handler;
 	struct {
 		struct list_item		callback_list;
 		int				ctrl_pipe_r;

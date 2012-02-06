@@ -684,7 +684,7 @@ static void debug_log_option_list(struct teamd_context *ctx)
 static void debug_change_handler_func(struct team_handle *th, void *arg,
 				      team_change_type_mask_t type_mask)
 {
-	struct teamd_context *ctx = arg;
+	struct teamd_context *ctx = team_get_user_priv(th);
 
 	if (type_mask & TEAM_PORT_CHANGE)
 		debug_log_port_list(ctx);
@@ -692,23 +692,23 @@ static void debug_change_handler_func(struct team_handle *th, void *arg,
 		debug_log_option_list(ctx);
 }
 
+static struct team_change_handler debug_change_handler = {
+	.func = debug_change_handler_func,
+	.type_mask = TEAM_PORT_CHANGE | TEAM_OPTION_CHANGE,
+};
+
 static int teamd_register_debug_handlers(struct teamd_context *ctx)
 {
 	if (!ctx->debug)
 		return 0;
-	ctx->debug_change_handler.func = debug_change_handler_func;
-	ctx->debug_change_handler.type_mask =
-				TEAM_PORT_CHANGE | TEAM_OPTION_CHANGE;
-	ctx->debug_change_handler.func_priv = ctx;
-	return team_change_handler_register(ctx->th,
-					    &ctx->debug_change_handler);
+	return team_change_handler_register(ctx->th, &debug_change_handler);
 }
 
 static void teamd_unregister_debug_handlers(struct teamd_context *ctx)
 {
 	if (!ctx->debug)
 		return;
-	team_change_handler_unregister(ctx->th, &ctx->debug_change_handler);
+	team_change_handler_unregister(ctx->th, &debug_change_handler);
 }
 
 static int teamd_init(struct teamd_context *ctx)
@@ -766,6 +766,8 @@ static int teamd_init(struct teamd_context *ctx)
 		teamd_log_err("Team init failed.");
 		goto team_destroy;
 	}
+
+	team_set_user_priv(ctx->th, ctx);
 
 	ctx->hwaddr_len = team_hwaddr_len_get(ctx->th, ctx->ifindex);
 	if (ctx->hwaddr_len < 0) {
