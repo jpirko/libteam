@@ -43,12 +43,18 @@ enum teamd_command {
 
 struct teamd_runner;
 
+enum teamd_loop_fd_type {
+	TEAMD_LOOP_FD_TYPE_READ,
+	TEAMD_LOOP_FD_TYPE_WRITE,
+};
+
 struct teamd_loop_callback {
 	struct list_item list;
 	void (*func)(void *func_priv);
 	void *func_priv;
 	int fd;
 	bool is_period;
+	enum teamd_loop_fd_type fd_type;
 };
 
 struct teamd_context {
@@ -92,6 +98,7 @@ const struct teamd_runner teamd_runner_activebackup;
 
 int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 			       struct teamd_loop_callback **plcb, int fd,
+			       enum teamd_loop_fd_type fd_type,
 			       void (*func)(void *func_priv), void *func_priv);
 int teamd_loop_callback_period_add(struct teamd_context *ctx,
 				   struct teamd_loop_callback **plcb,

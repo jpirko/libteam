@@ -220,26 +220,37 @@ static int teamd_run_loop_run(struct teamd_context *ctx)
 {
 	int err;
 	int ctrl_fd = ctx->run_loop.ctrl_pipe_r;
-	fd_set fds;
+	fd_set fds_r;
+	fd_set fds_w;
 	int fdmax;
 	struct list_item *lcb_list = &ctx->run_loop.callback_list;
 	struct teamd_loop_callback *lcb;
 	char ctrl_byte;
 
 	while (true) {
-		FD_ZERO(&fds);
-		FD_SET(ctrl_fd, &fds);
-		fdmax = ctrl_fd;
+		FD_ZERO(&fds_r);
+		FD_ZERO(&fds_w);
+		FD_SET(ctrl_fd, &fds_r);
+		fdmax = ctrl_fd + 1;
 		list_for_each_node_entry(lcb, lcb_list, list) {
 			if (lcb->fd) {
-				FD_SET(lcb->fd, &fds);
-				if (lcb->fd > fdmax)
-					fdmax = lcb->fd;
+				switch (lcb->fd_type) {
+				case TEAMD_LOOP_FD_TYPE_READ:
+					FD_SET(lcb->fd, &fds_r);
+					break;
+				case TEAMD_LOOP_FD_TYPE_WRITE:
+					FD_SET(lcb->fd, &fds_w);
+					break;
+				default:
+					continue;
+				}
+				if (lcb->fd >= fdmax)
+					fdmax = lcb->fd + 1;
+
 			}
 		}
-		fdmax++;
 
-		while (select(fdmax, &fds, NULL, NULL, NULL) < 0) {
+		while (select(fdmax, &fds_r, &fds_w, NULL, NULL) < 0) {
 			if (errno == EINTR)
 				continue;
 
@@ -247,7 +258,7 @@ static int teamd_run_loop_run(struct teamd_context *ctx)
 			return -errno;
 		}
 
-		if (FD_ISSET(ctrl_fd, &fds)) {
+		if (FD_ISSET(ctrl_fd, &fds_r)) {
 			err = read(ctrl_fd, &ctrl_byte, 1);
 			if (err != -1) {
 				switch(ctrl_byte) {
@@ -265,7 +276,10 @@ static int teamd_run_loop_run(struct teamd_context *ctx)
 		}
 
 		list_for_each_node_entry(lcb, lcb_list, list) {
-			if (lcb->fd && FD_ISSET(lcb->fd, &fds)) {
+			if ((FD_ISSET(lcb->fd, &fds_r) &&
+			     lcb->fd_type == TEAMD_LOOP_FD_TYPE_READ) ||
+			    (FD_ISSET(lcb->fd, &fds_w) &&
+			     lcb->fd_type == TEAMD_LOOP_FD_TYPE_WRITE)) {
 				if (lcb->is_period)
 					handle_period_fd(lcb->fd);
 				lcb->func(lcb->func_priv);
@@ -323,6 +337,7 @@ static int get_timerfd(int *pfd, time_t sec, long nsec)
 
 int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 			       struct teamd_loop_callback **plcb, int fd,
+			       enum teamd_loop_fd_type fd_type,
 			       void (*func)(void *func_priv), void *func_priv)
 {
 	struct teamd_loop_callback *lcb;
@@ -334,6 +349,7 @@ int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 	}
 	memset(lcb, 0, sizeof(*lcb));
 	lcb->fd = fd;
+	lcb->fd_type = fd_type;
 	lcb->func = func;
 	lcb->func_priv = func_priv;
 	list_add(&ctx->run_loop.callback_list, &lcb->list);
@@ -354,7 +370,8 @@ int teamd_loop_callback_period_add(struct teamd_context *ctx,
 	err = get_timerfd(&fd, sec, nsec);
 	if (err)
 		return err;
-	err = teamd_loop_callback_fd_add(ctx, plcb, fd, func, func_priv);
+	err = teamd_loop_callback_fd_add(ctx, plcb, fd, TEAMD_LOOP_FD_TYPE_READ,
+					 func, func_priv);
 	if (err) {
 		close(fd);
 		return err;
@@ -417,6 +434,7 @@ static int teamd_run_loop_init(struct teamd_context *ctx)
 
 	err = teamd_loop_callback_fd_add(ctx, &ctx->run_loop.daemon_lcb,
 					 daemon_signal_fd(),
+					 TEAMD_LOOP_FD_TYPE_READ,
 					 callback_daemon_signal, ctx);
 	if (err) {
 		teamd_log_err("Failed to add daemon loop callback");
@@ -425,6 +443,7 @@ static int teamd_run_loop_init(struct teamd_context *ctx)
 
 	err = teamd_loop_callback_fd_add(ctx, &ctx->run_loop.libteam_event_lcb,
 					 team_get_event_fd(ctx->th),
+					 TEAMD_LOOP_FD_TYPE_READ,
 					 callback_libteam_event, ctx);
 	if (err) {
 		teamd_log_err("Failed to add libteam event loop callback");
