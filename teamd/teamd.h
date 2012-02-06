@@ -52,21 +52,21 @@ struct teamd_loop_callback {
 };
 
 struct teamd_context {
-	enum teamd_command	cmd;
-	bool			daemonize;
-	bool			debug;
-	bool			force_recreate;
-	char *			config_file;
-	char *			config_text;
-	json_t *		config_json;
-	char *			pid_file;
-	char *			team_devname;
-	char *			argv0;
-	struct team_handle *	th;
+	enum teamd_command		cmd;
+	bool				daemonize;
+	bool				debug;
+	bool				force_recreate;
+	char *				config_file;
+	char *				config_text;
+	json_t *			config_json;
+	char *				pid_file;
+	char *				team_devname;
+	char *				argv0;
+	struct team_handle *		th;
 	const struct teamd_runner *	runner;
-	void *			runner_priv;
-	uint32_t		ifindex;
-	uint32_t		hwaddr_len;
+	void *				runner_priv;
+	uint32_t			ifindex;
+	uint32_t			hwaddr_len;
 	struct {
 		struct list_item		callback_list;
 		int				ctrl_pipe_r;
