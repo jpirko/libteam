@@ -28,6 +28,7 @@
 #include <linux/types.h>
 #include <team.h>
 #include <private/list.h>
+#include <private/misc.h>
 #include "team_private.h"
 
 struct team_option {
@@ -122,10 +123,9 @@ static int create_option(struct team_option **poption, char *name)
 	struct team_option *option;
 	int err;
 
-	option = malloc(sizeof(struct team_option));
+	option = myzalloc(sizeof(struct team_option));
 	if (!option)
 		return -ENOMEM;
-	memset(option, 0, sizeof(*option));
 
 	option->name = strdup(name);
 	if (!option->name) {

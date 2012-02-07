@@ -37,6 +37,8 @@
 #include <libdaemon/dlog.h>
 #include <libdaemon/dpid.h>
 #include <jansson.h>
+#include <private/list.h>
+#include <private/misc.h>
 #include <team.h>
 
 #include "teamd.h"
@@ -342,12 +344,11 @@ int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 {
 	struct teamd_loop_callback *lcb;
 
-	lcb = malloc(sizeof(*lcb));
+	lcb = myzalloc(sizeof(*lcb));
 	if (!lcb) {
 		teamd_log_err("Failed alloc memory for callback.");
 		return -ENOMEM;
 	}
-	memset(lcb, 0, sizeof(*lcb));
 	lcb->fd = fd;
 	lcb->fd_type = fd_type;
 	lcb->func = func;
@@ -630,10 +631,9 @@ static int teamd_runner_init(struct teamd_context *ctx)
 	}
 
 	if (ctx->runner->priv_size) {
-		ctx->runner_priv = malloc(ctx->runner->priv_size);
+		ctx->runner_priv = myzalloc(ctx->runner->priv_size);
 		if (!ctx->runner_priv)
 			return -ENOMEM;
-		memset(ctx->runner_priv, 0, ctx->runner->priv_size);
 	}
 
 	if (ctx->runner->init) {
@@ -672,13 +672,12 @@ static struct port_priv_item *get_ppitem(struct teamd_context *ctx,
 	}
 
 	alloc_size = sizeof(*ppitem) + ctx->runner->port_priv_size;
-	ppitem = malloc(alloc_size);
+	ppitem = myzalloc(alloc_size);
 	if (!ppitem) {
 		teamd_log_err("Failed to alloc port priv (ifindex %d).",
 			       ifindex);
 		return NULL;
 	}
-	memset(ppitem, 0, alloc_size);
 	ppitem->ifindex = ifindex;
 	list_add(&ctx->runner_port_priv_list, &ppitem->list);
 	return ppitem;
@@ -1054,10 +1053,9 @@ static int teamd_context_init(struct teamd_context **pctx)
 {
 	struct teamd_context *ctx;
 
-	ctx = malloc(sizeof(*ctx));
+	ctx = myzalloc(sizeof(*ctx));
 	if (!ctx)
 		return -ENOMEM;
-	memset(ctx, 0, sizeof(*ctx));
 	*pctx = ctx;
 
 	__g_pid_file = &ctx->pid_file;

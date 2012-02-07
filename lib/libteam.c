@@ -31,6 +31,7 @@
 #include <linux/types.h>
 #include <team.h>
 #include <private/list.h>
+#include <private/misc.h>
 #include "team_private.h"
 
 /**
@@ -292,11 +293,9 @@ struct team_handle *team_alloc(void)
 	const char *env;
 	int err;
 
-	th = malloc(sizeof(struct team_handle));
+	th = myzalloc(sizeof(struct team_handle));
 	if (!th)
 		return NULL;
-
-	memset(th, 0, sizeof(struct team_handle));
 
 	th->log_fn = log_stderr;
 	th->log_priority = LOG_ERR;

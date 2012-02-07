@@ -28,6 +28,7 @@
 #include <linux/types.h>
 #include <team.h>
 #include <private/list.h>
+#include <private/misc.h>
 #include "team_private.h"
 
 struct team_port {
@@ -113,12 +114,11 @@ int get_port_list_handler(struct nl_msg *msg, void *arg)
 		ifindex = nla_get_u32(port_attrs[TEAM_ATTR_PORT_IFINDEX]);
 		port = find_port(th, ifindex);
 		if (!port) {
-			port = malloc(sizeof(struct team_port));
+			port = myzalloc(sizeof(struct team_port));
 			if (!port) {
 				err(th, "Malloc failed.");
 				return NL_SKIP;
 			}
-			memset(port, 0, sizeof(struct team_port));
 			port->ifindex = ifindex;
 			list_add(&th->port_list, &port->list);
 		}
