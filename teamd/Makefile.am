@@ -4,12 +4,12 @@ ACLOCAL_AMFLAGS = -I m4
 
 AM_CFLAGS = -I${top_srcdir}/include
 
-teamd_CFLAGS= $(LIBDAEMON_CFLAGS) $(JANSSON_CFLAGS) -I${top_srcdir}/include -D_GNU_SOURCE
+teamd_CFLAGS= $(LIBDAEMON_CFLAGS) $(JANSSON_CFLAGS) $(DBUS_CFLAGS) -I${top_srcdir}/include -D_GNU_SOURCE
 
-teamd_LDADD = $(top_builddir)/lib/libteam.la $(LIBDAEMON_LIBS) $(JANSSON_LIBS)
+teamd_LDADD = $(top_builddir)/lib/libteam.la $(LIBDAEMON_LIBS) $(JANSSON_LIBS) $(DBUS_LIBS)
 
 bin_PROGRAMS=teamd
-teamd_SOURCES=teamd.c teamd_runner_basic_ones.c teamd_runner_activebackup.c
+teamd_SOURCES=teamd.c teamd_dbus.c teamd_runner_basic_ones.c teamd_runner_activebackup.c
 
 EXTRA_DIST = example_configs
 

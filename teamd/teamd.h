@@ -27,6 +27,7 @@
 #include <jansson.h>
 #include <team.h>
 #include <private/list.h>
+#include <dbus/dbus.h>
 
 #define teamd_log_err(args...) daemon_log(LOG_ERR, ##args)
 #define teamd_log_warn(args...) daemon_log(LOG_WARNING, ##args)
@@ -67,6 +68,9 @@ struct teamd_context {
 		int				ctrl_pipe_w;
 		int				err;
 	} run_loop;
+	struct {
+		DBusConnection *con;
+	} dbus;
 };
 
 struct teamd_runner {
@@ -112,6 +116,8 @@ const struct teamd_runner teamd_runner_roundrobin;
 const struct teamd_runner teamd_runner_activebackup;
 
 void *teamd_get_runner_port_priv(struct teamd_context *ctx, uint32_t ifindex);
+int teamd_dbus_init(struct teamd_context *ctx);
+void teamd_dbus_fini(struct teamd_context *ctx);
 
 /* Various helpers */
 char *dev_name(const struct teamd_context *ctx, uint32_t ifindex);

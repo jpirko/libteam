@@ -528,7 +528,7 @@ static int teamd_run_loop_init(struct teamd_context *ctx)
 	list_init(&ctx->run_loop.callback_list);
 	err = pipe(fds);
 	if (err)
-		return err;
+		return -errno;
 	ctx->run_loop.ctrl_pipe_r = fds[0];
 	ctx->run_loop.ctrl_pipe_w = fds[1];
 
@@ -1019,14 +1019,22 @@ static int teamd_init(struct teamd_context *ctx)
 		goto team_unreg_debug_handlers;
 	}
 
+	err = teamd_dbus_init(ctx);
+	if (err) {
+		teamd_log_err("Failed to init dbus.");
+		goto runner_fini;
+	}
+
 	err = teamd_add_ports(ctx);
 	if (err) {
 		teamd_log_err("Failed to add ports.");
-		goto runner_fini;
+		goto dbus_fini;
 	}
 
 	return 0;
 
+dbus_fini:
+	teamd_dbus_fini(ctx);
 runner_fini:
 	teamd_runner_fini(ctx);
 team_unreg_debug_handlers:
@@ -1045,6 +1053,7 @@ config_free:
 
 static void teamd_fini(struct teamd_context *ctx)
 {
+	teamd_dbus_fini(ctx);
 	teamd_runner_fini(ctx);
 	teamd_unregister_default_handlers(ctx);
 	teamd_run_loop_fini(ctx);
