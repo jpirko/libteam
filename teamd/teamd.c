@@ -235,7 +235,7 @@ static int teamd_run_loop_run(struct teamd_context *ctx)
 		FD_SET(ctrl_fd, &fds_r);
 		fdmax = ctrl_fd + 1;
 		list_for_each_node_entry(lcb, lcb_list, list) {
-			if (lcb->fd) {
+			if (teamd_loop_callback_is_enabled(lcb)) {
 				switch (lcb->fd_type) {
 				case TEAMD_LOOP_FD_TYPE_READ:
 					FD_SET(lcb->fd, &fds_r);
@@ -308,7 +308,7 @@ static void teamd_run_loop_quit(struct teamd_context *ctx, int err)
 	teamd_run_loop_sent_ctrl_byte(ctx, 'q');
 }
 
-static void teamd_run_loop_restart(struct teamd_context *ctx)
+void teamd_run_loop_restart(struct teamd_context *ctx)
 {
 	teamd_run_loop_sent_ctrl_byte(ctx, 'r');
 }
@@ -354,7 +354,7 @@ int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 	lcb->func = func;
 	lcb->func_priv = func_priv;
 	list_add(&ctx->run_loop.callback_list, &lcb->list);
-	teamd_run_loop_restart(ctx);
+	teamd_loop_callback_enable(ctx, lcb);
 	*plcb = lcb;
 	return 0;
 }

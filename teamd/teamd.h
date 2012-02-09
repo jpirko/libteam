@@ -55,6 +55,7 @@ struct teamd_loop_callback {
 	int fd;
 	bool is_period;
 	enum teamd_loop_fd_type fd_type;
+	bool enabled;
 };
 
 struct teamd_context {
@@ -109,6 +110,29 @@ int teamd_loop_callback_period_add(struct teamd_context *ctx,
 				   void *func_priv);
 void teamd_loop_callback_del(struct teamd_context *ctx,
 			     struct teamd_loop_callback *lcb);
+
+void teamd_run_loop_restart(struct teamd_context *ctx);
+
+static inline void teamd_loop_callback_enable(struct teamd_context *ctx,
+					      struct teamd_loop_callback *lcb)
+{
+	lcb->enabled = true;
+	teamd_run_loop_restart(ctx);
+}
+
+static inline void teamd_loop_callback_disable(struct teamd_context *ctx,
+					       struct teamd_loop_callback *lcb)
+{
+	lcb->enabled = false;
+	teamd_run_loop_restart(ctx);
+}
+
+static inline bool teamd_loop_callback_is_enabled(struct teamd_loop_callback *lcb)
+{
+	return lcb->enabled;
+}
+
+
 void *teamd_get_runner_port_priv(struct teamd_context *ctx, uint32_t ifindex);
 
 /* Various helpers */
