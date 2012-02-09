@@ -71,6 +71,7 @@ struct teamd_context {
 	struct team_handle *		th;
 	const struct teamd_runner *	runner;
 	void *				runner_priv;
+	struct list_item		runner_port_priv_list;
 	uint32_t			ifindex;
 	uint32_t			hwaddr_len;
 	struct {
@@ -89,6 +90,7 @@ struct teamd_runner {
 	size_t priv_size;
 	int (*init)(struct teamd_context *ctx);
 	void (*fini)(struct teamd_context *ctx);
+	size_t port_priv_size;
 };
 
 /* Runner structures */
@@ -107,6 +109,7 @@ int teamd_loop_callback_period_add(struct teamd_context *ctx,
 				   void *func_priv);
 void teamd_loop_callback_del(struct teamd_context *ctx,
 			     struct teamd_loop_callback *lcb);
+void *teamd_get_runner_port_priv(struct teamd_context *ctx, uint32_t ifindex);
 
 /* Various helpers */
 char *dev_name(const struct teamd_context *ctx, uint32_t ifindex);

@@ -653,6 +653,90 @@ static void teamd_runner_fini(struct teamd_context *ctx)
 	free(ctx->runner_priv);
 }
 
+struct port_priv_item {
+	struct list_item list;
+	uint32_t ifindex;
+	bool to_be_removed;
+	long priv[0];
+};
+
+static struct port_priv_item *get_ppitem(struct teamd_context *ctx,
+					 uint32_t ifindex)
+{
+	struct port_priv_item *ppitem;
+	size_t alloc_size;
+
+	list_for_each_node_entry(ppitem, &ctx->runner_port_priv_list, list) {
+		if (ppitem->ifindex == ifindex)
+			return ppitem;
+	}
+
+	alloc_size = sizeof(*ppitem) + ctx->runner->port_priv_size;
+	ppitem = malloc(alloc_size);
+	if (!ppitem) {
+		teamd_log_err("Failed to alloc port priv (ifindex %d).",
+			       ifindex);
+		return NULL;
+	}
+	memset(ppitem, 0, alloc_size);
+	ppitem->ifindex = ifindex;
+	list_add(&ctx->runner_port_priv_list, &ppitem->list);
+	return ppitem;
+}
+
+void *teamd_get_runner_port_priv(struct teamd_context *ctx, uint32_t ifindex)
+{
+	struct port_priv_item *ppitem;
+
+	ppitem = get_ppitem(ctx, ifindex);
+	if (!ppitem)
+		return NULL;
+	return &ppitem->priv;
+}
+
+static void check_ppitems_to_be_removed(struct teamd_context *ctx, bool killall)
+{
+	struct port_priv_item *ppitem, *tmp;
+
+	list_for_each_node_entry_safe(ppitem, tmp,
+				      &ctx->runner_port_priv_list, list) {
+		if (killall || ppitem->to_be_removed) {
+			list_del(&ppitem->list);
+			free(ppitem);
+		}
+	}
+}
+
+static void teamd_free_port_privs(struct teamd_context *ctx)
+{
+	check_ppitems_to_be_removed(ctx, true);
+}
+
+static void port_priv_change_handler_func(struct team_handle *th, void *arg,
+					  team_change_type_mask_t type_mask)
+{
+	struct teamd_context *ctx = team_get_user_priv(th);
+	struct team_port *port;
+	struct port_priv_item *ppitem;
+
+	check_ppitems_to_be_removed(ctx, false);
+
+	team_for_each_port(port, th) {
+		uint32_t ifindex = team_get_port_ifindex(port);
+
+		ppitem = get_ppitem(ctx, ifindex);
+		if (!ppitem)
+			continue;
+		if (team_is_port_removed(port))
+			ppitem->to_be_removed = true;
+	}
+}
+
+static struct team_change_handler port_priv_change_handler = {
+	.func = port_priv_change_handler_func,
+	.type_mask = TEAM_PORT_CHANGE | TEAM_OPTION_CHANGE,
+};
+
 static void debug_log_port_list(struct teamd_context *ctx)
 {
 	struct team_port *port;
@@ -716,18 +800,32 @@ static struct team_change_handler debug_change_handler = {
 	.type_mask = TEAM_PORT_CHANGE | TEAM_OPTION_CHANGE,
 };
 
-static int teamd_register_debug_handlers(struct teamd_context *ctx)
+static int teamd_register_default_handlers(struct teamd_context *ctx)
 {
+	int err;
+
+	err = team_change_handler_register(ctx->th, &port_priv_change_handler);
+	if (err)
+		return err;
+
 	if (!ctx->debug)
 		return 0;
-	return team_change_handler_register(ctx->th, &debug_change_handler);
+	err = team_change_handler_register(ctx->th, &debug_change_handler);
+	if (err)
+		goto unreg_port_priv_handler;
+	return 0;
+
+unreg_port_priv_handler:
+	team_change_handler_unregister(ctx->th, &port_priv_change_handler);
+
+	return err;
 }
 
-static void teamd_unregister_debug_handlers(struct teamd_context *ctx)
+static void teamd_unregister_default_handlers(struct teamd_context *ctx)
 {
-	if (!ctx->debug)
-		return;
-	team_change_handler_unregister(ctx->th, &debug_change_handler);
+	if (ctx->debug)
+		team_change_handler_unregister(ctx->th, &debug_change_handler);
+	team_change_handler_unregister(ctx->th, &port_priv_change_handler);
 }
 
 static int teamd_init(struct teamd_context *ctx)
@@ -735,6 +833,7 @@ static int teamd_init(struct teamd_context *ctx)
 	int err;
 	const char *team_name;
 
+	list_init(&ctx->runner_port_priv_list);
 	err = config_load(ctx);
 	if (err) {
 		teamd_log_err("Failed to load config.");
@@ -807,7 +906,7 @@ static int teamd_init(struct teamd_context *ctx)
 		goto team_destroy;
 	}
 
-	err = teamd_register_debug_handlers(ctx);
+	err = teamd_register_default_handlers(ctx);
 	if (err) {
 		teamd_log_err("Failed to register debug event handlers.");
 		goto run_loop_fini;
@@ -830,7 +929,7 @@ static int teamd_init(struct teamd_context *ctx)
 runner_fini:
 	teamd_runner_fini(ctx);
 team_unreg_debug_handlers:
-	teamd_unregister_debug_handlers(ctx);
+	teamd_unregister_default_handlers(ctx);
 run_loop_fini:
 	teamd_run_loop_fini(ctx);
 team_destroy:
@@ -839,17 +938,19 @@ team_free:
 	team_free(ctx->th);
 config_free:
 	config_free(ctx);
+	teamd_free_port_privs(ctx);
 	return err;
 }
 
 static void teamd_fini(struct teamd_context *ctx)
 {
 	teamd_runner_fini(ctx);
-	teamd_unregister_debug_handlers(ctx);
+	teamd_unregister_default_handlers(ctx);
 	teamd_run_loop_fini(ctx);
 	team_destroy(ctx->th);
 	team_free(ctx->th);
 	config_free(ctx);
+	teamd_free_port_privs(ctx);
 }
 
 static int teamd_start(struct teamd_context *ctx)
