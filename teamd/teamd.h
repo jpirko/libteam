@@ -42,6 +42,7 @@ enum teamd_command {
 };
 
 struct teamd_runner;
+struct teamd_context;
 
 enum teamd_loop_fd_type {
 	TEAMD_LOOP_FD_TYPE_READ = 0,
@@ -50,9 +51,12 @@ enum teamd_loop_fd_type {
 	TEAMD_LOOP_FD_TYPE_MAX = 3,
 };
 
+typedef void (*teamd_loop_callback_func_t)(struct teamd_context *ctx,
+					   void *func_priv);
+
 struct teamd_loop_callback {
 	struct list_item list;
-	void (*func)(void *func_priv);
+	teamd_loop_callback_func_t func;
 	void *func_priv;
 	int fd;
 	bool is_period;
@@ -104,11 +108,12 @@ const struct teamd_runner teamd_runner_activebackup;
 int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 			       struct teamd_loop_callback **plcb, int fd,
 			       enum teamd_loop_fd_type fd_type,
-			       void (*func)(void *func_priv), void *func_priv);
+			       teamd_loop_callback_func_t func,
+			       void *func_priv);
 int teamd_loop_callback_period_add(struct teamd_context *ctx,
 				   struct teamd_loop_callback **plcb,
 				   time_t sec, long nsec,
-				   void (*func)(void *func_priv),
+				   teamd_loop_callback_func_t func,
 				   void *func_priv);
 void teamd_loop_callback_del(struct teamd_context *ctx,
 			     struct teamd_loop_callback *lcb);

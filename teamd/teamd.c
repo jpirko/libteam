@@ -274,7 +274,7 @@ static int teamd_run_loop_run(struct teamd_context *ctx)
 			if (FD_ISSET(lcb->fd, &fds[lcb->fd_type])) {
 				if (lcb->is_period)
 					handle_period_fd(lcb->fd);
-				lcb->func(lcb->func_priv);
+				lcb->func(ctx, lcb->func_priv);
 			}
 		}
 	}
@@ -330,7 +330,8 @@ static int get_timerfd(int *pfd, time_t sec, long nsec)
 int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 			       struct teamd_loop_callback **plcb, int fd,
 			       enum teamd_loop_fd_type fd_type,
-			       void (*func)(void *func_priv), void *func_priv)
+			       teamd_loop_callback_func_t func,
+			       void *func_priv)
 {
 	struct teamd_loop_callback *lcb;
 
@@ -356,7 +357,7 @@ int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 int teamd_loop_callback_period_add(struct teamd_context *ctx,
 				   struct teamd_loop_callback **plcb,
 				   time_t sec, long nsec,
-				   void (*func)(void *func_priv),
+				   teamd_loop_callback_func_t func,
 				   void *func_priv)
 {
 	int err;
@@ -385,9 +386,8 @@ void teamd_loop_callback_del(struct teamd_context *ctx,
 	free(lcb);
 }
 
-static void callback_daemon_signal(void *func_priv)
+static void callback_daemon_signal(struct teamd_context *ctx, void *func_priv)
 {
-	struct teamd_context *ctx = func_priv;
 	int sig;
 
 	/* Get signal */
@@ -408,10 +408,8 @@ static void callback_daemon_signal(void *func_priv)
 	}
 }
 
-static void callback_libteam_event(void *func_priv)
+static void callback_libteam_event(struct teamd_context *ctx, void *func_priv)
 {
-	struct teamd_context *ctx = func_priv;
-
 	team_process_event(ctx->th);
 }
 
@@ -430,7 +428,7 @@ static int teamd_run_loop_init(struct teamd_context *ctx)
 	err = teamd_loop_callback_fd_add(ctx, &ctx->run_loop.daemon_lcb,
 					 daemon_signal_fd(),
 					 TEAMD_LOOP_FD_TYPE_READ,
-					 callback_daemon_signal, ctx);
+					 callback_daemon_signal, NULL);
 	if (err) {
 		teamd_log_err("Failed to add daemon loop callback");
 		goto close_pipe;
@@ -439,7 +437,7 @@ static int teamd_run_loop_init(struct teamd_context *ctx)
 	err = teamd_loop_callback_fd_add(ctx, &ctx->run_loop.libteam_event_lcb,
 					 team_get_event_fd(ctx->th),
 					 TEAMD_LOOP_FD_TYPE_READ,
-					 callback_libteam_event, ctx);
+					 callback_libteam_event, NULL);
 	if (err) {
 		teamd_log_err("Failed to add libteam event loop callback");
 		goto del_daemon_cb;
