@@ -44,8 +44,10 @@ enum teamd_command {
 struct teamd_runner;
 
 enum teamd_loop_fd_type {
-	TEAMD_LOOP_FD_TYPE_READ,
-	TEAMD_LOOP_FD_TYPE_WRITE,
+	TEAMD_LOOP_FD_TYPE_READ = 0,
+	TEAMD_LOOP_FD_TYPE_WRITE = 1,
+	TEAMD_LOOP_FD_TYPE_EXCEPTION = 2,
+	TEAMD_LOOP_FD_TYPE_MAX = 3,
 };
 
 struct teamd_loop_callback {

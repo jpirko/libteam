@@ -222,37 +222,30 @@ static int teamd_run_loop_run(struct teamd_context *ctx)
 {
 	int err;
 	int ctrl_fd = ctx->run_loop.ctrl_pipe_r;
-	fd_set fds_r;
-	fd_set fds_w;
+	fd_set fds[TEAMD_LOOP_FD_TYPE_MAX];
 	int fdmax;
 	struct list_item *lcb_list = &ctx->run_loop.callback_list;
 	struct teamd_loop_callback *lcb;
 	char ctrl_byte;
+	int i;
 
 	while (true) {
-		FD_ZERO(&fds_r);
-		FD_ZERO(&fds_w);
-		FD_SET(ctrl_fd, &fds_r);
+		for (i = 0; i < TEAMD_LOOP_FD_TYPE_MAX; i++)
+			FD_ZERO(&fds[i]);
+		FD_SET(ctrl_fd, &fds[TEAMD_LOOP_FD_TYPE_READ]);
 		fdmax = ctrl_fd + 1;
 		list_for_each_node_entry(lcb, lcb_list, list) {
 			if (teamd_loop_callback_is_enabled(lcb)) {
-				switch (lcb->fd_type) {
-				case TEAMD_LOOP_FD_TYPE_READ:
-					FD_SET(lcb->fd, &fds_r);
-					break;
-				case TEAMD_LOOP_FD_TYPE_WRITE:
-					FD_SET(lcb->fd, &fds_w);
-					break;
-				default:
-					continue;
-				}
+				FD_SET(lcb->fd, &fds[lcb->fd_type]);
 				if (lcb->fd >= fdmax)
 					fdmax = lcb->fd + 1;
 
 			}
 		}
 
-		while (select(fdmax, &fds_r, &fds_w, NULL, NULL) < 0) {
+		while (select(fdmax, &fds[TEAMD_LOOP_FD_TYPE_READ],
+			      &fds[TEAMD_LOOP_FD_TYPE_WRITE],
+			      &fds[TEAMD_LOOP_FD_TYPE_EXCEPTION], NULL) < 0) {
 			if (errno == EINTR)
 				continue;
 
@@ -260,7 +253,7 @@ static int teamd_run_loop_run(struct teamd_context *ctx)
 			return -errno;
 		}
 
-		if (FD_ISSET(ctrl_fd, &fds_r)) {
+		if (FD_ISSET(ctrl_fd, &fds[TEAMD_LOOP_FD_TYPE_READ])) {
 			err = read(ctrl_fd, &ctrl_byte, 1);
 			if (err != -1) {
 				switch(ctrl_byte) {
@@ -278,10 +271,7 @@ static int teamd_run_loop_run(struct teamd_context *ctx)
 		}
 
 		list_for_each_node_entry(lcb, lcb_list, list) {
-			if ((FD_ISSET(lcb->fd, &fds_r) &&
-			     lcb->fd_type == TEAMD_LOOP_FD_TYPE_READ) ||
-			    (FD_ISSET(lcb->fd, &fds_w) &&
-			     lcb->fd_type == TEAMD_LOOP_FD_TYPE_WRITE)) {
+			if (FD_ISSET(lcb->fd, &fds[lcb->fd_type])) {
 				if (lcb->is_period)
 					handle_period_fd(lcb->fd);
 				lcb->func(lcb->func_priv);
@@ -344,6 +334,10 @@ int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 {
 	struct teamd_loop_callback *lcb;
 
+	if (fd_type < 0 || fd_type >= TEAMD_LOOP_FD_TYPE_MAX) {
+		teamd_log_err("Invalid fd_type.");
+		return -EINVAL;
+	}
 	lcb = myzalloc(sizeof(*lcb));
 	if (!lcb) {
 		teamd_log_err("Failed alloc memory for callback.");
