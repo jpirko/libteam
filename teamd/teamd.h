@@ -94,11 +94,12 @@ int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 			       enum teamd_loop_fd_type fd_type,
 			       teamd_loop_callback_func_t func,
 			       void *func_priv);
-int teamd_loop_callback_period_add(struct teamd_context *ctx,
-				   const char *cb_name,
-				   time_t sec, long nsec,
-				   teamd_loop_callback_func_t func,
-				   void *func_priv);
+int teamd_loop_callback_timer_add(struct teamd_context *ctx,
+				  const char *cb_name,
+				  time_t i_sec, long i_nsec,
+				  time_t v_sec, long v_nsec,
+				  teamd_loop_callback_func_t func,
+				  void *func_priv);
 void teamd_loop_callback_del(struct teamd_context *ctx, const char *cb_name);
 int teamd_loop_callback_enable(struct teamd_context *ctx, const char *cb_name);
 int teamd_loop_callback_disable(struct teamd_context *ctx, const char *cb_name);

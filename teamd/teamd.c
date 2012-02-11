@@ -314,15 +314,16 @@ void teamd_run_loop_restart(struct teamd_context *ctx)
 	teamd_run_loop_sent_ctrl_byte(ctx, 'r');
 }
 
-static int get_timerfd(int *pfd, time_t sec, long nsec)
+static int get_timerfd(int *pfd, time_t i_sec, long i_nsec,
+		       time_t v_sec, long v_nsec)
 {
 	int fd;
 	struct itimerspec its;
 
-	its.it_interval.tv_sec = sec;
-	its.it_interval.tv_nsec = nsec;
-	its.it_value.tv_sec = sec;
-	its.it_value.tv_nsec = nsec;
+	its.it_interval.tv_sec = i_sec;
+	its.it_interval.tv_nsec = i_nsec;
+	its.it_value.tv_sec = v_sec;
+	its.it_value.tv_nsec = v_nsec;
 
 	fd = timerfd_create(CLOCK_MONOTONIC, 0);
 	if (fd < 0) {
@@ -390,16 +391,17 @@ lcb_free:
 	return err;
 }
 
-int teamd_loop_callback_period_add(struct teamd_context *ctx,
-				   const char *cb_name,
-				   time_t sec, long nsec,
-				   teamd_loop_callback_func_t func,
-				   void *func_priv)
+int teamd_loop_callback_timer_add(struct teamd_context *ctx,
+				  const char *cb_name,
+				  time_t i_sec, long i_nsec,
+				  time_t v_sec, long v_nsec,
+				  teamd_loop_callback_func_t func,
+				  void *func_priv)
 {
 	int err;
 	int fd;
 
-	err = get_timerfd(&fd, sec, nsec);
+	err = get_timerfd(&fd, i_sec, i_nsec, v_sec, v_nsec);
 	if (err)
 		return err;
 	err = teamd_loop_callback_fd_add(ctx, cb_name, fd,
