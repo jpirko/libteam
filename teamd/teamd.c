@@ -404,7 +404,6 @@ int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 	lcb->func = func;
 	lcb->func_priv = func_priv;
 	list_add(&ctx->run_loop.callback_list, &lcb->list);
-	lcb->enabled = true;
 	return 0;
 
 lcb_free:
@@ -544,6 +543,9 @@ static int teamd_run_loop_init(struct teamd_context *ctx)
 		teamd_log_err("Failed to add libteam event loop callback");
 		goto del_daemon_cb;
 	}
+
+	teamd_loop_callback_enable(ctx, "daemon");
+	teamd_loop_callback_enable(ctx, "libteam_events");
 
 	return 0;
 
