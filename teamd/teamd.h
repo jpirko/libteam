@@ -44,26 +44,6 @@ enum teamd_command {
 struct teamd_runner;
 struct teamd_context;
 
-enum teamd_loop_fd_type {
-	TEAMD_LOOP_FD_TYPE_READ = 0,
-	TEAMD_LOOP_FD_TYPE_WRITE = 1,
-	TEAMD_LOOP_FD_TYPE_EXCEPTION = 2,
-	TEAMD_LOOP_FD_TYPE_MAX = 3,
-};
-
-typedef void (*teamd_loop_callback_func_t)(struct teamd_context *ctx,
-					   void *func_priv);
-
-struct teamd_loop_callback {
-	struct list_item list;
-	teamd_loop_callback_func_t func;
-	void *func_priv;
-	int fd;
-	bool is_period;
-	enum teamd_loop_fd_type fd_type;
-	bool enabled;
-};
-
 struct teamd_context {
 	enum teamd_command		cmd;
 	bool				daemonize;
@@ -86,8 +66,6 @@ struct teamd_context {
 		int				ctrl_pipe_r;
 		int				ctrl_pipe_w;
 		int				err;
-		struct teamd_loop_callback *	daemon_lcb;
-		struct teamd_loop_callback *	libteam_event_lcb;
 	} run_loop;
 };
 
@@ -100,45 +78,37 @@ struct teamd_runner {
 	size_t port_priv_size;
 };
 
-/* Runner structures */
-const struct teamd_runner teamd_runner_dummy;
-const struct teamd_runner teamd_runner_roundrobin;
-const struct teamd_runner teamd_runner_activebackup;
+/* Main loop callbacks */
+enum teamd_loop_fd_type {
+	TEAMD_LOOP_FD_TYPE_READ = 0,
+	TEAMD_LOOP_FD_TYPE_WRITE = 1,
+	TEAMD_LOOP_FD_TYPE_EXCEPTION = 2,
+	TEAMD_LOOP_FD_TYPE_MAX = 3,
+};
+
+typedef void (*teamd_loop_callback_func_t)(struct teamd_context *ctx,
+					   void *func_priv);
 
 int teamd_loop_callback_fd_add(struct teamd_context *ctx,
-			       struct teamd_loop_callback **plcb, int fd,
+			       const char *cb_name, int fd,
 			       enum teamd_loop_fd_type fd_type,
 			       teamd_loop_callback_func_t func,
 			       void *func_priv);
 int teamd_loop_callback_period_add(struct teamd_context *ctx,
-				   struct teamd_loop_callback **plcb,
+				   const char *cb_name,
 				   time_t sec, long nsec,
 				   teamd_loop_callback_func_t func,
 				   void *func_priv);
-void teamd_loop_callback_del(struct teamd_context *ctx,
-			     struct teamd_loop_callback *lcb);
-
+void teamd_loop_callback_del(struct teamd_context *ctx, const char *cb_name);
+int teamd_loop_callback_enable(struct teamd_context *ctx, const char *cb_name);
+int teamd_loop_callback_disable(struct teamd_context *ctx, const char *cb_name);
+bool teamd_loop_callback_is_enabled(struct teamd_context *ctx, const char *cb_name);
 void teamd_run_loop_restart(struct teamd_context *ctx);
 
-static inline void teamd_loop_callback_enable(struct teamd_context *ctx,
-					      struct teamd_loop_callback *lcb)
-{
-	lcb->enabled = true;
-	teamd_run_loop_restart(ctx);
-}
-
-static inline void teamd_loop_callback_disable(struct teamd_context *ctx,
-					       struct teamd_loop_callback *lcb)
-{
-	lcb->enabled = false;
-	teamd_run_loop_restart(ctx);
-}
-
-static inline bool teamd_loop_callback_is_enabled(struct teamd_loop_callback *lcb)
-{
-	return lcb->enabled;
-}
-
+/* Runner structures */
+const struct teamd_runner teamd_runner_dummy;
+const struct teamd_runner teamd_runner_roundrobin;
+const struct teamd_runner teamd_runner_activebackup;
 
 void *teamd_get_runner_port_priv(struct teamd_context *ctx, uint32_t ifindex);
 
