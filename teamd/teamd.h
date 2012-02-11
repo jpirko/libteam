@@ -79,19 +79,19 @@ struct teamd_runner {
 };
 
 /* Main loop callbacks */
-enum teamd_loop_fd_type {
-	TEAMD_LOOP_FD_TYPE_READ = 0,
-	TEAMD_LOOP_FD_TYPE_WRITE = 1,
-	TEAMD_LOOP_FD_TYPE_EXCEPTION = 2,
-	TEAMD_LOOP_FD_TYPE_MAX = 3,
-};
+#define TEAMD_LOOP_FD_TYPE_READ		(1 << 0)
+#define TEAMD_LOOP_FD_TYPE_WRITE	(1 << 1)
+#define TEAMD_LOOP_FD_TYPE_EXCEPTION	(1 << 2)
+#define TEAMD_LOOP_FD_TYPE_MASK		(TEAMD_LOOP_FD_TYPE_READ | \
+					 TEAMD_LOOP_FD_TYPE_WRITE | \
+					 TEAMD_LOOP_FD_TYPE_EXCEPTION)
 
 typedef void (*teamd_loop_callback_func_t)(struct teamd_context *ctx,
 					   void *func_priv);
 
 int teamd_loop_callback_fd_add(struct teamd_context *ctx,
-			       const char *cb_name, int fd,
-			       enum teamd_loop_fd_type fd_type,
+			       const char *cb_name,
+			       int fd, int fd_type,
 			       teamd_loop_callback_func_t func,
 			       void *func_priv);
 int teamd_loop_callback_timer_add(struct teamd_context *ctx,

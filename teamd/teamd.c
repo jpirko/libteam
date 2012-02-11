@@ -224,39 +224,69 @@ struct teamd_loop_callback {
 	teamd_loop_callback_func_t func;
 	void *func_priv;
 	int fd;
+	int fd_type;
 	bool is_period;
-	enum teamd_loop_fd_type fd_type;
 	bool enabled;
 };
+
+static void teamd_run_loop_set_fds(struct list_item *lcb_list,
+				   fd_set *fds, int *fdmax)
+{
+	struct teamd_loop_callback *lcb;
+	int i;
+
+	list_for_each_node_entry(lcb, lcb_list, list) {
+		if (!lcb->enabled)
+			continue;
+		for (i = 0; i < 3; i++) {
+			if (lcb->fd_type & (1 << i)) {
+				FD_SET(lcb->fd, &fds[i]);
+				if (lcb->fd >= *fdmax)
+					*fdmax = lcb->fd + 1;
+			}
+		}
+	}
+}
+
+static void teamd_run_loop_do_callbacks(struct list_item *lcb_list, fd_set *fds,
+					struct teamd_context *ctx)
+{
+	struct teamd_loop_callback *lcb;
+	int i;
+
+	list_for_each_node_entry(lcb, lcb_list, list) {
+		for (i = 0; i < 3; i++) {
+			if (lcb->fd_type & (1 << i)) {
+				if (FD_ISSET(lcb->fd, &fds[i])) {
+					if (lcb->is_period)
+						handle_period_fd(lcb->fd);
+					lcb->func(ctx, lcb->func_priv);
+					break;
+				}
+			}
+		}
+	}
+}
 
 static int teamd_run_loop_run(struct teamd_context *ctx)
 {
 	int err;
 	int ctrl_fd = ctx->run_loop.ctrl_pipe_r;
-	fd_set fds[TEAMD_LOOP_FD_TYPE_MAX];
+	fd_set fds[3];
 	int fdmax;
-	struct list_item *lcb_list = &ctx->run_loop.callback_list;
-	struct teamd_loop_callback *lcb;
 	char ctrl_byte;
 	int i;
 
 	while (true) {
-		for (i = 0; i < TEAMD_LOOP_FD_TYPE_MAX; i++)
+		for (i = 0; i < 3; i++)
 			FD_ZERO(&fds[i]);
-		FD_SET(ctrl_fd, &fds[TEAMD_LOOP_FD_TYPE_READ]);
+		FD_SET(ctrl_fd, &fds[0]);
 		fdmax = ctrl_fd + 1;
-		list_for_each_node_entry(lcb, lcb_list, list) {
-			if (lcb->enabled) {
-				FD_SET(lcb->fd, &fds[lcb->fd_type]);
-				if (lcb->fd >= fdmax)
-					fdmax = lcb->fd + 1;
 
-			}
-		}
+		teamd_run_loop_set_fds(&ctx->run_loop.callback_list,
+				       fds, &fdmax);
 
-		while (select(fdmax, &fds[TEAMD_LOOP_FD_TYPE_READ],
-			      &fds[TEAMD_LOOP_FD_TYPE_WRITE],
-			      &fds[TEAMD_LOOP_FD_TYPE_EXCEPTION], NULL) < 0) {
+		while (select(fdmax, &fds[0], &fds[1], &fds[2], NULL) < 0) {
 			if (errno == EINTR)
 				continue;
 
@@ -264,7 +294,7 @@ static int teamd_run_loop_run(struct teamd_context *ctx)
 			return -errno;
 		}
 
-		if (FD_ISSET(ctrl_fd, &fds[TEAMD_LOOP_FD_TYPE_READ])) {
+		if (FD_ISSET(ctrl_fd, &fds[0])) {
 			err = read(ctrl_fd, &ctrl_byte, 1);
 			if (err != -1) {
 				switch(ctrl_byte) {
@@ -281,13 +311,8 @@ static int teamd_run_loop_run(struct teamd_context *ctx)
 			}
 		}
 
-		list_for_each_node_entry(lcb, lcb_list, list) {
-			if (FD_ISSET(lcb->fd, &fds[lcb->fd_type])) {
-				if (lcb->is_period)
-					handle_period_fd(lcb->fd);
-				lcb->func(ctx, lcb->func_priv);
-			}
-		}
+		teamd_run_loop_do_callbacks(&ctx->run_loop.callback_list,
+					    fds, ctx);
 	}
 	return 0;
 }
@@ -351,8 +376,8 @@ static struct teamd_loop_callback *get_lcb(struct teamd_context *ctx,
 }
 
 int teamd_loop_callback_fd_add(struct teamd_context *ctx,
-			       const char *cb_name, int fd,
-			       enum teamd_loop_fd_type fd_type,
+			       const char *cb_name,
+			       int fd, int fd_type,
 			       teamd_loop_callback_func_t func,
 			       void *func_priv)
 {
@@ -363,10 +388,6 @@ int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 		teamd_log_err("Callback named \"%s\" is already registered.",
 			      cb_name);
 		return -EEXIST;
-	}
-	if (fd_type < 0 || fd_type >= TEAMD_LOOP_FD_TYPE_MAX) {
-		teamd_log_err("Invalid fd_type.");
-		return -EINVAL;
 	}
 	lcb = myzalloc(sizeof(*lcb));
 	if (!lcb) {
@@ -379,7 +400,7 @@ int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 		goto lcb_free;
 	}
 	lcb->fd = fd;
-	lcb->fd_type = fd_type;
+	lcb->fd_type = fd_type & TEAMD_LOOP_FD_TYPE_MASK;
 	lcb->func = func;
 	lcb->func_priv = func_priv;
 	list_add(&ctx->run_loop.callback_list, &lcb->list);
