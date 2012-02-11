@@ -79,19 +79,19 @@ struct teamd_runner {
 };
 
 /* Main loop callbacks */
-#define TEAMD_LOOP_FD_TYPE_READ		(1 << 0)
-#define TEAMD_LOOP_FD_TYPE_WRITE	(1 << 1)
-#define TEAMD_LOOP_FD_TYPE_EXCEPTION	(1 << 2)
-#define TEAMD_LOOP_FD_TYPE_MASK		(TEAMD_LOOP_FD_TYPE_READ | \
-					 TEAMD_LOOP_FD_TYPE_WRITE | \
-					 TEAMD_LOOP_FD_TYPE_EXCEPTION)
+#define TEAMD_LOOP_FD_EVENT_READ	(1 << 0)
+#define TEAMD_LOOP_FD_EVENT_WRITE	(1 << 1)
+#define TEAMD_LOOP_FD_EVENT_EXCEPTION	(1 << 2)
+#define TEAMD_LOOP_FD_EVENT_MASK	(TEAMD_LOOP_FD_EVENT_READ | \
+					 TEAMD_LOOP_FD_EVENT_WRITE | \
+					 TEAMD_LOOP_FD_EVENT_EXCEPTION)
 
 typedef void (*teamd_loop_callback_func_t)(struct teamd_context *ctx,
-					   void *func_priv);
+					   int events, void *func_priv);
 
 int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 			       const char *cb_name,
-			       int fd, int fd_type,
+			       int fd, int fd_event,
 			       teamd_loop_callback_func_t func,
 			       void *func_priv);
 int teamd_loop_callback_timer_add(struct teamd_context *ctx,

@@ -224,7 +224,7 @@ struct teamd_loop_callback {
 	teamd_loop_callback_func_t func;
 	void *func_priv;
 	int fd;
-	int fd_type;
+	int fd_event;
 	bool is_period;
 	bool enabled;
 };
@@ -239,7 +239,7 @@ static void teamd_run_loop_set_fds(struct list_item *lcb_list,
 		if (!lcb->enabled)
 			continue;
 		for (i = 0; i < 3; i++) {
-			if (lcb->fd_type & (1 << i)) {
+			if (lcb->fd_event & (1 << i)) {
 				FD_SET(lcb->fd, &fds[i]);
 				if (lcb->fd >= *fdmax)
 					*fdmax = lcb->fd + 1;
@@ -253,15 +253,18 @@ static void teamd_run_loop_do_callbacks(struct list_item *lcb_list, fd_set *fds,
 {
 	struct teamd_loop_callback *lcb;
 	int i;
+	int events;
 
 	list_for_each_node_entry(lcb, lcb_list, list) {
 		for (i = 0; i < 3; i++) {
-			if (lcb->fd_type & (1 << i)) {
-				if (FD_ISSET(lcb->fd, &fds[i])) {
+			if (lcb->fd_event& (1 << i)) {
+				events = 0;
+				if (FD_ISSET(lcb->fd, &fds[i]))
+					events |= (1 << i);
+				if (events) {
 					if (lcb->is_period)
 						handle_period_fd(lcb->fd);
-					lcb->func(ctx, lcb->func_priv);
-					break;
+					lcb->func(ctx, events, lcb->func_priv);
 				}
 			}
 		}
@@ -377,7 +380,7 @@ static struct teamd_loop_callback *get_lcb(struct teamd_context *ctx,
 
 int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 			       const char *cb_name,
-			       int fd, int fd_type,
+			       int fd, int fd_event,
 			       teamd_loop_callback_func_t func,
 			       void *func_priv)
 {
@@ -400,7 +403,7 @@ int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 		goto lcb_free;
 	}
 	lcb->fd = fd;
-	lcb->fd_type = fd_type & TEAMD_LOOP_FD_TYPE_MASK;
+	lcb->fd_event = fd_event & TEAMD_LOOP_FD_EVENT_MASK;
 	lcb->func = func;
 	lcb->func_priv = func_priv;
 	list_add(&ctx->run_loop.callback_list, &lcb->list);
@@ -425,7 +428,7 @@ int teamd_loop_callback_timer_add(struct teamd_context *ctx,
 	if (err)
 		return err;
 	err = teamd_loop_callback_fd_add(ctx, cb_name, fd,
-					 TEAMD_LOOP_FD_TYPE_READ,
+					 TEAMD_LOOP_FD_EVENT_READ,
 					 func, func_priv);
 	if (err) {
 		close(fd);
@@ -487,7 +490,9 @@ bool teamd_loop_callback_is_enabled(struct teamd_context *ctx, const char *cb_na
 	}
 	return lcb->enabled;
 }
-static void callback_daemon_signal(struct teamd_context *ctx, void *func_priv)
+
+static void callback_daemon_signal(struct teamd_context *ctx, int events,
+				   void *func_priv)
 {
 	int sig;
 
@@ -509,7 +514,8 @@ static void callback_daemon_signal(struct teamd_context *ctx, void *func_priv)
 	}
 }
 
-static void callback_libteam_event(struct teamd_context *ctx, void *func_priv)
+static void callback_libteam_event(struct teamd_context *ctx, int events,
+				   void *func_priv)
 {
 	team_process_event(ctx->th);
 }
@@ -528,7 +534,7 @@ static int teamd_run_loop_init(struct teamd_context *ctx)
 
 	err = teamd_loop_callback_fd_add(ctx, "daemon",
 					 daemon_signal_fd(),
-					 TEAMD_LOOP_FD_TYPE_READ,
+					 TEAMD_LOOP_FD_EVENT_READ,
 					 callback_daemon_signal, NULL);
 	if (err) {
 		teamd_log_err("Failed to add daemon loop callback");
@@ -537,7 +543,7 @@ static int teamd_run_loop_init(struct teamd_context *ctx)
 
 	err = teamd_loop_callback_fd_add(ctx, "libteam_events",
 					 team_get_event_fd(ctx->th),
-					 TEAMD_LOOP_FD_TYPE_READ,
+					 TEAMD_LOOP_FD_EVENT_READ,
 					 callback_libteam_event, NULL);
 	if (err) {
 		teamd_log_err("Failed to add libteam event loop callback");
