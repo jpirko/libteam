@@ -681,6 +681,70 @@ static int teamd_check_change_hwaddr(struct teamd_context *ctx)
 	return err;
 }
 
+static int get_port_obj(json_t **pport_obj, struct teamd_context *ctx,
+			const char *port_name)
+{
+	int err;
+	json_t *ports_obj;
+	json_t *port_obj;
+
+	err = json_unpack(ctx->config_json, "{s:o}", "ports", &ports_obj);
+	if (err) {
+		ports_obj = json_object();
+		if (!ports_obj)
+			return -ENOMEM;
+		err = json_object_set(ctx->config_json, "ports", ports_obj);
+		if (err) {
+			json_decref(ports_obj);
+			return -ENOMEM;
+		}
+	}
+	err = json_unpack(ports_obj, "{s:o}", port_name, &port_obj);
+	if (err) {
+		port_obj = json_object();
+		if (!port_obj)
+			return -ENOMEM;
+		err = json_object_set(ports_obj, port_name, port_obj);
+		if (err) {
+			json_decref(port_obj);
+			return -ENOMEM;
+		}
+	}
+	*pport_obj = port_obj;
+	return 0;
+}
+
+int teamd_update_port_config(struct teamd_context *ctx, const char *port_name,
+			     const char *json_port_cfg_str)
+{
+	int err;
+	json_t *port_obj;
+	json_t *port_new_obj;
+	json_error_t jerror;
+
+	port_new_obj = json_loads(json_port_cfg_str, JSON_REJECT_DUPLICATES,
+				  &jerror);
+	if (!port_new_obj) {
+		teamd_log_err("Failed to parse port config string: %s on line %d, column %d",
+			      jerror.text, jerror.line, jerror.column);
+		return -EIO;
+	}
+	err = get_port_obj(&port_obj, ctx, port_name);
+	if (err) {
+		teamd_log_err("Failed to obtain port config object");
+		goto new_port_decref;
+	}
+
+	/* replace existing object content */
+	json_object_clear(port_obj);
+	err = json_object_update(port_obj, port_new_obj);
+	if (err)
+		teamd_log_err("Failed to update existing config port object");
+new_port_decref:
+	json_decref(port_new_obj);
+	return err;
+}
+
 static int teamd_add_ports(struct teamd_context *ctx)
 {
 	int err;

@@ -83,6 +83,9 @@ struct teamd_runner {
 	size_t port_priv_size;
 };
 
+int teamd_update_port_config(struct teamd_context *ctx, const char *port_name,
+			     const char *json_port_cfg_str);
+
 /* Main loop callbacks */
 #define TEAMD_LOOP_FD_EVENT_READ	(1 << 0)
 #define TEAMD_LOOP_FD_EVENT_WRITE	(1 << 1)
