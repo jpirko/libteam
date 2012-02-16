@@ -107,7 +107,8 @@ static void print_help(const struct teamd_context *ctx) {
             "    -g --debug               Increase verbosity\n"
             "    -r --force-recreate      Force team device recreation in case it\n"
             "                             already exists\n"
-            "    -t --team-dev=DEVNAME    Use the specified team device\n",
+            "    -t --team-dev=DEVNAME    Use the specified team device\n"
+            "    -D --dbus-enable         Enable D-Bus interface\n",
             ctx->argv0);
 	printf("Available runners: ");
 	for (i = 0; i < TEAMD_RUNNER_LIST_SIZE; i++) {
@@ -133,10 +134,11 @@ static int parse_command_line(struct teamd_context *ctx,
 		{ "debug",		no_argument,		NULL, 'g' },
 		{ "force-recreate",	no_argument,		NULL, 'r' },
 		{ "team-dev",		required_argument,	NULL, 't' },
+		{ "dbus-enable",	no_argument,		NULL, 'D' },
 		{ NULL, 0, NULL, 0 }
 	};
 
-	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:grt:",
+	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:grt:D",
 				  long_options, NULL)) >= 0) {
 
 		switch(opt) {
@@ -179,6 +181,9 @@ static int parse_command_line(struct teamd_context *ctx,
 		case 't':
 			free(ctx->team_devname);
 			ctx->team_devname = strdup(optarg);
+			break;
+		case 'D':
+			ctx->dbus.enabled = true;
 			break;
 		default:
 			return -1;

@@ -373,6 +373,8 @@ int teamd_dbus_init(struct teamd_context *ctx)
 	int err;
 	char *id;
 
+	if (!ctx->dbus.enabled)
+		return 0;
 	err = teamd_dbus_con_init(ctx);
 	if (err)
 		return err;
@@ -396,6 +398,8 @@ con_fini:
 
 void teamd_dbus_fini(struct teamd_context *ctx)
 {
+	if (!ctx->dbus.enabled)
+		return;
 	teamd_dbus_iface_fini(ctx);
 	teamd_dbus_con_fini(ctx);
 }

@@ -69,7 +69,8 @@ struct teamd_context {
 		int				err;
 	} run_loop;
 	struct {
-		DBusConnection *con;
+		bool			enabled;
+		DBusConnection *	con;
 	} dbus;
 };
 
