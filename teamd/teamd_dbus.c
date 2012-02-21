@@ -337,7 +337,7 @@ static void dispatch_exit(void *priv)
 
 int teamd_dbus_mainloop_init(struct teamd_context *ctx)
 {
-	struct dispatch_priv *dp;
+	struct dispatch_priv *dp = dp;
 	int err;
 
 	err = dispatch_init(&dp, ctx);

@@ -427,7 +427,7 @@ int teamd_loop_callback_timer_add(struct teamd_context *ctx,
 				  void *func_priv)
 {
 	int err;
-	int fd;
+	int fd = fd;
 
 	err = get_timerfd(&fd, i_sec, i_nsec, v_sec, v_nsec);
 	if (err)
