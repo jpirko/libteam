@@ -27,6 +27,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <inttypes.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <linux/netdevice.h>
@@ -219,7 +220,7 @@ static void handle_period_fd(int fd)
 		return;
 	}
 	if (exp > 1)
-		teamd_log_warn("some periodic function calls missed (%lu)",
+		teamd_log_warn("some periodic function calls missed (%" PRIu64 ")",
 			       exp - 1);
 }
 
