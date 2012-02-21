@@ -24,6 +24,7 @@ teamd \(em team network device control daemon
 .RB [ \-g ]
 .RB [ \-d ]
 .RB [ \-r ]
+.RB [ \-D ]
 .TP
 .B teamd
 .B "\-f config_file"
@@ -31,6 +32,7 @@ teamd \(em team network device control daemon
 .RB [ \-g ]
 .RB [ \-d ]
 .RB [ \-r ]
+.RB [ \-D ]
 .SH DESCRIPTION
 .PP
 teamd is a daemon which job is to "puppet control" given team network device.
@@ -73,6 +75,9 @@ Force team device recreation in case it already exists.
 .TP
 .B "\-t devicename, \-\-team-dev devicename"
 Use the specified team device name (overrides "device" key in config).
+.TP
+.B "\-D, \-\-dbus-enable"
+Enable D-Bus interface.
 
 .SH AUTHOR
 .PP
