@@ -1018,6 +1018,12 @@ static int teamd_init(struct teamd_context *ctx)
 			err = -EINVAL;
 			goto config_free;
 		}
+		ctx->team_devname = strdup(team_name);
+		if (!ctx->team_devname) {
+			teamd_log_err("Failed allocate memory for device name.");
+			err = -ENOMEM;
+			goto config_free;
+		}
 	} else {
 		team_name = ctx->team_devname;
 	}
@@ -1246,6 +1252,7 @@ static int teamd_context_init(struct teamd_context **pctx)
 
 static void teamd_context_fini(struct teamd_context *ctx)
 {
+	free(ctx->team_devname);
 	free(ctx->config_text);
 	free(ctx->config_file);
 	free(ctx->pid_file);

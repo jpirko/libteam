@@ -56,32 +56,40 @@ int teamd_dbus_iface_init(struct teamd_context *ctx)
 {
 	DBusError error;
 	int err;
+	char *service_name;
+
+	err = asprintf(&service_name, TEAMD_DBUS_SERVICE ".%s",
+		       ctx->team_devname);
+	if (err == -1)
+		return -errno;
 
 	if (dbus_connection_register_object_path(ctx->dbus.con,
 						 TEAMD_DBUS_PATH, &vtable,
 						 ctx) == FALSE) {
 		teamd_log_err("dbus: Could not set up message handler");
-		return -EINVAL;
+		err = -EINVAL;
+		goto out;
 	}
 	dbus_error_init(&error);
-	err = dbus_bus_request_name(ctx->dbus.con, TEAMD_DBUS_SERVICE, 0,
+	err = dbus_bus_request_name(ctx->dbus.con, service_name, 0,
 				    &error);
 	if (err == DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
-		teamd_log_dbg("dbus: have name %s", TEAMD_DBUS_SERVICE);
+		teamd_log_dbg("dbus: have name %s", service_name);
 		err = 0;
 	} else if (dbus_error_is_set(&error)) {
 		teamd_log_err("dbus: Failed to acquire %s: %s: %s",
-			      TEAMD_DBUS_SERVICE, error.name, error.message);
+			      service_name, error.name, error.message);
 		err = -EINVAL;
 	} else {
-		teamd_log_err("dbus: name %s already taken.",
-			      TEAMD_DBUS_SERVICE);
+		teamd_log_err("dbus: name %s already taken.", service_name);
 		err = -EBUSY;
 	}
 	dbus_error_free(&error);
 	if (err)
 		dbus_connection_unregister_object_path(ctx->dbus.con,
 						       TEAMD_DBUS_PATH);
+out:
+	free(service_name);
 	return err;
 }
 
