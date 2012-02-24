@@ -19,16 +19,208 @@
 
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <errno.h>
 #include <dbus/dbus.h>
+#include <jansson.h>
 #include <private/misc.h>
 #include <team.h>
 
 #include "teamd.h"
 
 #define TEAMD_DBUS_SERVICE	"org.libteam.teamd"
+#define TEAMD_DBUS_IFACE	"org.libteam.teamd"
 #define TEAMD_DBUS_PATH		"/org/libteam/teamd"
+
+static DBusMessage *port_config_update(DBusMessage *message,
+				       struct teamd_context *ctx)
+{
+	DBusMessage *reply;
+	DBusError error;
+	const char *port_devname;
+	const char *port_config;
+	uint32_t ifindex;
+	int err;
+
+	dbus_error_init(&error);
+	if (dbus_message_get_args(message, &error,
+				  DBUS_TYPE_STRING, &port_devname,
+				  DBUS_TYPE_STRING, &port_config,
+				  DBUS_TYPE_INVALID) == FALSE) {
+		teamd_log_err("Failed to get args: %s: %s",
+			      error.name, error.message);
+		reply = dbus_message_new_error(message,
+					       TEAMD_DBUS_IFACE ".InvalidArgs",
+					       "Did not receive correct "
+					       "message arguments.");
+		goto out;
+	}
+	teamd_log_dbg("port_devname \"%s\", port_config \"%s\"\n",
+		      port_devname, port_config);
+
+	ifindex = team_ifname2ifindex(ctx->th, port_devname);
+	if (!ifindex) {
+		teamd_log_err("Device \"%s\" does not exist.", port_devname);
+		reply = dbus_message_new_error(message,
+					       TEAMD_DBUS_IFACE ".NoSuchDev",
+					       "No such device.");
+		goto out;
+	}
+	err = teamd_update_port_config(ctx, port_devname, port_config);
+	if (err) {
+		teamd_log_err("Failed to update config for port \"%s\".",
+			      port_devname);
+		reply = dbus_message_new_error(message,
+					       TEAMD_DBUS_IFACE ".ConfigUpdateFail",
+					       "Failed to update config.");
+		goto out;
+	}
+	reply = dbus_message_new_method_return(message);
+out:
+	dbus_error_free(&error);
+	return reply;
+}
+
+static DBusMessage *port_add(DBusMessage *message, struct teamd_context *ctx)
+{
+	DBusMessage *reply;
+	DBusError error;
+	const char *port_devname;
+	uint32_t ifindex;
+	int err;
+
+	dbus_error_init(&error);
+	if (dbus_message_get_args(message, &error,
+				  DBUS_TYPE_STRING, &port_devname,
+				  DBUS_TYPE_INVALID) == FALSE) {
+		teamd_log_err("Failed to get args: %s: %s",
+			      error.name, error.message);
+		reply = dbus_message_new_error(message,
+					       TEAMD_DBUS_IFACE ".InvalidArgs",
+					       "Did not receive correct "
+					       "message arguments.");
+		goto out;
+	}
+	teamd_log_dbg("port_devname \"%s\"\n", port_devname);
+
+	ifindex = team_ifname2ifindex(ctx->th, port_devname);
+	if (!ifindex) {
+		teamd_log_err("Device \"%s\" does not exist.", port_devname);
+		reply = dbus_message_new_error(message,
+					       TEAMD_DBUS_IFACE ".NoSuchDev",
+					       "No such device.");
+		goto out;
+	}
+	err = team_port_add(ctx->th, ifindex);
+	if (err) {
+		teamd_log_err("Failed to add port \"%s\".", port_devname);
+		reply = dbus_message_new_error(message,
+					       TEAMD_DBUS_IFACE ".PortAddFail",
+					       "Failed to add port.");
+		goto out;
+	}
+	reply = dbus_message_new_method_return(message);
+out:
+	dbus_error_free(&error);
+	return reply;
+}
+
+static DBusMessage *port_remove(DBusMessage *message, struct teamd_context *ctx)
+{
+	DBusMessage *reply;
+	DBusError error;
+	const char *port_devname;
+	uint32_t ifindex;
+	int err;
+
+	dbus_error_init(&error);
+	if (dbus_message_get_args(message, &error,
+				  DBUS_TYPE_STRING, &port_devname,
+				  DBUS_TYPE_INVALID) == FALSE) {
+		teamd_log_err("Failed to get args: %s: %s",
+			      error.name, error.message);
+		reply = dbus_message_new_error(message,
+					       TEAMD_DBUS_IFACE ".InvalidArgs",
+					       "Did not receive correct "
+					       "message arguments.");
+		goto out;
+	}
+	teamd_log_dbg("port_devname \"%s\"\n", port_devname);
+
+	ifindex = team_ifname2ifindex(ctx->th, port_devname);
+	if (!ifindex) {
+		teamd_log_err("Device \"%s\" does not exist.", port_devname);
+		reply = dbus_message_new_error(message,
+					       TEAMD_DBUS_IFACE ".NoSuchDev",
+					       "No such device.");
+		goto out;
+	}
+	err = team_port_remove(ctx->th, ifindex);
+	if (err) {
+		teamd_log_err("Failed to remove port \"%s\".", port_devname);
+		reply = dbus_message_new_error(message,
+					       TEAMD_DBUS_IFACE ".PortRemoveFail",
+					       "Failed to del port.");
+		goto out;
+	}
+	reply = dbus_message_new_method_return(message);
+out:
+	dbus_error_free(&error);
+	return reply;
+}
+
+static DBusMessage *config_dump(DBusMessage *message, struct teamd_context *ctx)
+{
+	DBusMessage *reply = NULL;
+	char *cfg;
+
+	cfg = json_dumps(ctx->config_json, JSON_COMPACT | JSON_ENSURE_ASCII | JSON_SORT_KEYS);
+	if (!cfg) {
+		teamd_log_err("Failed to get config dump.");
+		reply = dbus_message_new_error(message,
+					       TEAMD_DBUS_IFACE ".ConfigDumpFail",
+					       "Failed to dump config.");
+		goto out;
+	}
+	reply = dbus_message_new_method_return(message);
+	if (reply)
+		dbus_message_append_args(reply, DBUS_TYPE_STRING, &cfg,
+					 DBUS_TYPE_INVALID);
+	free(cfg);
+out:
+	return reply;
+}
+
+static char *introspection_xml =
+	"<node name='" TEAMD_DBUS_PATH "'>"
+	"  <interface name='" TEAMD_DBUS_IFACE "'>"
+	"    <method name='PortConfigUpdate'>"
+	"      <arg type='s' name='port_devname' direction='in'/>"
+	"      <arg type='s' name='port_config' direction='in'/>"
+	"    </method>"
+	"    <method name='PortAdd'>"
+	"      <arg type='s' name='port_devname' direction='in'/>"
+	"    </method>"
+	"    <method name='PortRemove'>"
+	"      <arg type='s' name='port_devname' direction='in'/>"
+	"    </method>"
+	"    <method name='ConfigDump'>"
+	"    </method>"
+	"  </interface>"
+	"</node>";
+
+static DBusMessage *introspect(DBusMessage *message)
+{
+	DBusMessage *reply;
+
+	reply = dbus_message_new_method_return(message);
+	if (!reply)
+		return NULL;
+	dbus_message_append_args(reply, DBUS_TYPE_STRING, &introspection_xml,
+				 DBUS_TYPE_INVALID);
+	return reply;
+}
 
 static DBusHandlerResult message_handler(DBusConnection *con,
 					 DBusMessage *message,
@@ -37,6 +229,8 @@ static DBusHandlerResult message_handler(DBusConnection *con,
 	const char *method;
 	const char *path;
 	const char *msg_interface;
+	DBusMessage *reply;
+	struct teamd_context *ctx = user_data;
 
 	method = dbus_message_get_member(message);
 	path = dbus_message_get_path(message);
@@ -44,6 +238,32 @@ static DBusHandlerResult message_handler(DBusConnection *con,
 	if (!method || !path || !msg_interface)
 		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 	teamd_log_dbg("dbus: %s.%s (%s)", msg_interface, method, path);
+
+	if (!strcmp(method, "Introspect") &&
+	    !strcmp(msg_interface, "org.freedesktop.DBus.Introspectable")) {
+		reply = introspect(message);
+	}
+
+	if (!strcmp(msg_interface, TEAMD_DBUS_IFACE)) {
+		if (!strcmp(method, "PortConfigUpdate")) {
+			reply = port_config_update(message, ctx);
+		} else if (!strcmp(method, "PortAdd")) {
+			reply = port_add(message, ctx);
+		} else if (!strcmp(method, "PortRemove")) {
+			reply = port_remove(message, ctx);
+		} else if (!strcmp(method, "ConfigDump")) {
+			reply = config_dump(message, ctx);
+		}
+	}
+
+	if (!dbus_message_get_no_reply(message)) {
+		if (!reply)
+			reply = dbus_message_new_method_return(message);
+		if (reply) {
+			dbus_connection_send(con, reply, NULL);
+			dbus_message_unref(reply);
+		}
+	}
 
 	return DBUS_HANDLER_RESULT_HANDLED;
 }
@@ -89,6 +309,7 @@ int teamd_dbus_iface_init(struct teamd_context *ctx)
 		dbus_connection_unregister_object_path(ctx->dbus.con,
 						       TEAMD_DBUS_PATH);
 out:
+	dbus_error_free(&error);
 	free(service_name);
 	return err;
 }
@@ -102,17 +323,20 @@ void teamd_dbus_iface_fini(struct teamd_context *ctx)
 int teamd_dbus_con_init(struct teamd_context *ctx)
 {
 	DBusError error;
+	int err = 0;
 
 	dbus_error_init(&error);
 	ctx->dbus.con = dbus_bus_get(DBUS_BUS_SYSTEM, &error);
 	if (!ctx->dbus.con) {
 		teamd_log_err("dbus: Could not acquire the system bus: %s - %s",
 			      error.name, error.message);
-		return -EINVAL;
+		err = -EINVAL;
+		goto free_err;
 	}
-	dbus_error_free(&error);
 	dbus_connection_set_exit_on_disconnect(ctx->dbus.con, FALSE);
-	return 0;
+free_err:
+	dbus_error_free(&error);
+	return err;
 }
 
 void teamd_dbus_con_fini(struct teamd_context *ctx)
