@@ -21,6 +21,7 @@
 #define _TEAMD_H_
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <libdaemon/dlog.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -43,7 +44,10 @@ enum teamd_command {
 };
 
 struct teamd_runner;
+struct teamd_link_watch;
 struct teamd_context;
+
+typedef void (*teamd_link_watch_handler_t)(struct teamd_context *ctx);
 
 struct teamd_context {
 	enum teamd_command		cmd;
@@ -59,7 +63,10 @@ struct teamd_context {
 	struct team_handle *		th;
 	const struct teamd_runner *	runner;
 	void *				runner_priv;
-	struct list_item		runner_port_priv_list;
+	const struct teamd_link_watch *	link_watch;
+	void *				link_watch_priv;
+	teamd_link_watch_handler_t	link_watch_handler;
+	struct list_item		port_priv_list;
 	uint32_t			ifindex;
 	uint32_t			hwaddr_len;
 	struct {
@@ -80,6 +87,15 @@ struct teamd_runner {
 	size_t priv_size;
 	int (*init)(struct teamd_context *ctx);
 	void (*fini)(struct teamd_context *ctx);
+	size_t port_priv_size;
+};
+
+struct teamd_link_watch {
+	const char *name;
+	size_t priv_size;
+	int (*init)(struct teamd_context *ctx);
+	void (*fini)(struct teamd_context *ctx);
+	bool (*is_port_up)(struct teamd_context *ctx, uint32_t ifindex);
 	size_t port_priv_size;
 };
 
@@ -119,7 +135,26 @@ const struct teamd_runner teamd_runner_dummy;
 const struct teamd_runner teamd_runner_roundrobin;
 const struct teamd_runner teamd_runner_activebackup;
 
+/* Link-watch structures */
+const struct teamd_link_watch teamd_link_watch_ethtool;
+
+static inline void teamd_link_watch_set_handler(struct teamd_context *ctx,
+						teamd_link_watch_handler_t handler)
+{
+	ctx->link_watch_handler = handler;
+}
+
+static inline bool teamd_link_watch_port_up(struct teamd_context *ctx,
+					    uint32_t ifindex)
+{
+	if (ctx->link_watch && ctx->link_watch->is_port_up)
+		return ctx->link_watch->is_port_up(ctx, ifindex);
+	return true;
+}
+
 void *teamd_get_runner_port_priv(struct teamd_context *ctx, uint32_t ifindex);
+void *teamd_get_link_watch_port_priv(struct teamd_context *ctx,
+				     uint32_t ifindex);
 int teamd_dbus_init(struct teamd_context *ctx);
 void teamd_dbus_fini(struct teamd_context *ctx);
 

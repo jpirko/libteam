@@ -18,6 +18,7 @@
  */
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
@@ -105,10 +106,8 @@ static void change_active_port(struct teamd_context *ctx,
 			      strerror(-err));
 }
 
-static void port_change_handler_func(struct team_handle *th, void *arg,
-				     team_change_type_mask_t type_mask)
+static void link_watch_handler(struct teamd_context *ctx)
 {
-	struct teamd_context *ctx = team_get_user_priv(th);
 	struct team_port *port;
 	uint32_t active_ifindex;
 	char *active_ifname;
@@ -120,7 +119,7 @@ static void port_change_handler_func(struct team_handle *th, void *arg,
 	int best_prio = INT_MIN;
 	int err;
 
-	err = team_get_active_port(th, &active_ifindex);
+	err = team_get_active_port(ctx->th, &active_ifindex);
 	if (err) {
 		teamd_log_err("Failed to get active port.");
 		return;
@@ -131,10 +130,10 @@ static void port_change_handler_func(struct team_handle *th, void *arg,
 		      active_ifname, active_ifindex,
 		      get_port_prio(ctx, active_ifname));
 
-	team_for_each_port(port, th) {
+	team_for_each_port(port, ctx->th) {
 		uint32_t ifindex = team_get_port_ifindex(port);
 
-		if (team_is_port_link_up(port)) {
+		if (teamd_link_watch_port_up(ctx, ifindex)) {
 			uint32_t speed = team_get_port_speed(port);
 			uint8_t duplex = team_get_port_duplex(port);
 			char *ifname = dev_name(ctx, ifindex);
@@ -172,23 +171,19 @@ nochange:
 	free(active_ifname);
 }
 
-static struct team_change_handler port_change_handler = {
-	.func = port_change_handler_func,
-	.type_mask = TEAM_PORT_CHANGE,
-};
-
 static int abl_init(struct teamd_context *ctx)
 {
-	return team_change_handler_register(ctx->th, &port_change_handler);
+	teamd_link_watch_set_handler(ctx, link_watch_handler);
+	return 0;
 }
 
 static void abl_fini(struct teamd_context *ctx)
 {
-	team_change_handler_unregister(ctx->th, &port_change_handler);
+	teamd_link_watch_set_handler(ctx, NULL);
 }
 
 const struct teamd_runner teamd_runner_activebackup = {
-	.name		= "activebackup_linkmon",
+	.name		= "activebackup",
 	.team_mode_name	= "activebackup",
 	.init		= abl_init,
 	.fini		= abl_fini,

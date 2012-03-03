@@ -61,13 +61,14 @@ char *dev_name_dup(const struct teamd_context *ctx, uint32_t ifindex)
 	return strdup(ifname);
 }
 
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
 static const struct teamd_runner *teamd_runner_list[] = {
 	&teamd_runner_dummy,
 	&teamd_runner_roundrobin,
 	&teamd_runner_activebackup,
 };
 
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #define TEAMD_RUNNER_LIST_SIZE ARRAY_SIZE(teamd_runner_list)
 
 static const struct teamd_runner *teamd_find_runner(const char *runner_name)
@@ -81,6 +82,22 @@ static const struct teamd_runner *teamd_find_runner(const char *runner_name)
 	return NULL;
 }
 
+static const struct teamd_link_watch *teamd_link_watch_list[] = {
+	&teamd_link_watch_ethtool,
+};
+
+#define TEAMD_LINK_WATCH_LIST_SIZE ARRAY_SIZE(teamd_link_watch_list)
+
+static const struct teamd_link_watch *teamd_find_link_watch(const char *link_watch_name)
+{
+	int i;
+
+	for (i = 0; i < TEAMD_LINK_WATCH_LIST_SIZE; i++) {
+		if (strcmp(teamd_link_watch_list[i]->name, link_watch_name) == 0)
+			return teamd_link_watch_list[i];
+	}
+	return NULL;
+}
 
 static void libteam_log_daemon(struct team_handle *th, int priority,
 			       const char *file, int line, const char *fn,
@@ -825,34 +842,96 @@ static void teamd_runner_fini(struct teamd_context *ctx)
 	free(ctx->runner_priv);
 }
 
+static int teamd_link_watch_init(struct teamd_context *ctx)
+{
+	int err;
+	const char *link_watch_name;
+
+	err = json_unpack(ctx->config_json, "{s:{s:s}}", "link_watch", "name",
+			  &link_watch_name);
+	if (err) {
+		teamd_log_info("Failed to get link watch name from config. Using no link watch!");
+		return 0;
+	}
+	teamd_log_dbg("Using link_watch \"%s\".", link_watch_name);
+	ctx->link_watch = teamd_find_link_watch(link_watch_name);
+	if (!ctx->link_watch) {
+		teamd_log_err("No link_watch named \"%s\" available.",
+			      link_watch_name);
+		return -ENOENT;
+	}
+
+	if (ctx->link_watch->priv_size) {
+		ctx->link_watch_priv = myzalloc(ctx->link_watch->priv_size);
+		if (!ctx->link_watch_priv)
+			return -ENOMEM;
+	}
+
+	if (ctx->link_watch->init) {
+		err = ctx->link_watch->init(ctx);
+		if (err) {
+			free(ctx->link_watch_priv);
+			return err;
+		}
+	}
+	return 0;
+}
+
+static void teamd_link_watch_fini(struct teamd_context *ctx)
+{
+	if (!ctx->link_watch)
+		return;
+	if (ctx->link_watch->fini)
+		ctx->link_watch->fini(ctx);
+	free(ctx->link_watch_priv);
+}
+
 struct port_priv_item {
 	struct list_item list;
 	uint32_t ifindex;
 	bool to_be_removed;
-	long priv[0];
+	void *runner_priv;
+	void *link_watch_priv;
 };
+
+
 
 static struct port_priv_item *get_ppitem(struct teamd_context *ctx,
 					 uint32_t ifindex)
 {
 	struct port_priv_item *ppitem;
-	size_t alloc_size;
 
-	list_for_each_node_entry(ppitem, &ctx->runner_port_priv_list, list) {
+	list_for_each_node_entry(ppitem, &ctx->port_priv_list, list) {
 		if (ppitem->ifindex == ifindex)
 			return ppitem;
 	}
 
-	alloc_size = sizeof(*ppitem) + ctx->runner->port_priv_size;
-	ppitem = myzalloc(alloc_size);
-	if (!ppitem) {
-		teamd_log_err("Failed to alloc port priv (ifindex %d).",
-			       ifindex);
-		return NULL;
+	ppitem = myzalloc(sizeof(*ppitem));
+	if (!ppitem)
+		goto err_out;
+	if (ctx->runner->port_priv_size) {
+		ppitem->runner_priv = myzalloc(ctx->runner->port_priv_size);
+		if (!ppitem->runner_priv)
+			goto free_ppitem;
+	}
+	if (ctx->link_watch && ctx->link_watch->port_priv_size) {
+		ppitem->link_watch_priv =
+				myzalloc(ctx->link_watch->port_priv_size);
+		if (!ppitem->link_watch_priv)
+			goto free_runner_priv;
 	}
 	ppitem->ifindex = ifindex;
-	list_add(&ctx->runner_port_priv_list, &ppitem->list);
+	list_add(&ctx->port_priv_list, &ppitem->list);
 	return ppitem;
+
+free_ppitem:
+	free(ppitem);
+free_runner_priv:
+	free(ppitem->runner_priv);
+err_out:
+	teamd_log_err("Failed to alloc port priv.");
+	return NULL;
+
 }
 
 void *teamd_get_runner_port_priv(struct teamd_context *ctx, uint32_t ifindex)
@@ -862,7 +941,18 @@ void *teamd_get_runner_port_priv(struct teamd_context *ctx, uint32_t ifindex)
 	ppitem = get_ppitem(ctx, ifindex);
 	if (!ppitem)
 		return NULL;
-	return &ppitem->priv;
+	return ppitem->runner_priv;
+}
+
+void *teamd_get_link_watch_port_priv(struct teamd_context *ctx,
+				     uint32_t ifindex)
+{
+	struct port_priv_item *ppitem;
+
+	ppitem = get_ppitem(ctx, ifindex);
+	if (!ppitem)
+		return NULL;
+	return ppitem->link_watch_priv;
 }
 
 static void check_ppitems_to_be_removed(struct teamd_context *ctx, bool killall)
@@ -870,9 +960,11 @@ static void check_ppitems_to_be_removed(struct teamd_context *ctx, bool killall)
 	struct port_priv_item *ppitem, *tmp;
 
 	list_for_each_node_entry_safe(ppitem, tmp,
-				      &ctx->runner_port_priv_list, list) {
+				      &ctx->port_priv_list, list) {
 		if (killall || ppitem->to_be_removed) {
 			list_del(&ppitem->list);
+			free(ppitem->runner_priv);
+			free(ppitem->link_watch_priv);
 			free(ppitem);
 		}
 	}
@@ -1004,7 +1096,7 @@ static int teamd_init(struct teamd_context *ctx)
 	int err;
 	const char *team_name;
 
-	list_init(&ctx->runner_port_priv_list);
+	list_init(&ctx->port_priv_list);
 	err = config_load(ctx);
 	if (err) {
 		teamd_log_err("Failed to load config.");
@@ -1089,10 +1181,16 @@ static int teamd_init(struct teamd_context *ctx)
 		goto run_loop_fini;
 	}
 
+	err = teamd_link_watch_init(ctx);
+	if (err) {
+		teamd_log_err("Failed to init link watch.");
+		goto team_unreg_debug_handlers;
+	}
+
 	err = teamd_runner_init(ctx);
 	if (err) {
 		teamd_log_err("Failed to init runner.");
-		goto team_unreg_debug_handlers;
+		goto link_watch_fini;
 	}
 
 	err = teamd_dbus_init(ctx);
@@ -1113,6 +1211,8 @@ dbus_fini:
 	teamd_dbus_fini(ctx);
 runner_fini:
 	teamd_runner_fini(ctx);
+link_watch_fini:
+	teamd_link_watch_fini(ctx);
 team_unreg_debug_handlers:
 	teamd_unregister_default_handlers(ctx);
 run_loop_fini:
@@ -1131,6 +1231,7 @@ static void teamd_fini(struct teamd_context *ctx)
 {
 	teamd_dbus_fini(ctx);
 	teamd_runner_fini(ctx);
+	teamd_link_watch_fini(ctx);
 	teamd_unregister_default_handlers(ctx);
 	teamd_run_loop_fini(ctx);
 	team_destroy(ctx->th);
