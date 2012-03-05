@@ -894,17 +894,10 @@ struct port_priv_item {
 	void *link_watch_priv;
 };
 
-
-
-static struct port_priv_item *get_ppitem(struct teamd_context *ctx,
-					 uint32_t ifindex)
+static struct port_priv_item *alloc_ppitem(struct teamd_context *ctx,
+					   uint32_t ifindex)
 {
 	struct port_priv_item *ppitem;
-
-	list_for_each_node_entry(ppitem, &ctx->port_priv_list, list) {
-		if (ppitem->ifindex == ifindex)
-			return ppitem;
-	}
 
 	ppitem = myzalloc(sizeof(*ppitem));
 	if (!ppitem)
@@ -920,8 +913,6 @@ static struct port_priv_item *get_ppitem(struct teamd_context *ctx,
 		if (!ppitem->link_watch_priv)
 			goto free_runner_priv;
 	}
-	ppitem->ifindex = ifindex;
-	list_add(&ctx->port_priv_list, &ppitem->list);
 	return ppitem;
 
 free_ppitem:
@@ -931,7 +922,78 @@ free_runner_priv:
 err_out:
 	teamd_log_err("Failed to alloc port priv.");
 	return NULL;
+}
 
+static void ppitem_free(struct port_priv_item *ppitem)
+{
+	list_del(&ppitem->list);
+	free(ppitem->runner_priv);
+	free(ppitem->link_watch_priv);
+	free(ppitem);
+}
+
+static struct port_priv_item *create_ppitem(struct teamd_context *ctx,
+					    uint32_t ifindex)
+{
+	struct port_priv_item *ppitem;
+	int err;
+
+	ppitem = alloc_ppitem(ctx, ifindex);
+	if (!ppitem)
+		return NULL;
+	ppitem->ifindex = ifindex;
+	list_add(&ctx->port_priv_list, &ppitem->list);
+	if (ctx->link_watch && ctx->link_watch->port_added) {
+		err = ctx->link_watch->port_added(ctx, ifindex,
+						  ppitem->link_watch_priv);
+		if (err) {
+			teamd_log_err("Link watch port_added failed: %s.",
+				      strerror(-err));
+			goto list_del;
+		}
+	}
+	if (ctx->runner->port_added) {
+		err = ctx->runner->port_added(ctx, ifindex,
+					      ppitem->runner_priv);
+		if (err) {
+			teamd_log_err("Runner port_added failed: %s.",
+				      strerror(-err));
+			goto lw_port_removed;
+		}
+	}
+	return ppitem;
+lw_port_removed:
+	if (ctx->link_watch && ctx->link_watch->port_removed)
+		ctx->link_watch->port_removed(ctx, ppitem->ifindex,
+					      ppitem->link_watch_priv);
+list_del:
+	list_del(&ppitem->list);
+	ppitem_free(ppitem);
+	return NULL;
+}
+
+static void ppitem_destroy(struct teamd_context *ctx,
+			   struct port_priv_item *ppitem)
+{
+	if (ctx->runner->port_removed)
+		ctx->runner->port_removed(ctx, ppitem->ifindex,
+					  ppitem->runner_priv);
+	if (ctx->link_watch && ctx->link_watch->port_removed)
+		ctx->link_watch->port_removed(ctx, ppitem->ifindex,
+					      ppitem->link_watch_priv);
+	ppitem_free(ppitem);
+}
+
+static struct port_priv_item *get_ppitem(struct teamd_context *ctx,
+					 uint32_t ifindex)
+{
+	struct port_priv_item *ppitem;
+
+	list_for_each_node_entry(ppitem, &ctx->port_priv_list, list) {
+		if (ppitem->ifindex == ifindex)
+			return ppitem;
+	}
+	return create_ppitem(ctx, ifindex);
 }
 
 void *teamd_get_runner_port_priv(struct teamd_context *ctx, uint32_t ifindex)
@@ -961,12 +1023,8 @@ static void check_ppitems_to_be_removed(struct teamd_context *ctx, bool killall)
 
 	list_for_each_node_entry_safe(ppitem, tmp,
 				      &ctx->port_priv_list, list) {
-		if (killall || ppitem->to_be_removed) {
-			list_del(&ppitem->list);
-			free(ppitem->runner_priv);
-			free(ppitem->link_watch_priv);
-			free(ppitem);
-		}
+		if (killall || ppitem->to_be_removed)
+			ppitem_destroy(ctx, ppitem);
 	}
 }
 

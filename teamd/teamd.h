@@ -87,6 +87,8 @@ struct teamd_runner {
 	size_t priv_size;
 	int (*init)(struct teamd_context *ctx);
 	void (*fini)(struct teamd_context *ctx);
+	int (*port_added)(struct teamd_context *ctx, uint32_t ifindex, void *runner_port_priv);
+	void (*port_removed)(struct teamd_context *ctx, uint32_t ifindex, void *runner_port_priv);
 	size_t port_priv_size;
 };
 
@@ -95,6 +97,8 @@ struct teamd_link_watch {
 	size_t priv_size;
 	int (*init)(struct teamd_context *ctx);
 	void (*fini)(struct teamd_context *ctx);
+	int (*port_added)(struct teamd_context *ctx, uint32_t ifindex, void *link_watch_port_priv);
+	void (*port_removed)(struct teamd_context *ctx, uint32_t ifindex, void *link_watch_port_priv);
 	bool (*is_port_up)(struct teamd_context *ctx, uint32_t ifindex);
 	size_t port_priv_size;
 };
