@@ -143,6 +143,7 @@ const struct teamd_runner teamd_runner_activebackup;
 
 /* Link-watch structures */
 const struct teamd_link_watch teamd_link_watch_ethtool;
+const struct teamd_link_watch teamd_link_watch_arp_ping;
 
 bool teamd_link_watch_port_up(struct teamd_context *ctx,
 			      struct teamd_port *tdport);
@@ -169,5 +170,11 @@ void teamd_dbus_fini(struct teamd_context *ctx);
 /* Various helpers */
 char *dev_name(const struct teamd_context *ctx, uint32_t ifindex);
 char *dev_name_dup(const struct teamd_context *ctx, uint32_t ifindex);
+static inline void convert_ms(time_t *sec, long *nsec, int ms)
+{
+	*sec = ms / 1000;
+	*nsec = (ms % 1000) * 1000000;
+}
+
 
 #endif /* _TEAMD_H_ */

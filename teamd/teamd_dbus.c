@@ -412,12 +412,6 @@ static void toggle_watch(DBusWatch *watch, void *priv)
 		teamd_loop_callback_disable(ctx, cb_name);
 }
 
-static void convert_ms(time_t *sec, long *nsec, int ms)
-{
-	*sec = ms / 1000;
-	*nsec = (ms % 1000) * 1000000;
-}
-
 static int callback_timeout(struct teamd_context *ctx, int events,
 			    void *func_priv)
 {
