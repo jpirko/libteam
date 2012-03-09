@@ -61,8 +61,6 @@ char *dev_name_dup(const struct teamd_context *ctx, uint32_t ifindex)
 	return strdup(ifname);
 }
 
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-
 static const struct teamd_runner *teamd_runner_list[] = {
 	&teamd_runner_dummy,
 	&teamd_runner_roundrobin,
@@ -78,23 +76,6 @@ static const struct teamd_runner *teamd_find_runner(const char *runner_name)
 	for (i = 0; i < TEAMD_RUNNER_LIST_SIZE; i++) {
 		if (strcmp(teamd_runner_list[i]->name, runner_name) == 0)
 			return teamd_runner_list[i];
-	}
-	return NULL;
-}
-
-static const struct teamd_link_watch *teamd_link_watch_list[] = {
-	&teamd_link_watch_ethtool,
-};
-
-#define TEAMD_LINK_WATCH_LIST_SIZE ARRAY_SIZE(teamd_link_watch_list)
-
-static const struct teamd_link_watch *teamd_find_link_watch(const char *link_watch_name)
-{
-	int i;
-
-	for (i = 0; i < TEAMD_LINK_WATCH_LIST_SIZE; i++) {
-		if (strcmp(teamd_link_watch_list[i]->name, link_watch_name) == 0)
-			return teamd_link_watch_list[i];
 	}
 	return NULL;
 }
@@ -840,50 +821,6 @@ static void teamd_runner_fini(struct teamd_context *ctx)
 	if (ctx->runner->fini)
 		ctx->runner->fini(ctx);
 	free(ctx->runner_priv);
-}
-
-static int teamd_link_watch_init(struct teamd_context *ctx)
-{
-	int err;
-	const char *link_watch_name;
-
-	err = json_unpack(ctx->config_json, "{s:{s:s}}", "link_watch", "name",
-			  &link_watch_name);
-	if (err) {
-		teamd_log_info("Failed to get link watch name from config. Using no link watch!");
-		return 0;
-	}
-	teamd_log_dbg("Using link_watch \"%s\".", link_watch_name);
-	ctx->link_watch = teamd_find_link_watch(link_watch_name);
-	if (!ctx->link_watch) {
-		teamd_log_err("No link_watch named \"%s\" available.",
-			      link_watch_name);
-		return -ENOENT;
-	}
-
-	if (ctx->link_watch->priv_size) {
-		ctx->link_watch_priv = myzalloc(ctx->link_watch->priv_size);
-		if (!ctx->link_watch_priv)
-			return -ENOMEM;
-	}
-
-	if (ctx->link_watch->init) {
-		err = ctx->link_watch->init(ctx);
-		if (err) {
-			free(ctx->link_watch_priv);
-			return err;
-		}
-	}
-	return 0;
-}
-
-static void teamd_link_watch_fini(struct teamd_context *ctx)
-{
-	if (!ctx->link_watch)
-		return;
-	if (ctx->link_watch->fini)
-		ctx->link_watch->fini(ctx);
-	free(ctx->link_watch_priv);
 }
 
 static void debug_log_port_list(struct teamd_context *ctx)

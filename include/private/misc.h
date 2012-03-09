@@ -20,9 +20,13 @@
 #ifndef _T_MISC_H_
 #define _T_MISC_H_
 
+#include <stdlib.h>
+
 static inline void *myzalloc(size_t size)
 {
 	return calloc(1, size);
 }
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 #endif /* _T_MISC_H_ */

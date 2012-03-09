@@ -63,8 +63,6 @@ struct teamd_context {
 	struct team_handle *		th;
 	const struct teamd_runner *	runner;
 	void *				runner_priv;
-	const struct teamd_link_watch *	link_watch;
-	void *				link_watch_priv;
 	teamd_link_watch_handler_t	link_watch_handler;
 	struct list_item		port_priv_list;
 	uint32_t			ifindex;
@@ -82,8 +80,10 @@ struct teamd_context {
 };
 
 struct teamd_port {
-	uint32_t	ifindex;
-	char *		ifname; /* device name in time it joined team */
+	uint32_t			ifindex;
+	char *				ifname; /* device name in time it joined team */
+	const struct teamd_link_watch *	link_watch;
+	json_t *			link_watch_json;
 };
 
 struct teamd_runner {
@@ -99,9 +99,6 @@ struct teamd_runner {
 
 struct teamd_link_watch {
 	const char *name;
-	size_t priv_size;
-	int (*init)(struct teamd_context *ctx);
-	void (*fini)(struct teamd_context *ctx);
 	int (*port_added)(struct teamd_context *ctx, uint32_t ifindex, void *link_watch_port_priv);
 	void (*port_removed)(struct teamd_context *ctx, uint32_t ifindex, void *link_watch_port_priv);
 	bool (*is_port_up)(struct teamd_context *ctx, uint32_t ifindex);
@@ -147,18 +144,16 @@ const struct teamd_runner teamd_runner_activebackup;
 /* Link-watch structures */
 const struct teamd_link_watch teamd_link_watch_ethtool;
 
+bool teamd_link_watch_port_up(struct teamd_context *ctx, uint32_t ifindex);
+void teamd_link_watch_select(struct teamd_context *ctx,
+			     struct teamd_port *tdport);
+int teamd_link_watch_init(struct teamd_context *ctx);
+void teamd_link_watch_fini(struct teamd_context *ctx);
+
 static inline void teamd_link_watch_set_handler(struct teamd_context *ctx,
 						teamd_link_watch_handler_t handler)
 {
 	ctx->link_watch_handler = handler;
-}
-
-static inline bool teamd_link_watch_port_up(struct teamd_context *ctx,
-					    uint32_t ifindex)
-{
-	if (ctx->link_watch && ctx->link_watch->is_port_up)
-		return ctx->link_watch->is_port_up(ctx, ifindex);
-	return true;
 }
 
 int teamd_per_port_init(struct teamd_context *ctx);

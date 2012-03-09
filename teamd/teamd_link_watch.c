@@ -19,9 +19,30 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
+#include <private/misc.h>
 #include <team.h>
 
 #include "teamd.h"
+
+const struct teamd_link_watch teamd_link_watch_ethtool;
+static const struct teamd_link_watch *teamd_link_watch_list[] = {
+	&teamd_link_watch_ethtool,
+};
+
+#define TEAMD_LINK_WATCH_LIST_SIZE ARRAY_SIZE(teamd_link_watch_list)
+
+static const struct teamd_link_watch *teamd_find_link_watch(const char *link_watch_name)
+{
+	int i;
+
+	for (i = 0; i < TEAMD_LINK_WATCH_LIST_SIZE; i++) {
+		if (strcmp(teamd_link_watch_list[i]->name, link_watch_name) == 0)
+			return teamd_link_watch_list[i];
+	}
+	return NULL;
+}
+
 
 static void call_link_watch_handler(struct teamd_context *ctx)
 {
@@ -42,6 +63,62 @@ static struct team_change_handler port_change_handler = {
 	.type_mask = TEAM_PORT_CHANGE,
 };
 
+bool teamd_link_watch_port_up(struct teamd_context *ctx, uint32_t ifindex)
+{
+	struct teamd_port *tdport = teamd_get_port(ctx, ifindex);
+
+	if (tdport && tdport->link_watch && tdport->link_watch->is_port_up)
+		return tdport->link_watch->is_port_up(ctx, ifindex);
+	return true;
+}
+
+void teamd_link_watch_select(struct teamd_context *ctx,
+			     struct teamd_port *tdport)
+{
+	int err;
+	const char *link_watch_name;
+	json_t *link_watch_obj;
+
+	err = json_unpack(ctx->config_json, "{s:{s:{s:o}}}", "ports",
+			  tdport->ifname, "link_watch", &link_watch_obj);
+	if (err) {
+		teamd_log_dbg("Failed to get link watch from port config.");
+		err = json_unpack(ctx->config_json, "{s:o}", "link_watch",
+				  &link_watch_obj);
+		if (err) {
+			teamd_log_info("Failed to get link watch from config.");
+			goto nowatch;
+		}
+	}
+	err = json_unpack(link_watch_obj, "{s:s}", "name", &link_watch_name);
+	if (err) {
+		teamd_log_info("Failed to get link watch name.");
+		goto nowatch;
+	}
+	teamd_log_dbg("Using link_watch \"%s\" for port \"%s\".",
+		      link_watch_name, tdport->ifname);
+	tdport->link_watch = teamd_find_link_watch(link_watch_name);
+	if (!tdport->link_watch) {
+		teamd_log_info("No link_watch named \"%s\" available.",
+			       link_watch_name);
+		goto nowatch;
+	}
+	tdport->link_watch_json = link_watch_obj;
+	return;
+nowatch:
+	teamd_log_info("Using no link watch for port \"%s\"!", tdport->ifname);
+}
+
+int teamd_link_watch_init(struct teamd_context *ctx)
+{
+	return team_change_handler_register(ctx->th, &port_change_handler);
+}
+
+void teamd_link_watch_fini(struct teamd_context *ctx)
+{
+	team_change_handler_unregister(ctx->th, &port_change_handler);
+}
+
 static bool lw_ethtool_is_port_up(struct teamd_context *ctx, uint32_t ifindex)
 {
 	struct team_port *port;
@@ -52,19 +129,7 @@ static bool lw_ethtool_is_port_up(struct teamd_context *ctx, uint32_t ifindex)
 	return false;
 }
 
-static int lw_ethtool_init(struct teamd_context *ctx)
-{
-	return team_change_handler_register(ctx->th, &port_change_handler);
-}
-
-static void lw_ethtool_fini(struct teamd_context *ctx)
-{
-	team_change_handler_unregister(ctx->th, &port_change_handler);
-}
-
 const struct teamd_link_watch teamd_link_watch_ethtool = {
 	.name		= "ethtool",
-	.init		= lw_ethtool_init,
-	.fini		= lw_ethtool_fini,
 	.is_port_up	= lw_ethtool_is_port_up,
 };
