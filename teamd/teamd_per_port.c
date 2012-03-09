@@ -18,6 +18,8 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
+#include <errno.h>
 #include <inttypes.h>
 #include <string.h>
 #include <private/list.h>
@@ -84,8 +86,9 @@ static void ppitem_free(struct port_priv_item *ppitem)
 	free(ppitem);
 }
 
-static struct port_priv_item *create_ppitem(struct teamd_context *ctx,
-					    uint32_t ifindex)
+static int create_ppitem(struct teamd_context *ctx,
+			 struct port_priv_item **p_ppitem,
+			 uint32_t ifindex)
 {
 	struct port_priv_item *ppitem;
 	struct teamd_port *tdport;
@@ -93,7 +96,7 @@ static struct port_priv_item *create_ppitem(struct teamd_context *ctx,
 
 	ppitem = alloc_ppitem(ctx, ifindex);
 	if (!ppitem)
-		return NULL;
+		return -ENOMEM;
 	tdport = _port(ppitem);
 	list_add(&ctx->port_priv_list, &ppitem->list);
 	if (tdport->link_watch && tdport->link_watch->port_added) {
@@ -114,7 +117,8 @@ static struct port_priv_item *create_ppitem(struct teamd_context *ctx,
 			goto lw_port_removed;
 		}
 	}
-	return ppitem;
+	*p_ppitem = ppitem;
+	return 0;
 lw_port_removed:
 	if (tdport->link_watch && tdport->link_watch->port_removed)
 		tdport->link_watch->port_removed(ctx, ifindex,
@@ -122,7 +126,7 @@ lw_port_removed:
 list_del:
 	list_del(&ppitem->list);
 	ppitem_free(ppitem);
-	return NULL;
+	return err;
 }
 
 static void ppitem_destroy(struct teamd_context *ctx,
@@ -194,6 +198,7 @@ static void port_priv_change_handler_func(struct team_handle *th, void *arg,
 	struct teamd_context *ctx = team_get_user_priv(th);
 	struct team_port *port;
 	struct port_priv_item *ppitem;
+	int err;
 
 	check_ppitems_to_be_removed(ctx, false);
 
@@ -202,9 +207,11 @@ static void port_priv_change_handler_func(struct team_handle *th, void *arg,
 
 		ppitem = get_ppitem(ctx, ifindex);
 		if (!ppitem) {
-			ppitem = create_ppitem(ctx, ifindex);
-			if (!ppitem)
-				continue;
+			err = create_ppitem(ctx, &ppitem, ifindex);
+			if (err) {
+				teamd_run_loop_quit(ctx, err);
+				return;
+			}
 		}
 		if (team_is_port_removed(port))
 			ppitem->to_be_removed = true;

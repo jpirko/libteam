@@ -335,7 +335,7 @@ retry:
 		goto retry;
 }
 
-static void teamd_run_loop_quit(struct teamd_context *ctx, int err)
+void teamd_run_loop_quit(struct teamd_context *ctx, int err)
 {
 	ctx->run_loop.err = err;
 	teamd_run_loop_sent_ctrl_byte(ctx, 'q');
