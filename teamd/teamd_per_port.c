@@ -217,3 +217,13 @@ void teamd_per_port_fini(struct teamd_context *ctx)
 	team_change_handler_unregister(ctx->th, &port_priv_change_handler);
 	teamd_free_port_privs(ctx);
 }
+
+struct teamd_port *teamd_get_port(struct teamd_context *ctx, uint32_t ifindex)
+{
+	struct port_priv_item *ppitem;
+
+	ppitem = get_ppitem(ctx, ifindex);
+	if (!ppitem)
+		return NULL;
+	return _port(ppitem);
+}

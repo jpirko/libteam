@@ -162,6 +162,7 @@ static inline bool teamd_link_watch_port_up(struct teamd_context *ctx,
 
 int teamd_per_port_init(struct teamd_context *ctx);
 void teamd_per_port_fini(struct teamd_context *ctx);
+struct teamd_port *teamd_get_port(struct teamd_context *ctx, uint32_t ifindex);
 
 void *teamd_get_runner_port_priv(struct teamd_context *ctx, uint32_t ifindex);
 void *teamd_get_link_watch_port_priv(struct teamd_context *ctx,
