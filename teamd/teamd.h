@@ -81,6 +81,10 @@ struct teamd_context {
 	} dbus;
 };
 
+struct teamd_port {
+	uint32_t ifindex;
+};
+
 struct teamd_runner {
 	const char *name;
 	const char *team_mode_name;
