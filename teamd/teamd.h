@@ -82,7 +82,8 @@ struct teamd_context {
 };
 
 struct teamd_port {
-	uint32_t ifindex;
+	uint32_t	ifindex;
+	char *		ifname; /* device name in time it joined team */
 };
 
 struct teamd_runner {

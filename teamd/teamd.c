@@ -893,9 +893,11 @@ static void debug_log_port_list(struct teamd_context *ctx)
 	teamd_log_dbg("<port_list>");
 	team_for_each_port(port, ctx->th) {
 		uint32_t ifindex = team_get_port_ifindex(port);
+		struct teamd_port *tdport;
 
-		teamd_log_dbg("%d: %s: %s %u %s%s%s", ifindex,
-			      dev_name(ctx, ifindex),
+		tdport = teamd_get_port(ctx, ifindex);
+		teamd_log_dbg("%d: %s(%s): %s %u %s%s%s", ifindex,
+			      dev_name(ctx, ifindex), tdport ? tdport->ifname : "",
 			      team_is_port_link_up(port) ? "up": "down",
 			      team_get_port_speed(port),
 			      team_get_port_duplex(port) ? "fullduplex" : "halfduplex",

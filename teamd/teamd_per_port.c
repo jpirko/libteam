@@ -44,10 +44,13 @@ static struct port_priv_item *alloc_ppitem(struct teamd_context *ctx,
 	ppitem = myzalloc(sizeof(*ppitem));
 	if (!ppitem)
 		goto err_out;
+	_port(ppitem)->ifname = dev_name_dup(ctx, ifindex);
+	if (!_port(ppitem)->ifname)
+		goto free_ppitem;
 	if (ctx->runner->port_priv_size) {
 		ppitem->runner_priv = myzalloc(ctx->runner->port_priv_size);
 		if (!ppitem->runner_priv)
-			goto free_ppitem;
+			goto free_ifname;
 	}
 	if (ctx->link_watch && ctx->link_watch->port_priv_size) {
 		ppitem->link_watch_priv =
@@ -57,10 +60,12 @@ static struct port_priv_item *alloc_ppitem(struct teamd_context *ctx,
 	}
 	return ppitem;
 
-free_ppitem:
-	free(ppitem);
 free_runner_priv:
 	free(ppitem->runner_priv);
+free_ifname:
+	free(_port(ppitem)->ifname);
+free_ppitem:
+	free(ppitem);
 err_out:
 	teamd_log_err("Failed to alloc port priv.");
 	return NULL;
@@ -69,8 +74,9 @@ err_out:
 static void ppitem_free(struct port_priv_item *ppitem)
 {
 	list_del(&ppitem->list);
-	free(ppitem->runner_priv);
 	free(ppitem->link_watch_priv);
+	free(ppitem->runner_priv);
+	free(_port(ppitem)->ifname);
 	free(ppitem);
 }
 
