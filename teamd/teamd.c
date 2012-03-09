@@ -886,178 +886,6 @@ static void teamd_link_watch_fini(struct teamd_context *ctx)
 	free(ctx->link_watch_priv);
 }
 
-struct port_priv_item {
-	struct list_item list;
-	uint32_t ifindex;
-	bool to_be_removed;
-	void *runner_priv;
-	void *link_watch_priv;
-};
-
-static struct port_priv_item *alloc_ppitem(struct teamd_context *ctx,
-					   uint32_t ifindex)
-{
-	struct port_priv_item *ppitem;
-
-	ppitem = myzalloc(sizeof(*ppitem));
-	if (!ppitem)
-		goto err_out;
-	if (ctx->runner->port_priv_size) {
-		ppitem->runner_priv = myzalloc(ctx->runner->port_priv_size);
-		if (!ppitem->runner_priv)
-			goto free_ppitem;
-	}
-	if (ctx->link_watch && ctx->link_watch->port_priv_size) {
-		ppitem->link_watch_priv =
-				myzalloc(ctx->link_watch->port_priv_size);
-		if (!ppitem->link_watch_priv)
-			goto free_runner_priv;
-	}
-	return ppitem;
-
-free_ppitem:
-	free(ppitem);
-free_runner_priv:
-	free(ppitem->runner_priv);
-err_out:
-	teamd_log_err("Failed to alloc port priv.");
-	return NULL;
-}
-
-static void ppitem_free(struct port_priv_item *ppitem)
-{
-	list_del(&ppitem->list);
-	free(ppitem->runner_priv);
-	free(ppitem->link_watch_priv);
-	free(ppitem);
-}
-
-static struct port_priv_item *create_ppitem(struct teamd_context *ctx,
-					    uint32_t ifindex)
-{
-	struct port_priv_item *ppitem;
-	int err;
-
-	ppitem = alloc_ppitem(ctx, ifindex);
-	if (!ppitem)
-		return NULL;
-	ppitem->ifindex = ifindex;
-	list_add(&ctx->port_priv_list, &ppitem->list);
-	if (ctx->link_watch && ctx->link_watch->port_added) {
-		err = ctx->link_watch->port_added(ctx, ifindex,
-						  ppitem->link_watch_priv);
-		if (err) {
-			teamd_log_err("Link watch port_added failed: %s.",
-				      strerror(-err));
-			goto list_del;
-		}
-	}
-	if (ctx->runner->port_added) {
-		err = ctx->runner->port_added(ctx, ifindex,
-					      ppitem->runner_priv);
-		if (err) {
-			teamd_log_err("Runner port_added failed: %s.",
-				      strerror(-err));
-			goto lw_port_removed;
-		}
-	}
-	return ppitem;
-lw_port_removed:
-	if (ctx->link_watch && ctx->link_watch->port_removed)
-		ctx->link_watch->port_removed(ctx, ppitem->ifindex,
-					      ppitem->link_watch_priv);
-list_del:
-	list_del(&ppitem->list);
-	ppitem_free(ppitem);
-	return NULL;
-}
-
-static void ppitem_destroy(struct teamd_context *ctx,
-			   struct port_priv_item *ppitem)
-{
-	if (ctx->runner->port_removed)
-		ctx->runner->port_removed(ctx, ppitem->ifindex,
-					  ppitem->runner_priv);
-	if (ctx->link_watch && ctx->link_watch->port_removed)
-		ctx->link_watch->port_removed(ctx, ppitem->ifindex,
-					      ppitem->link_watch_priv);
-	ppitem_free(ppitem);
-}
-
-static struct port_priv_item *get_ppitem(struct teamd_context *ctx,
-					 uint32_t ifindex)
-{
-	struct port_priv_item *ppitem;
-
-	list_for_each_node_entry(ppitem, &ctx->port_priv_list, list) {
-		if (ppitem->ifindex == ifindex)
-			return ppitem;
-	}
-	return create_ppitem(ctx, ifindex);
-}
-
-void *teamd_get_runner_port_priv(struct teamd_context *ctx, uint32_t ifindex)
-{
-	struct port_priv_item *ppitem;
-
-	ppitem = get_ppitem(ctx, ifindex);
-	if (!ppitem)
-		return NULL;
-	return ppitem->runner_priv;
-}
-
-void *teamd_get_link_watch_port_priv(struct teamd_context *ctx,
-				     uint32_t ifindex)
-{
-	struct port_priv_item *ppitem;
-
-	ppitem = get_ppitem(ctx, ifindex);
-	if (!ppitem)
-		return NULL;
-	return ppitem->link_watch_priv;
-}
-
-static void check_ppitems_to_be_removed(struct teamd_context *ctx, bool killall)
-{
-	struct port_priv_item *ppitem, *tmp;
-
-	list_for_each_node_entry_safe(ppitem, tmp,
-				      &ctx->port_priv_list, list) {
-		if (killall || ppitem->to_be_removed)
-			ppitem_destroy(ctx, ppitem);
-	}
-}
-
-static void teamd_free_port_privs(struct teamd_context *ctx)
-{
-	check_ppitems_to_be_removed(ctx, true);
-}
-
-static void port_priv_change_handler_func(struct team_handle *th, void *arg,
-					  team_change_type_mask_t type_mask)
-{
-	struct teamd_context *ctx = team_get_user_priv(th);
-	struct team_port *port;
-	struct port_priv_item *ppitem;
-
-	check_ppitems_to_be_removed(ctx, false);
-
-	team_for_each_port(port, th) {
-		uint32_t ifindex = team_get_port_ifindex(port);
-
-		ppitem = get_ppitem(ctx, ifindex);
-		if (!ppitem)
-			continue;
-		if (team_is_port_removed(port))
-			ppitem->to_be_removed = true;
-	}
-}
-
-static struct team_change_handler port_priv_change_handler = {
-	.func = port_priv_change_handler_func,
-	.type_mask = TEAM_PORT_CHANGE | TEAM_OPTION_CHANGE,
-};
-
 static void debug_log_port_list(struct teamd_context *ctx)
 {
 	struct team_port *port;
@@ -1123,30 +951,16 @@ static struct team_change_handler debug_change_handler = {
 
 static int teamd_register_default_handlers(struct teamd_context *ctx)
 {
-	int err;
-
-	err = team_change_handler_register(ctx->th, &port_priv_change_handler);
-	if (err)
-		return err;
-
 	if (!ctx->debug)
 		return 0;
-	err = team_change_handler_register(ctx->th, &debug_change_handler);
-	if (err)
-		goto unreg_port_priv_handler;
-	return 0;
-
-unreg_port_priv_handler:
-	team_change_handler_unregister(ctx->th, &port_priv_change_handler);
-
-	return err;
+	return team_change_handler_register(ctx->th, &debug_change_handler);
 }
 
 static void teamd_unregister_default_handlers(struct teamd_context *ctx)
 {
-	if (ctx->debug)
-		team_change_handler_unregister(ctx->th, &debug_change_handler);
-	team_change_handler_unregister(ctx->th, &port_priv_change_handler);
+	if (!ctx->debug)
+		return;
+	team_change_handler_unregister(ctx->th, &debug_change_handler);
 }
 
 static int teamd_init(struct teamd_context *ctx)
@@ -1154,7 +968,6 @@ static int teamd_init(struct teamd_context *ctx)
 	int err;
 	const char *team_name;
 
-	list_init(&ctx->port_priv_list);
 	err = config_load(ctx);
 	if (err) {
 		teamd_log_err("Failed to load config.");
@@ -1239,10 +1052,16 @@ static int teamd_init(struct teamd_context *ctx)
 		goto run_loop_fini;
 	}
 
+	err = teamd_per_port_init(ctx);
+	if (err) {
+		teamd_log_err("Failed to init per-port.");
+		goto team_unreg_debug_handlers;
+	}
+
 	err = teamd_link_watch_init(ctx);
 	if (err) {
 		teamd_log_err("Failed to init link watch.");
-		goto team_unreg_debug_handlers;
+		goto per_port_fini;
 	}
 
 	err = teamd_runner_init(ctx);
@@ -1271,6 +1090,8 @@ runner_fini:
 	teamd_runner_fini(ctx);
 link_watch_fini:
 	teamd_link_watch_fini(ctx);
+per_port_fini:
+	teamd_per_port_fini(ctx);
 team_unreg_debug_handlers:
 	teamd_unregister_default_handlers(ctx);
 run_loop_fini:
@@ -1281,7 +1102,6 @@ team_free:
 	team_free(ctx->th);
 config_free:
 	config_free(ctx);
-	teamd_free_port_privs(ctx);
 	return err;
 }
 
@@ -1290,12 +1110,12 @@ static void teamd_fini(struct teamd_context *ctx)
 	teamd_dbus_fini(ctx);
 	teamd_runner_fini(ctx);
 	teamd_link_watch_fini(ctx);
+	teamd_per_port_fini(ctx);
 	teamd_unregister_default_handlers(ctx);
 	teamd_run_loop_fini(ctx);
 	team_destroy(ctx->th);
 	team_free(ctx->th);
 	config_free(ctx);
-	teamd_free_port_privs(ctx);
 }
 
 static int teamd_start(struct teamd_context *ctx)
