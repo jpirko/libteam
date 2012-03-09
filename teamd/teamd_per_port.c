@@ -220,7 +220,7 @@ static void port_priv_change_handler_func(struct team_handle *th, void *arg,
 
 static struct team_change_handler port_priv_change_handler = {
 	.func = port_priv_change_handler_func,
-	.type_mask = TEAM_PORT_CHANGE | TEAM_OPTION_CHANGE,
+	.type_mask = TEAM_PORT_CHANGE,
 };
 
 int teamd_per_port_init(struct teamd_context *ctx)
