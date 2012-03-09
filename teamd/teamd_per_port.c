@@ -135,7 +135,7 @@ static struct port_priv_item *get_ppitem(struct teamd_context *ctx,
 		if (_port(ppitem)->ifindex == ifindex)
 			return ppitem;
 	}
-	return create_ppitem(ctx, ifindex);
+	return NULL;
 }
 
 void *teamd_get_runner_port_priv(struct teamd_context *ctx, uint32_t ifindex)
@@ -188,8 +188,11 @@ static void port_priv_change_handler_func(struct team_handle *th, void *arg,
 		uint32_t ifindex = team_get_port_ifindex(port);
 
 		ppitem = get_ppitem(ctx, ifindex);
-		if (!ppitem)
-			continue;
+		if (!ppitem) {
+			ppitem = create_ppitem(ctx, ifindex);
+			if (!ppitem)
+				continue;
+		}
 		if (team_is_port_removed(port))
 			ppitem->to_be_removed = true;
 	}
