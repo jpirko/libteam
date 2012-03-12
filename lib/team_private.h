@@ -109,7 +109,7 @@ int send_and_recv(struct team_handle *th, struct nl_msg *msg,
 		  void *valid_data);
 void set_call_change_handlers(struct team_handle *th,
 			      team_change_type_mask_t set_type_mask);
-void check_call_change_handlers(struct team_handle *th,
-				team_change_type_mask_t call_type_mask);
+int check_call_change_handlers(struct team_handle *th,
+			       team_change_type_mask_t call_type_mask);
 
 #endif /* _TEAM_PRIVATE_H_ */

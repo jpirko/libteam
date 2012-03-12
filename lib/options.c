@@ -258,8 +258,7 @@ static int get_options(struct team_handle *th)
 	if (err)
 		return err;
 
-	check_call_change_handlers(th, TEAM_OPTION_CHANGE);
-	return 0;
+	return check_call_change_handlers(th, TEAM_OPTION_CHANGE);
 
 nla_put_failure:
 	nlmsg_free(msg);

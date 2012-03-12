@@ -71,8 +71,8 @@ static void do_main_loop(struct team_handle *th)
 
 }
 
-static void port_change_handler_func(struct team_handle *th, void *arg,
-				     team_change_type_mask_t type_mask)
+static int port_change_handler_func(struct team_handle *th, void *arg,
+				    team_change_type_mask_t type_mask)
 {
 	struct team_port *port;
 
@@ -88,6 +88,7 @@ static void port_change_handler_func(struct team_handle *th, void *arg,
 		       team_get_port_speed(port),
 		       team_get_port_duplex(port));
 	}
+	return 0;
 }
 
 static struct team_change_handler port_change_handler = {
@@ -95,8 +96,8 @@ static struct team_change_handler port_change_handler = {
 	.type_mask	= TEAM_PORT_CHANGE,
 };
 
-static void option_change_handler_func(struct team_handle *th, void *arg,
-				       team_change_type_mask_t type_mask)
+static int option_change_handler_func(struct team_handle *th, void *arg,
+				      team_change_type_mask_t type_mask)
 {
 	struct team_option *option;
 
@@ -106,6 +107,7 @@ static void option_change_handler_func(struct team_handle *th, void *arg,
 		       team_get_option_name(option),
 		       team_is_option_changed(option));
 	}
+	return 0;
 }
 
 static struct team_change_handler option_change_handler = {

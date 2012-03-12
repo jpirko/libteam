@@ -44,18 +44,19 @@ static const struct teamd_link_watch *teamd_find_link_watch(const char *link_wat
 }
 
 
-static void call_link_watch_handler(struct teamd_context *ctx)
+static int call_link_watch_handler(struct teamd_context *ctx)
 {
 	if (ctx->link_watch_handler)
-		ctx->link_watch_handler(ctx);
+		return ctx->link_watch_handler(ctx);
+	return 0;
 }
 
-static void port_change_handler_func(struct team_handle *th, void *arg,
-				     team_change_type_mask_t type_mask)
+static int port_change_handler_func(struct team_handle *th, void *arg,
+				    team_change_type_mask_t type_mask)
 {
 	struct teamd_context *ctx = team_get_user_priv(th);
 
-	call_link_watch_handler(ctx);
+	return call_link_watch_handler(ctx);
 }
 
 static struct team_change_handler port_change_handler = {

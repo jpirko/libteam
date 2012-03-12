@@ -50,8 +50,8 @@ void team_set_log_priority(struct team_handle *th, int priority);
 void *team_get_user_priv(struct team_handle *th);
 void team_set_user_priv(struct team_handle *th, void *priv);
 int team_get_event_fd(struct team_handle *th);
-void team_process_event(struct team_handle *th);
-void team_check_events(struct team_handle *th);
+int team_process_event(struct team_handle *th);
+int team_check_events(struct team_handle *th);
 int team_get_mode_name(struct team_handle *th, char **mode_name);
 int team_set_mode_name(struct team_handle *th, const char *mode_name);
 int team_get_active_port(struct team_handle *th, uint32_t *ifindex);
@@ -128,7 +128,7 @@ enum {
 typedef unsigned int team_change_type_mask_t;
 
 struct team_change_handler {
-	void			(*func)(struct team_handle *th,
+	int			(*func)(struct team_handle *th,
 					void *func_priv,
 					team_change_type_mask_t type_mask);
 					/* type_mask passed to function

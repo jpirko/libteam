@@ -47,7 +47,7 @@ struct teamd_runner;
 struct teamd_link_watch;
 struct teamd_context;
 
-typedef void (*teamd_link_watch_handler_t)(struct teamd_context *ctx);
+typedef int (*teamd_link_watch_handler_t)(struct teamd_context *ctx);
 
 struct teamd_context {
 	enum teamd_command		cmd;

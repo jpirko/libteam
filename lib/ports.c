@@ -153,8 +153,7 @@ static int get_port_list(struct team_handle *th)
 	if (err)
 		return err;
 
-	check_call_change_handlers(th, TEAM_PORT_CHANGE);
-	return 0;
+	return check_call_change_handlers(th, TEAM_PORT_CHANGE);
 
 nla_put_failure:
 	nlmsg_free(msg);

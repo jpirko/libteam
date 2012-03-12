@@ -183,9 +183,10 @@ void set_call_change_handlers(struct team_handle *th,
 	th->change_handler.pending_type_mask |= set_type_mask;
 }
 
-void check_call_change_handlers(struct team_handle *th,
-				team_change_type_mask_t call_type_mask)
+int check_call_change_handlers(struct team_handle *th,
+			       team_change_type_mask_t call_type_mask)
 {
+	int err = 0;
 	struct change_handler_item *handler_item;
 	team_change_type_mask_t to_call_type_mask =
 			th->change_handler.pending_type_mask & call_type_mask;
@@ -196,10 +197,14 @@ void check_call_change_handlers(struct team_handle *th,
 				handler->type_mask & to_call_type_mask;
 
 		if (item_type_mask) {
-			handler->func(th, handler->func_priv, item_type_mask);
+			err = handler->func(th, handler->func_priv,
+					    item_type_mask);
+			if (err)
+				break;
 		}
 	}
 	th->change_handler.pending_type_mask &= ~call_type_mask;
+	return err;
 }
 
 static struct change_handler_item *
@@ -637,12 +642,13 @@ int team_get_event_fd(struct team_handle *th)
  * nl_recvmsgs_default() which blocks so be sure to call this only
  * if there are some data to read on event socket file descriptor.
  *
+ * Returns: zero on success or negative number in case of an error.
  **/
 TEAM_EXPORT
-void team_process_event(struct team_handle *th)
+int team_process_event(struct team_handle *th)
 {
 	nl_recvmsgs_default(th->nl_sock_event);
-	check_call_change_handlers(th, TEAM_ANY_CHANGE);
+	return check_call_change_handlers(th, TEAM_ANY_CHANGE);
 }
 
 /**
@@ -653,9 +659,10 @@ void team_process_event(struct team_handle *th)
  * them one by one. This is safe to be called even if no data present
  * on event socket file descriptor.
  *
+ * Returns: zero on success or negative number in case of an error.
  **/
 TEAM_EXPORT
-void team_check_events(struct team_handle *th)
+int team_check_events(struct team_handle *th)
 {
 	int err;
 	fd_set rfds;
@@ -670,11 +677,15 @@ void team_check_events(struct team_handle *th)
 		err = select(fdmax, &rfds, NULL, NULL, &tv);
 		if (err == -1 && errno == EINTR)
 			continue;
-		if (err != -1 && FD_ISSET(tfd, &rfds))
-			team_process_event(th);
-		else
+		if (err != -1 && FD_ISSET(tfd, &rfds)) {
+			err = team_process_event(th);
+			if (err)
+				return err;
+		} else {
 			break;
+		}
 	}
+	return 0;
 }
 
 /**

@@ -106,7 +106,7 @@ static void change_active_port(struct teamd_context *ctx,
 			      strerror(-err));
 }
 
-static void link_watch_handler(struct teamd_context *ctx)
+static int link_watch_handler(struct teamd_context *ctx)
 {
 	struct team_port *port;
 	uint32_t active_ifindex;
@@ -122,7 +122,7 @@ static void link_watch_handler(struct teamd_context *ctx)
 	err = team_get_active_port(ctx->th, &active_ifindex);
 	if (err) {
 		teamd_log_err("Failed to get active port.");
-		return;
+		return err;
 	}
 
 	active_ifname = dev_name_dup(ctx, active_ifindex);
@@ -169,6 +169,7 @@ static void link_watch_handler(struct teamd_context *ctx)
 
 nochange:
 	free(active_ifname);
+	return 0;
 }
 
 static int abl_init(struct teamd_context *ctx)

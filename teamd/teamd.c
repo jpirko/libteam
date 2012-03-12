@@ -872,8 +872,8 @@ static void debug_log_option_list(struct teamd_context *ctx)
 	teamd_log_dbg("</option_list>");
 }
 
-static void debug_change_handler_func(struct team_handle *th, void *arg,
-				      team_change_type_mask_t type_mask)
+static int debug_change_handler_func(struct team_handle *th, void *arg,
+				     team_change_type_mask_t type_mask)
 {
 	struct teamd_context *ctx = team_get_user_priv(th);
 
@@ -881,6 +881,7 @@ static void debug_change_handler_func(struct team_handle *th, void *arg,
 		debug_log_port_list(ctx);
 	if (type_mask & TEAM_OPTION_CHANGE)
 		debug_log_option_list(ctx);
+	return 0;
 }
 
 static struct team_change_handler debug_change_handler = {

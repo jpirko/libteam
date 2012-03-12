@@ -192,7 +192,7 @@ static void teamd_free_port_privs(struct teamd_context *ctx)
 	check_ppitems_to_be_removed(ctx, true);
 }
 
-static void port_priv_change_handler_func(struct team_handle *th, void *arg,
+static int port_priv_change_handler_func(struct team_handle *th, void *arg,
 					  team_change_type_mask_t type_mask)
 {
 	struct teamd_context *ctx = team_get_user_priv(th);
@@ -210,12 +210,13 @@ static void port_priv_change_handler_func(struct team_handle *th, void *arg,
 			err = create_ppitem(ctx, &ppitem, ifindex);
 			if (err) {
 				teamd_run_loop_quit(ctx, err);
-				return;
+				return err;
 			}
 		}
 		if (team_is_port_removed(port))
 			ppitem->to_be_removed = true;
 	}
+	return 0;
 }
 
 static struct team_change_handler port_priv_change_handler = {
