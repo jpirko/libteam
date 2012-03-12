@@ -64,12 +64,11 @@ static struct team_change_handler port_change_handler = {
 	.type_mask = TEAM_PORT_CHANGE,
 };
 
-bool teamd_link_watch_port_up(struct teamd_context *ctx, uint32_t ifindex)
+bool teamd_link_watch_port_up(struct teamd_context *ctx,
+			      struct teamd_port *tdport)
 {
-	struct teamd_port *tdport = teamd_get_port(ctx, ifindex);
-
 	if (tdport && tdport->link_watch && tdport->link_watch->is_port_up)
-		return tdport->link_watch->is_port_up(ctx, ifindex);
+		return tdport->link_watch->is_port_up(ctx, tdport);
 	return true;
 }
 
@@ -120,12 +119,13 @@ void teamd_link_watch_fini(struct teamd_context *ctx)
 	team_change_handler_unregister(ctx->th, &port_change_handler);
 }
 
-static bool lw_ethtool_is_port_up(struct teamd_context *ctx, uint32_t ifindex)
+static bool lw_ethtool_is_port_up(struct teamd_context *ctx,
+				  struct teamd_port *tdport)
 {
 	struct team_port *port;
 
 	team_for_each_port(port, ctx->th)
-		if (team_get_port_ifindex(port) == ifindex)
+		if (team_get_port_ifindex(port) == tdport->ifindex)
 			return team_is_port_link_up(port);
 	return false;
 }

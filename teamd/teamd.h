@@ -92,16 +92,16 @@ struct teamd_runner {
 	size_t priv_size;
 	int (*init)(struct teamd_context *ctx);
 	void (*fini)(struct teamd_context *ctx);
-	int (*port_added)(struct teamd_context *ctx, uint32_t ifindex, void *runner_port_priv);
-	void (*port_removed)(struct teamd_context *ctx, uint32_t ifindex, void *runner_port_priv);
+	int (*port_added)(struct teamd_context *ctx, struct teamd_port *tdport);
+	void (*port_removed)(struct teamd_context *ctx, struct teamd_port *tdport);
 	size_t port_priv_size;
 };
 
 struct teamd_link_watch {
 	const char *name;
-	int (*port_added)(struct teamd_context *ctx, uint32_t ifindex, void *link_watch_port_priv);
-	void (*port_removed)(struct teamd_context *ctx, uint32_t ifindex, void *link_watch_port_priv);
-	bool (*is_port_up)(struct teamd_context *ctx, uint32_t ifindex);
+	int (*port_added)(struct teamd_context *ctx, struct teamd_port *tdport);
+	void (*port_removed)(struct teamd_context *ctx, struct teamd_port *tdport);
+	bool (*is_port_up)(struct teamd_context *ctx, struct teamd_port *tdport);
 	size_t port_priv_size;
 };
 
@@ -144,7 +144,8 @@ const struct teamd_runner teamd_runner_activebackup;
 /* Link-watch structures */
 const struct teamd_link_watch teamd_link_watch_ethtool;
 
-bool teamd_link_watch_port_up(struct teamd_context *ctx, uint32_t ifindex);
+bool teamd_link_watch_port_up(struct teamd_context *ctx,
+			      struct teamd_port *tdport);
 void teamd_link_watch_select(struct teamd_context *ctx,
 			     struct teamd_port *tdport);
 int teamd_link_watch_init(struct teamd_context *ctx);
@@ -160,9 +161,8 @@ int teamd_per_port_init(struct teamd_context *ctx);
 void teamd_per_port_fini(struct teamd_context *ctx);
 struct teamd_port *teamd_get_port(struct teamd_context *ctx, uint32_t ifindex);
 
-void *teamd_get_runner_port_priv(struct teamd_context *ctx, uint32_t ifindex);
-void *teamd_get_link_watch_port_priv(struct teamd_context *ctx,
-				     uint32_t ifindex);
+void *teamd_get_runner_port_priv(struct teamd_port *tdport);
+void *teamd_get_link_watch_port_priv(struct teamd_port *tdport);
 int teamd_dbus_init(struct teamd_context *ctx);
 void teamd_dbus_fini(struct teamd_context *ctx);
 

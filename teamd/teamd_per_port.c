@@ -29,7 +29,7 @@
 #include "teamd.h"
 
 struct port_priv_item {
-	struct teamd_port port;
+	struct teamd_port port; /* must be first */
 	struct list_item list;
 	bool to_be_removed;
 	void *runner_priv;
@@ -100,8 +100,7 @@ static int create_ppitem(struct teamd_context *ctx,
 	tdport = _port(ppitem);
 	list_add(&ctx->port_priv_list, &ppitem->list);
 	if (tdport->link_watch && tdport->link_watch->port_added) {
-		err = tdport->link_watch->port_added(ctx, ifindex,
-						     ppitem->link_watch_priv);
+		err = tdport->link_watch->port_added(ctx, tdport);
 		if (err) {
 			teamd_log_err("Link watch port_added failed: %s.",
 				      strerror(-err));
@@ -109,8 +108,7 @@ static int create_ppitem(struct teamd_context *ctx,
 		}
 	}
 	if (ctx->runner->port_added) {
-		err = ctx->runner->port_added(ctx, ifindex,
-					      ppitem->runner_priv);
+		err = ctx->runner->port_added(ctx, tdport);
 		if (err) {
 			teamd_log_err("Runner port_added failed: %s.",
 				      strerror(-err));
@@ -121,8 +119,7 @@ static int create_ppitem(struct teamd_context *ctx,
 	return 0;
 lw_port_removed:
 	if (tdport->link_watch && tdport->link_watch->port_removed)
-		tdport->link_watch->port_removed(ctx, ifindex,
-						 ppitem->link_watch_priv);
+		tdport->link_watch->port_removed(ctx, tdport);
 list_del:
 	list_del(&ppitem->list);
 	ppitem_free(ppitem);
@@ -135,11 +132,9 @@ static void ppitem_destroy(struct teamd_context *ctx,
 	struct teamd_port *tdport = _port(ppitem);
 
 	if (ctx->runner->port_removed)
-		ctx->runner->port_removed(ctx, tdport->ifindex,
-					  ppitem->runner_priv);
+		ctx->runner->port_removed(ctx, tdport);
 	if (tdport->link_watch && tdport->link_watch->port_removed)
-		tdport->link_watch->port_removed(ctx, tdport->ifindex,
-						 ppitem->link_watch_priv);
+		tdport->link_watch->port_removed(ctx, tdport);
 	ppitem_free(ppitem);
 }
 
@@ -155,24 +150,17 @@ static struct port_priv_item *get_ppitem(struct teamd_context *ctx,
 	return NULL;
 }
 
-void *teamd_get_runner_port_priv(struct teamd_context *ctx, uint32_t ifindex)
+void *teamd_get_runner_port_priv(struct teamd_port *tdport)
 {
-	struct port_priv_item *ppitem;
+	struct port_priv_item *ppitem = (struct port_priv_item *) tdport;
 
-	ppitem = get_ppitem(ctx, ifindex);
-	if (!ppitem)
-		return NULL;
 	return ppitem->runner_priv;
 }
 
-void *teamd_get_link_watch_port_priv(struct teamd_context *ctx,
-				     uint32_t ifindex)
+void *teamd_get_link_watch_port_priv(struct teamd_port *tdport)
 {
-	struct port_priv_item *ppitem;
+	struct port_priv_item *ppitem = (struct port_priv_item *) tdport;
 
-	ppitem = get_ppitem(ctx, ifindex);
-	if (!ppitem)
-		return NULL;
 	return ppitem->link_watch_priv;
 }
 

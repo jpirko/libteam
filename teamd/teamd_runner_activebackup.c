@@ -69,12 +69,15 @@ static bool is_port_sticky(struct teamd_context *ctx, const char *port_name)
 }
 
 static void change_active_port(struct teamd_context *ctx,
-			       uint32_t old_active_ifindex,
-			       uint32_t new_active_ifindex)
+			       struct teamd_port *old_tdport,
+			       struct teamd_port *new_tdport)
 {
+	uint32_t new_active_ifindex = new_tdport->ifindex;
+	uint32_t old_active_ifindex = 0;
 	int err;
 
-	if (old_active_ifindex) {
+	if (old_tdport) {
+		old_active_ifindex = old_tdport->ifindex;
 		err = team_hwaddr_set(ctx->th, old_active_ifindex,
 				      abl_priv(ctx)->old_active_hwaddr,
 				      ctx->hwaddr_len);
@@ -109,66 +112,58 @@ static void change_active_port(struct teamd_context *ctx,
 static int link_watch_handler(struct teamd_context *ctx)
 {
 	struct team_port *port;
-	uint32_t active_ifindex;
-	char *active_ifname;
-	bool active_down = false;
-	uint32_t best_ifindex = 0;
-	char *best_ifname;
+	uint32_t ifindex;
+	struct teamd_port *active_tdport;
+	struct teamd_port *best_tdport = NULL;
 	uint32_t best_speed = 0;
 	uint8_t best_duplex = 0;
 	int best_prio = INT_MIN;
 	int err;
 
-	err = team_get_active_port(ctx->th, &active_ifindex);
+	err = team_get_active_port(ctx->th, &ifindex);
 	if (err) {
 		teamd_log_err("Failed to get active port.");
 		return err;
 	}
-
-	active_ifname = dev_name_dup(ctx, active_ifindex);
-	teamd_log_dbg("Current active port: \"%s\" (ifindex \"%d\", prio \"%d\").",
-		      active_ifname, active_ifindex,
-		      get_port_prio(ctx, active_ifname));
+	active_tdport = teamd_get_port(ctx, ifindex);
+	if (active_tdport)
+		teamd_log_dbg("Current active port: \"%s\" (ifindex \"%d\", prio \"%d\").",
+			      active_tdport->ifname, active_tdport->ifindex,
+			      get_port_prio(ctx, active_tdport->ifname));
 
 	team_for_each_port(port, ctx->th) {
-		uint32_t ifindex = team_get_port_ifindex(port);
+		struct teamd_port *tdport;
 
-		if (teamd_link_watch_port_up(ctx, ifindex)) {
+		tdport = teamd_get_port(ctx, team_get_port_ifindex(port));
+		if (teamd_link_watch_port_up(ctx, tdport)) {
 			uint32_t speed = team_get_port_speed(port);
 			uint8_t duplex = team_get_port_duplex(port);
-			char *ifname = dev_name(ctx, ifindex);
-			int prio = get_port_prio(ctx, ifname);
+			int prio = get_port_prio(ctx, tdport->ifname);
 
-			if (!best_ifindex ||
+			if (!best_tdport ||
 			    (prio > best_prio) ||
 			    (speed > best_speed) ||
 			    (speed == best_speed && duplex > best_duplex)) {
+				best_tdport = tdport;
 				best_prio = prio;
-				best_ifindex = ifindex;
 				best_speed = speed;
 				best_duplex = duplex;
 			}
-		} else if (ifindex == active_ifindex) {
-			active_down = true;
 		}
 	}
 
-	if (!best_ifindex || best_ifindex == active_ifindex)
-		goto nochange;
+	if (!best_tdport || best_tdport == active_tdport)
+		return 0;
 
-	best_ifname = dev_name_dup(ctx, best_ifindex);
 	teamd_log_dbg("Found best port: \"%s\" (ifindex \"%d\", prio \"%d\").",
-		      best_ifname, best_ifindex, best_prio);
-	if ((active_down || !active_ifindex ||
-	     !is_port_sticky(ctx, active_ifname))) {
-		teamd_log_info("Changing active port to from \"%s\" to \"%s\".",
-			       active_ifname, best_ifname);
-		change_active_port(ctx, active_ifindex, best_ifindex);
+		      best_tdport->ifname, best_tdport->ifindex, best_prio);
+	if (!active_tdport ||
+	    !teamd_link_watch_port_up(ctx, active_tdport) ||
+	    !is_port_sticky(ctx, active_tdport->ifname)) {
+		teamd_log_info("Changing active port to \"%s\".",
+			       best_tdport->ifname);
+		change_active_port(ctx, active_tdport, best_tdport);
 	}
-	free(best_ifname);
-
-nochange:
-	free(active_ifname);
 	return 0;
 }
 
