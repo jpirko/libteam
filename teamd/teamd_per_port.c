@@ -208,10 +208,8 @@ static int port_priv_change_handler_func(struct team_handle *th, void *arg,
 		ppitem = get_ppitem(ctx, ifindex);
 		if (!ppitem) {
 			err = create_ppitem(ctx, &ppitem, ifindex);
-			if (err) {
-				teamd_run_loop_quit(ctx, err);
+			if (err)
 				return err;
-			}
 		}
 		if (team_is_port_removed(port))
 			ppitem->to_be_removed = true;

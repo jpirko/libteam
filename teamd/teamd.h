@@ -116,7 +116,7 @@ int teamd_update_port_config(struct teamd_context *ctx, const char *port_name,
 					 TEAMD_LOOP_FD_EVENT_WRITE | \
 					 TEAMD_LOOP_FD_EVENT_EXCEPTION)
 
-typedef void (*teamd_loop_callback_func_t)(struct teamd_context *ctx,
+typedef int (*teamd_loop_callback_func_t)(struct teamd_context *ctx,
 					   int events, void *func_priv);
 
 int teamd_loop_callback_fd_add(struct teamd_context *ctx,
@@ -134,7 +134,6 @@ void teamd_loop_callback_del(struct teamd_context *ctx, const char *cb_name);
 int teamd_loop_callback_enable(struct teamd_context *ctx, const char *cb_name);
 int teamd_loop_callback_disable(struct teamd_context *ctx, const char *cb_name);
 bool teamd_loop_callback_is_enabled(struct teamd_context *ctx, const char *cb_name);
-void teamd_run_loop_quit(struct teamd_context *ctx, int err);
 void teamd_run_loop_restart(struct teamd_context *ctx);
 
 /* Runner structures */

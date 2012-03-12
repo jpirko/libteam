@@ -201,7 +201,7 @@ static const char *pid_file_proc(void) {
 	return *__g_pid_file;
 }
 
-static void handle_period_fd(int fd)
+static int handle_period_fd(int fd)
 {
 	ssize_t ret;
 	uint64_t exp;
@@ -209,17 +209,18 @@ static void handle_period_fd(int fd)
 	ret = read(fd, &exp, sizeof(uint64_t));
 	if (ret == -1) {
 		if (errno == EINTR || errno == EAGAIN)
-			return;
+			return 0;
 		teamd_log_err("read() failed.");
-		return;
+		return -errno;
 	}
 	if (ret != sizeof(uint64_t)) {
 		teamd_log_err("read() returned unexpected number of bytes.");
-		return;
+		return -EINVAL;
 	}
 	if (exp > 1)
 		teamd_log_warn("some periodic function calls missed (%" PRIu64 ")",
 			       exp - 1);
+	return 0;
 }
 
 struct teamd_loop_callback {
@@ -252,12 +253,13 @@ static void teamd_run_loop_set_fds(struct list_item *lcb_list,
 	}
 }
 
-static void teamd_run_loop_do_callbacks(struct list_item *lcb_list, fd_set *fds,
+static int teamd_run_loop_do_callbacks(struct list_item *lcb_list, fd_set *fds,
 					struct teamd_context *ctx)
 {
 	struct teamd_loop_callback *lcb;
 	int i;
 	int events;
+	int err;
 
 	list_for_each_node_entry(lcb, lcb_list, list) {
 		for (i = 0; i < 3; i++) {
@@ -266,13 +268,19 @@ static void teamd_run_loop_do_callbacks(struct list_item *lcb_list, fd_set *fds,
 				if (FD_ISSET(lcb->fd, &fds[i]))
 					events |= (1 << i);
 				if (events) {
-					if (lcb->is_period)
-						handle_period_fd(lcb->fd);
-					lcb->func(ctx, events, lcb->func_priv);
+					if (lcb->is_period) {
+						err = handle_period_fd(lcb->fd);
+						if (err)
+							return err;
+					}
+					err = lcb->func(ctx, events, lcb->func_priv);
+					if (err)
+						return err;
 				}
 			}
 		}
 	}
+	return 0;
 }
 
 static int teamd_run_loop_run(struct teamd_context *ctx)
@@ -318,8 +326,10 @@ static int teamd_run_loop_run(struct teamd_context *ctx)
 			}
 		}
 
-		teamd_run_loop_do_callbacks(&ctx->run_loop.callback_list,
-					    fds, ctx);
+		err = teamd_run_loop_do_callbacks(&ctx->run_loop.callback_list,
+						  fds, ctx);
+		if (err)
+			return err;
 	}
 	return 0;
 }
@@ -495,16 +505,15 @@ bool teamd_loop_callback_is_enabled(struct teamd_context *ctx, const char *cb_na
 	return lcb->enabled;
 }
 
-static void callback_daemon_signal(struct teamd_context *ctx, int events,
-				   void *func_priv)
+static int callback_daemon_signal(struct teamd_context *ctx, int events,
+				  void *func_priv)
 {
 	int sig;
 
 	/* Get signal */
 	if ((sig = daemon_signal_next()) <= 0) {
 		teamd_log_err("daemon_signal_next() failed.");
-		teamd_run_loop_quit(ctx, -errno);
-		return;
+		return -EINVAL;
 	}
 
 	/* Dispatch signal */
@@ -516,12 +525,13 @@ static void callback_daemon_signal(struct teamd_context *ctx, int events,
 		teamd_run_loop_quit(ctx, 0);
 		break;
 	}
+	return 0;
 }
 
-static void callback_libteam_event(struct teamd_context *ctx, int events,
-				   void *func_priv)
+static int callback_libteam_event(struct teamd_context *ctx, int events,
+				  void *func_priv)
 {
-	team_process_event(ctx->th);
+	return team_process_event(ctx->th);
 }
 
 static int teamd_run_loop_init(struct teamd_context *ctx)

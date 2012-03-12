@@ -344,8 +344,8 @@ void teamd_dbus_con_fini(struct teamd_context *ctx)
 	dbus_connection_unref(ctx->dbus.con);
 }
 
-static void callback_watch(struct teamd_context *ctx, int events,
-			   void *func_priv)
+static int callback_watch(struct teamd_context *ctx, int events,
+			  void *func_priv)
 {
 	DBusWatch *watch = func_priv;
 
@@ -357,6 +357,7 @@ static void callback_watch(struct teamd_context *ctx, int events,
 	if (events & TEAMD_LOOP_FD_EVENT_EXCEPTION)
 		dbus_watch_handle(watch, DBUS_WATCH_ERROR);
 	dbus_connection_unref(ctx->dbus.con);
+	return 0;
 }
 
 static dbus_bool_t add_watch(DBusWatch *watch, void *priv)
@@ -417,12 +418,13 @@ static void convert_ms(time_t *sec, long *nsec, int ms)
 	*nsec = (ms % 1000) * 1000000;
 }
 
-static void callback_timeout(struct teamd_context *ctx, int events,
-			     void *func_priv)
+static int callback_timeout(struct teamd_context *ctx, int events,
+			    void *func_priv)
 {
 	DBusTimeout *timeout = func_priv;
 
 	dbus_timeout_handle(timeout);
+	return 0;
 }
 
 static dbus_bool_t add_timeout(DBusTimeout *timeout, void *priv)
@@ -482,7 +484,7 @@ struct dispatch_priv {
 	struct teamd_context *ctx;
 };
 
-static void callback_dispatch(struct teamd_context *ctx, int events,
+static int callback_dispatch(struct teamd_context *ctx, int events,
 			      void *func_priv)
 {
 	struct dispatch_priv *dp = func_priv;
@@ -492,13 +494,14 @@ static void callback_dispatch(struct teamd_context *ctx, int events,
 	err = read(dp->fd_r, &byte, 1);
 	if (err == -1) {
 		if (errno != EINTR && errno != EAGAIN) {
-			teamd_log_err("dbus: dispatch, read() failed, errno: %d. ",
-				      errno);
+			teamd_log_err("dbus: dispatch, read() failed.");
+			return -errno;
 		}
 	} else {
 		while (dbus_connection_dispatch(ctx->dbus.con) ==
 			DBUS_DISPATCH_DATA_REMAINS);
 	}
+	return 0;
 }
 
 static void wakeup_dispatch(struct dispatch_priv *dp)
