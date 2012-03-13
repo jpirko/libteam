@@ -789,7 +789,7 @@ static int teamd_runner_init(struct teamd_context *ctx)
 	err = json_unpack(ctx->config_json, "{s:s}", "runner", &runner_name);
 	if (err) {
 		teamd_log_err("Failed to get team runner name from config.");
-		return err;
+		return -ENOENT;
 	}
 	teamd_log_dbg("Using team runner \"%s\".", runner_name);
 	ctx->runner = teamd_find_runner(runner_name);
@@ -928,7 +928,7 @@ static int teamd_init(struct teamd_context *ctx)
 		err = json_unpack(ctx->config_json, "{s:s}", "device", &team_name);
 		if (err) {
 			teamd_log_err("Failed to get team device name.");
-			err = -EINVAL;
+			err = -ENOENT;
 			goto config_free;
 		}
 		ctx->team_devname = strdup(team_name);
