@@ -327,17 +327,21 @@ static int callback_socket(struct teamd_context *ctx, int events,
 
 static int set_in_addr(struct in_addr *addr, const char *hostname)
 {
-	if (inet_aton(hostname, addr) != 1) {
-		struct hostent *ent;
+	struct addrinfo *result;
+	struct addrinfo hints;
+	struct sockaddr_in *sin;
+	int err;
 
-		ent = gethostbyname2(hostname, AF_INET);
-		if (!ent) {
-			teamd_log_err("Failed get address for host \"%s\".",
-				      hostname);
-			return -ENOENT;
-		}
-		memcpy(addr, ent->h_addr, sizeof(*addr));
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	err = getaddrinfo(hostname, NULL, &hints, &result);
+	if (err) {
+		teamd_log_err("getaddrinfo failed: %s", gai_strerror(err));
+		return -ENOENT;
 	}
+	sin = (struct sockaddr_in *) result->ai_addr;
+	memcpy(addr, &sin->sin_addr, sizeof(*addr));
+	freeaddrinfo(result);
 	return 0;
 }
 
