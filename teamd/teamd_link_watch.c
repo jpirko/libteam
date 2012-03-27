@@ -270,7 +270,7 @@ static int getsockname_hwaddr(int sock, struct sockaddr_ll *addr,
 		teamd_log_err("Failed to getsockname.");
 		return -errno;
 	}
-	if (addr->sll_halen != expected_len) {
+	if (expected_len && addr->sll_halen != expected_len) {
 		teamd_log_err("Unexpected length of hw address.");
 		return -ENOTSUP;
 	}
