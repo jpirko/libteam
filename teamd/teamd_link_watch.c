@@ -31,6 +31,7 @@
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 #include <net/if_arp.h>
+#include <linux/filter.h>
 #include <time.h>
 #include <private/misc.h>
 #include <team.h>
@@ -215,10 +216,12 @@ static char *str_sockaddr_in6(struct sockaddr_in6 *sin6)
 }
 
 static int packet_sock_open(int *sock_p, const uint32_t ifindex,
-			    const unsigned short family)
+			    const unsigned short family,
+			    const struct sock_fprog *fprog)
 {
 	struct sockaddr_ll ll_my;
 	int sock;
+	int ret;
 	int err;
 
 	sock = socket(PF_PACKET, SOCK_DGRAM, 0);
@@ -226,17 +229,28 @@ static int packet_sock_open(int *sock_p, const uint32_t ifindex,
 		teamd_log_err("Failed to create packet socket.");
 		return -errno;
 	}
+
+	if (fprog) {
+		ret = setsockopt(sock, SOL_SOCKET, SO_ATTACH_FILTER,
+				 fprog, sizeof(*fprog));
+		if (ret == -1) {
+			teamd_log_err("Failed to attach filter.");
+			err = -errno;
+			goto close_sock;
+		}
+	}
+
 	memset(&ll_my, 0, sizeof(ll_my));
 	ll_my.sll_family = AF_PACKET;
 	ll_my.sll_ifindex = ifindex;
 	ll_my.sll_protocol = family;
-	err = bind(sock, (struct sockaddr *) &ll_my, sizeof(ll_my));
-	if (err == -1) {
+	ret = bind(sock, (struct sockaddr *) &ll_my, sizeof(ll_my));
+	if (ret == -1) {
 		teamd_log_err("Failed to bind socket.");
 		err = -errno;
 		goto close_sock;
 	}
-	teamd_log_err("A %d.", sock);
+
 	*sock_p = sock;
 	return 0;
 close_sock:
@@ -508,7 +522,7 @@ struct lw_ap_port_priv {
 static int lw_ap_sock_open(struct lw_psr_port_priv *port_priv)
 {
 	return packet_sock_open(&port_priv->sock, port_priv->tdport->ifindex,
-				htons(ETH_P_ARP));
+				htons(ETH_P_ARP), NULL);
 }
 
 static void lw_ap_sock_close(struct lw_psr_port_priv *port_priv)
@@ -738,6 +752,26 @@ close_sock:
 	return err;
 }
 
+#define OFFSET_NEXT_HEADER					\
+	in_struct_offset(struct ip6_hdr, ip6_nxt)
+#define OFFSET_NA_TYPE						\
+	sizeof (struct ip6_hdr) +				\
+	in_struct_offset(struct nd_neighbor_advert, nd_na_type)
+
+struct sock_filter na_flt[] = {
+	BPF_STMT(BPF_LD+BPF_B+BPF_ABS, OFFSET_NEXT_HEADER),
+	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, IPPROTO_ICMPV6, 0, 3),
+	BPF_STMT(BPF_LD+BPF_B+BPF_ABS, OFFSET_NA_TYPE),
+	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, ND_NEIGHBOR_ADVERT, 0, 1),
+	BPF_STMT(BPF_RET + BPF_K, (u_int)-1),
+	BPF_STMT(BPF_RET + BPF_K, 0),
+};
+
+const struct sock_fprog na_fprog = {
+	.len = ARRAY_SIZE(na_flt),
+	.filter = na_flt,
+};
+
 static int lw_nsnap_sock_open(struct lw_psr_port_priv *port_priv)
 {
 	struct lw_nsnap_port_priv *nsnap_port_priv = (struct lw_nsnap_port_priv *) port_priv;
@@ -750,7 +784,7 @@ static int lw_nsnap_sock_open(struct lw_psr_port_priv *port_priv)
 	 * So we use packet socket to get these packets.
 	 */
 	err = packet_sock_open(&port_priv->sock, port_priv->tdport->ifindex,
-			       htons(ETH_P_IPV6));
+			       htons(ETH_P_IPV6), &na_fprog);
 	if (err)
 		return err;
 	err = icmp6_sock_open(&nsnap_port_priv->tx_sock);
@@ -870,7 +904,7 @@ static int lw_nsnap_receive(struct lw_psr_port_priv *port_priv)
 	/* check IPV6 header */
 	if (nap.ip6h.ip6_vfc != 0x60 /* IPV6 */ ||
 	    nap.ip6h.ip6_plen != htons(sizeof(nap) - sizeof(nap.ip6h)) ||
-	    nap.ip6h.ip6_nxt != 58 /* IPPROTO_ICMPV6 */ ||
+	    nap.ip6h.ip6_nxt != IPPROTO_ICMPV6 ||
 	    nap.ip6h.ip6_hlim != 255 /* Do not route */ ||
 	    memcmp(&nap.ip6h.ip6_src, &nsnap_port_priv->dst.sin6_addr,
 		   sizeof(struct in6_addr)))
