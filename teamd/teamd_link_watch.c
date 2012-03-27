@@ -519,10 +519,25 @@ struct lw_ap_port_priv {
 	struct in_addr dst;
 };
 
+#define OFFSET_ARP_OP_CODE					\
+	in_struct_offset(struct arphdr, ar_op)
+
+struct sock_filter arp_rpl_flt[] = {
+	BPF_STMT(BPF_LD + BPF_H + BPF_ABS, OFFSET_ARP_OP_CODE),
+	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARPOP_REPLY, 0, 1),
+	BPF_STMT(BPF_RET + BPF_K, (u_int)-1),
+	BPF_STMT(BPF_RET + BPF_K, 0),
+};
+
+const struct sock_fprog arp_rpl_fprog = {
+	.len = ARRAY_SIZE(arp_rpl_flt),
+	.filter = arp_rpl_flt,
+};
+
 static int lw_ap_sock_open(struct lw_psr_port_priv *port_priv)
 {
 	return packet_sock_open(&port_priv->sock, port_priv->tdport->ifindex,
-				htons(ETH_P_ARP), NULL);
+				htons(ETH_P_ARP), &arp_rpl_fprog);
 }
 
 static void lw_ap_sock_close(struct lw_psr_port_priv *port_priv)
