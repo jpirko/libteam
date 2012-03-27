@@ -914,9 +914,6 @@ static int lw_nsnap_receive(struct lw_psr_port_priv *port_priv)
 		return -errno;
 	}
 
-	if (ll_from.sll_ifindex != port_priv->tdport->ifindex)
-		return 0;
-
 	/* check IPV6 header */
 	if (nap.ip6h.ip6_vfc != 0x60 /* IPV6 */ ||
 	    nap.ip6h.ip6_plen != htons(sizeof(nap) - sizeof(nap.ip6h)) ||
