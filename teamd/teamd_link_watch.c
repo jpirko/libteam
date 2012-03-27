@@ -342,7 +342,8 @@ static int lw_psr_callback_periodic(struct teamd_context *ctx, int events,
 		port_priv->missed = 0;
 	} else {
 		port_priv->missed++;
-		if (port_priv->missed > port_priv->missed_max) {
+		if (port_priv->missed > port_priv->missed_max &&
+		    orig_link_up) {
 			teamd_log_dbg("Missed %u replies (max %u).",
 				       port_priv->missed,
 				       port_priv->missed_max);
