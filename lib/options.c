@@ -36,6 +36,7 @@ struct team_option {
 	enum team_option_type	type;
 	char *			name;
 	void *			data;
+	int			data_len;
 	bool			changed;
 	bool			changed_locally;
 };
@@ -76,27 +77,29 @@ static struct team_option *find_option(struct team_handle *th, const char *name)
 	return NULL;
 }
 
-static int get_option_data_size_by_type(int opt_type, const void *data)
+static int get_option_data_size_by_type(int opt_type, const void *data,
+					int data_len)
 {
 	switch (opt_type) {
 	case TEAM_OPTION_TYPE_U32:
 		return sizeof(__u32);
 	case TEAM_OPTION_TYPE_STRING:
 		return sizeof(char) * (strlen((char *) data) + 1);
+	case TEAM_OPTION_TYPE_BINARY:
+		return data_len;
 	default:
 		return -EINVAL;
 	}
 }
 
 static int update_option(struct team_handle *th, struct team_option *option,
-			 int opt_type, const void *data, bool changed,
-			 bool changed_locally)
+			 int opt_type, const void *data, int data_len,
+			 bool changed, bool changed_locally)
 {
 	void *tmp_data;
 	int data_size;
 
-
-	data_size = get_option_data_size_by_type(opt_type, data);
+	data_size = get_option_data_size_by_type(opt_type, data, data_len);
 	if (data_size < 0)
 		return data_size;
 
@@ -111,6 +114,7 @@ static int update_option(struct team_handle *th, struct team_option *option,
 	memcpy(tmp_data, data, data_size);
 	free(option->data);
 	option->data = tmp_data;
+	option->data_len = data_size;
 	option->type = opt_type;
 	option->changed = changed;
 	option->changed_locally = changed_locally;
@@ -142,6 +146,8 @@ err_alloc_name:
 	return err;
 }
 
+#define __NLA_BINARY 11 /* Not in libnl atm */
+
 int get_options_handler(struct nl_msg *msg, void *arg)
 {
 	struct nlmsghdr *nlh = nlmsg_hdr(msg);
@@ -171,6 +177,7 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 		__u32 arg;
 		int opt_type;
 		void *data;
+		int data_len;
 		char *str;
 		int err = 0;
 		bool option_created = false;
@@ -194,6 +201,7 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 			changed = false;
 
 		nla_type = nla_get_u32(option_attrs[TEAM_ATTR_OPTION_TYPE]);
+		data_len = nla_len(option_attrs[TEAM_ATTR_OPTION_DATA]);
 		switch (nla_type) {
 		case NLA_U32:
 			arg = nla_get_u32(option_attrs[TEAM_ATTR_OPTION_DATA]);
@@ -204,6 +212,10 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 			str = nla_get_string(option_attrs[TEAM_ATTR_OPTION_DATA]);
 			data = str;
 			opt_type = TEAM_OPTION_TYPE_STRING;
+			break;
+		case __NLA_BINARY:
+			data = nla_data(option_attrs[TEAM_ATTR_OPTION_DATA]);
+			opt_type = TEAM_OPTION_TYPE_BINARY;
 			break;
 		default:
 			err(th, "Unknown nla_type received.");
@@ -220,7 +232,8 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 				option_created = true;
 			}
 		}
-		err = update_option(th, option, opt_type, data, changed, false);
+		err = update_option(th, option, opt_type, data, data_len,
+				    changed, false);
 		if (option_created) {
 			if (err)
 				free_option(option);
@@ -379,6 +392,32 @@ char *team_get_option_value_string(struct team_option *option)
 }
 
 /**
+ * team_get_option_value_binary:
+ * @option: option structure
+ *
+ * Get option value as void pointer.
+ *
+ * Returns: pointer to data.
+ **/
+TEAM_EXPORT
+void *team_get_option_value_binary(struct team_option *option)
+{
+	return option->data;
+}
+
+/**
+ * team_get_option_value_len:
+ * @option: option structure
+ *
+ * Get option value length.
+ **/
+TEAM_EXPORT
+unsigned int team_get_option_value_len(struct team_option *option)
+{
+	return option->data_len;
+}
+
+/**
  * team_is_option_changed:
  * @option: option structure
  *
@@ -440,8 +479,32 @@ int team_get_option_value_by_name_string(struct team_handle *th,
 	return 0;
 }
 
+/**
+ * team_get_option_value_by_name_binary:
+ * @th: libteam library context
+ * @name: option name
+ * data_ptr: where the value will be stored
+ *
+ * Get option referred by @name and store its value as pointer to data
+ * into @data_ptr.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_get_option_value_by_name_binary(struct team_handle *th,
+					 const char *name, void **data_ptr)
+{
+	struct team_option *option;
+
+	option = team_get_option_by_name(th, name);
+	if (!option)
+		return -ENOENT;
+	*data_ptr = team_get_option_value_binary(option);
+	return 0;
+}
+
 static int local_set_option_value(struct team_handle *th, const char *opt_name,
-				  const void *data, int opt_type)
+				  const void *data, int data_len, int opt_type)
 {
 	struct team_option *option;
 	int err;
@@ -451,7 +514,7 @@ static int local_set_option_value(struct team_handle *th, const char *opt_name,
 		err(th, "Option not found on local set attempt.");
 		return -ENOENT;
 	}
-	err = update_option(th, option, opt_type, data, true, true);
+	err = update_option(th, option, opt_type, data, data_len, true, true);
 	if (err) {
 		err(th, "Failed update option locally: %s", strerror(-err));
 		return err;
@@ -459,8 +522,10 @@ static int local_set_option_value(struct team_handle *th, const char *opt_name,
 	return 0;
 }
 
-static int set_option_value(struct team_handle *th, const char *opt_name,
-			    const void *data, int opt_type)
+static int set_option_value_with_len(struct team_handle *th,
+				     const char *opt_name,
+				     const void *data, int data_len,
+				     int opt_type)
 {
 	struct nl_msg *msg;
 	struct nlattr *option_list;
@@ -474,6 +539,9 @@ static int set_option_value(struct team_handle *th, const char *opt_name,
 		break;
 	case TEAM_OPTION_TYPE_STRING:
 		nla_type = NLA_STRING;
+		break;
+	case TEAM_OPTION_TYPE_BINARY:
+		nla_type = __NLA_BINARY;
 		break;
 	default:
 		return -ENOENT;
@@ -501,6 +569,9 @@ static int set_option_value(struct team_handle *th, const char *opt_name,
 		case NLA_STRING:
 			NLA_PUT_STRING(msg, TEAM_ATTR_OPTION_DATA, (char *) data);
 			break;
+		case __NLA_BINARY:
+			NLA_PUT(msg, TEAM_ATTR_OPTION_DATA, data_len, (char *) data);
+			break;
 		default:
 			goto nla_put_failure;
 	}
@@ -512,13 +583,19 @@ static int set_option_value(struct team_handle *th, const char *opt_name,
 		return err;
 	}
 
-	err = local_set_option_value(th, opt_name, data, opt_type);
+	err = local_set_option_value(th, opt_name, data, data_len, opt_type);
 
 	return err;
 
 nla_put_failure:
 	nlmsg_free(msg);
 	return -ENOBUFS;
+}
+
+static int set_option_value(struct team_handle *th, const char *opt_name,
+			    const void *data, int opt_type)
+{
+	return set_option_value_with_len(th, opt_name, data, 0, opt_type);
 }
 
 /**
@@ -553,4 +630,24 @@ int team_set_option_value_by_name_string(struct team_handle *th,
 					 const char *name, const char *str)
 {
 	return set_option_value(th, name, str, TEAM_OPTION_TYPE_STRING);
+}
+
+/**
+ * team_set_option_value_by_name_binary:
+ * @th: libteam library context
+ * @name: option name
+ * @data: binary data to be set
+ * @data_len: binary data length
+ *
+ * Set binary type option.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_set_option_value_by_name_binary(struct team_handle *th,
+					 const char *name, const void *data,
+					 unsigned int data_len)
+{
+	return set_option_value_with_len(th, name, data, data_len,
+					 TEAM_OPTION_TYPE_BINARY);
 }
