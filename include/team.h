@@ -23,6 +23,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdarg.h>
+#include <linux/filter.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,6 +57,8 @@ int team_get_mode_name(struct team_handle *th, char **mode_name);
 int team_set_mode_name(struct team_handle *th, const char *mode_name);
 int team_get_active_port(struct team_handle *th, uint32_t *ifindex);
 int team_set_active_port(struct team_handle *th, uint32_t ifindex);
+int team_get_bpf_hash_func(struct team_handle *th, struct sock_fprog *fp);
+int team_set_bpf_hash_func(struct team_handle *th, const struct sock_fprog *fp);
 
 /*
  * team_port

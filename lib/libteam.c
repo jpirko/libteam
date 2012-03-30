@@ -29,6 +29,7 @@
 #include <netlink/cli/link.h>
 #include <linux/if_team.h>
 #include <linux/types.h>
+#include <linux/filter.h>
 #include <team.h>
 #include <private/list.h>
 #include <private/misc.h>
@@ -748,6 +749,59 @@ TEAM_EXPORT
 int team_set_active_port(struct team_handle *th, uint32_t ifindex)
 {
 	return team_set_option_value_by_name_u32(th, "activeport", ifindex);
+}
+
+/**
+ * team_get_bpf_hash_func:
+ * @th: libteam library context
+ * @fp: where current BPF instruction set will be stored
+ *
+ * Get tx port selecting hash function. Note this is possible only if
+ * team is in "loadbalance" mode.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_get_bpf_hash_func(struct team_handle *th, struct sock_fprog *fp)
+{
+	struct team_option *option;
+	unsigned int data_len;
+
+	option = team_get_option_by_name(th, "bpf_hash_func");
+	if (!option)
+		return -ENOENT;
+
+	data_len = team_get_option_value_len(option);
+	if (data_len % sizeof(struct sock_filter))
+		return -EINVAL;
+
+	fp->filter = team_get_option_value_binary(option);
+	fp->len = data_len / sizeof(struct sock_filter);
+	return 0;
+}
+
+/**
+ * team_set_bpf_hash_func:
+ * @th: libteam library context
+ * @fp: prepared BPF instruction set
+ *
+ * Set tx port selecting hash function. Note this is possible only if
+ * team is in "loadbalance" mode. Passing NULL clears current function.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_set_bpf_hash_func(struct team_handle *th, const struct sock_fprog *fp)
+{
+	void *data = NULL;
+	unsigned int data_len = 0;
+
+	if (fp) {
+		data = fp->filter;
+		data_len = fp->len * sizeof(struct sock_filter);
+	}
+	return team_set_option_value_by_name_binary(th, "bpf_hash_func",
+						    data, data_len);
 }
 
 /**
