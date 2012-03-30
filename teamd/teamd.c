@@ -65,6 +65,7 @@ static const struct teamd_runner *teamd_runner_list[] = {
 	&teamd_runner_dummy,
 	&teamd_runner_roundrobin,
 	&teamd_runner_activebackup,
+	&teamd_runner_loadbalance,
 };
 
 #define TEAMD_RUNNER_LIST_SIZE ARRAY_SIZE(teamd_runner_list)
