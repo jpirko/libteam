@@ -92,9 +92,33 @@ static int get_option_data_size_by_type(int opt_type, const void *data,
 	}
 }
 
-static int update_option(struct team_handle *th, struct team_option *option,
-			 int opt_type, const void *data, int data_len,
-			 bool changed, bool changed_locally)
+static int create_option(struct team_option **poption, const char *opt_name)
+{
+	struct team_option *option;
+	int err;
+
+	option = myzalloc(sizeof(struct team_option));
+	if (!option)
+		return -ENOMEM;
+
+	option->name = strdup(opt_name);
+	if (!option->name) {
+		err = -ENOMEM;
+		goto err_alloc_name;
+	}
+
+	*poption = option;
+	return 0;
+
+err_alloc_name:
+	free(option);
+
+	return err;
+}
+
+static int do_update_option(struct team_handle *th, struct team_option *option,
+			    int opt_type, const void *data, int data_len,
+			    bool changed, bool changed_locally)
 {
 	void *tmp_data;
 	int data_size;
@@ -122,28 +146,33 @@ static int update_option(struct team_handle *th, struct team_option *option,
 	return 0;
 }
 
-static int create_option(struct team_option **poption, char *name)
+static int update_option(struct team_handle *th, struct team_option **poption,
+			 const char *opt_name, int opt_type,
+			 const void *data, int data_len,
+			 bool changed, bool changed_locally)
 {
 	struct team_option *option;
+	bool option_created = false;
 	int err;
 
-	option = myzalloc(sizeof(struct team_option));
-	if (!option)
-		return -ENOMEM;
-
-	option->name = strdup(name);
-	if (!option->name) {
-		err = -ENOMEM;
-		goto err_alloc_name;
+	option = find_option(th, opt_name);
+	if (!option) {
+		err = create_option(&option, opt_name);
+		if (err)
+			return err;
+		option_created = true;
 	}
-
+	err = do_update_option(th, option, opt_type, data, data_len,
+			       changed, changed_locally);
+	if (err) {
+		if (option_created)
+			free_option(option);
+		return err;
+	}
+	if (option_created)
+		list_add(&th->option_list, &option->list);
 	*poption = option;
 	return 0;
-
-err_alloc_name:
-	free(option);
-
-	return err;
 }
 
 #define __NLA_BINARY 11 /* Not in libnl atm */
@@ -179,8 +208,7 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 		void *data;
 		int data_len;
 		char *str;
-		int err = 0;
-		bool option_created = false;
+		int err;
 
 		if (nla_parse_nested(option_attrs, TEAM_ATTR_OPTION_MAX,
 				     nl_option, NULL)) {
@@ -222,24 +250,8 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 			continue;
 		}
 
-		option = find_option(th, opt_name);
-		if (!option) {
-			err = create_option(&option, opt_name);
-			if (err) {
-				err(th, "Failed to create option: %s", strerror(-err));
-				continue;
-			} else {
-				option_created = true;
-			}
-		}
-		err = update_option(th, option, opt_type, data, data_len,
-				    changed, false);
-		if (option_created) {
-			if (err)
-				free_option(option);
-			else
-				list_add(&th->option_list, &option->list);
-		}
+		err = update_option(th, &option, opt_name, opt_type,
+				    data, data_len, changed, false);
 		if (err) {
 			err(th, "Failed to update option: %s", strerror(-err));
 			continue;
@@ -509,16 +521,10 @@ static int local_set_option_value(struct team_handle *th, const char *opt_name,
 	struct team_option *option;
 	int err;
 
-	option = find_option(th, opt_name);
-	if (!option) {
-		err(th, "Option not found on local set attempt.");
-		return -ENOENT;
-	}
-	err = update_option(th, option, opt_type, data, data_len, true, true);
-	if (err) {
-		err(th, "Failed update option locally: %s", strerror(-err));
+	err = update_option(th, &option, opt_name, opt_type,
+			    data, data_len, true, true);
+	if (err)
 		return err;
-	}
 	return 0;
 }
 
