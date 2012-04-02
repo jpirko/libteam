@@ -142,10 +142,6 @@ const struct teamd_runner teamd_runner_roundrobin;
 const struct teamd_runner teamd_runner_activebackup;
 const struct teamd_runner teamd_runner_loadbalance;
 
-/* Link-watch structures */
-const struct teamd_link_watch teamd_link_watch_ethtool;
-const struct teamd_link_watch teamd_link_watch_arp_ping;
-
 bool teamd_link_watch_port_up(struct teamd_context *ctx,
 			      struct teamd_port *tdport);
 void teamd_link_watch_select(struct teamd_context *ctx,
