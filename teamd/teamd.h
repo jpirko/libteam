@@ -164,6 +164,9 @@ void *teamd_get_link_watch_port_priv(struct teamd_port *tdport);
 int teamd_dbus_init(struct teamd_context *ctx);
 void teamd_dbus_fini(struct teamd_context *ctx);
 
+int teamd_hash_func_init(struct sock_fprog *fprog, json_t *tx_hash_obj);
+void teamd_hash_func_fini(struct sock_fprog *fprog);
+
 /* Various helpers */
 char *dev_name(const struct teamd_context *ctx, uint32_t ifindex);
 char *dev_name_dup(const struct teamd_context *ctx, uint32_t ifindex);

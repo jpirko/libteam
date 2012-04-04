@@ -17,24 +17,34 @@
  *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include <linux/filter.h>
+#include <jansson.h>
 #include <private/misc.h>
 #include <team.h>
 
 #include "teamd.h"
 
-struct sock_filter test_flt[] = {
-	BPF_STMT(BPF_RET + BPF_K, 0),
-};
-
-const struct sock_fprog test_fprog = {
-	.len = ARRAY_SIZE(test_flt),
-	.filter = test_flt,
-};
-
 static int lb_init(struct teamd_context *ctx)
 {
-	return team_set_bpf_hash_func(ctx->th, &test_fprog);
+	json_t *tx_hash_obj;
+	struct sock_fprog fprog;
+	int err;
+
+	err = json_unpack(ctx->config_json, "{s:o}", "tx_hash",
+			  &tx_hash_obj);
+	if (err) {
+		teamd_log_warn("No Tx hash recipe found in config.");
+		return 0;
+	}
+	err = teamd_hash_func_init(&fprog, tx_hash_obj);
+	if (err) {
+		teamd_log_err("Failed to init hash function.");
+		return err;
+	}
+	err = team_set_bpf_hash_func(ctx->th, &fprog);
+	if (err)
+		teamd_log_err("Failed to set hash function.");
+	teamd_hash_func_fini(&fprog);
+	return err;
 }
 
 const struct teamd_runner teamd_runner_loadbalance = {
