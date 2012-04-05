@@ -15,4 +15,4 @@ teamd_SOURCES=teamd.c teamd_per_port.c teamd_dbus.c teamd_link_watch.c \
 
 EXTRA_DIST = example_configs
 
-noinst_HEADERS = teamd.h
+noinst_HEADERS = teamd.h teamd_bpf_chef.h
