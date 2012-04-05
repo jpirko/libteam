@@ -229,7 +229,7 @@ static DBusHandlerResult message_handler(DBusConnection *con,
 	const char *method;
 	const char *path;
 	const char *msg_interface;
-	DBusMessage *reply;
+	DBusMessage *reply = NULL;
 	struct teamd_context *ctx = user_data;
 
 	method = dbus_message_get_member(message);
