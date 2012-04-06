@@ -35,6 +35,7 @@ struct team_option {
 	struct list_item	list;
 	enum team_option_type	type;
 	char *			name;
+	uint32_t		port_ifindex; /* != 0 if option is per-port */
 	void *			data;
 	int			data_len;
 	bool			changed;
@@ -66,12 +67,15 @@ static void option_list_cleanup_last_state(struct team_handle *th)
 		option->changed = false;
 }
 
-static struct team_option *find_option(struct team_handle *th, const char *name)
+static struct team_option *find_option(struct team_handle *th,
+				       const char *opt_name,
+				       uint32_t opt_port_ifindex)
 {
 	struct team_option *option;
 
 	list_for_each_node_entry(option, &th->option_list, list) {
-		if (strcmp(option->name, name) == 0)
+		if (strcmp(option->name, opt_name) == 0 &&
+		    option->port_ifindex == opt_port_ifindex)
 			return option;
 	}
 	return NULL;
@@ -92,7 +96,8 @@ static int get_option_data_size_by_type(int opt_type, const void *data,
 	}
 }
 
-static int create_option(struct team_option **poption, const char *opt_name)
+static int create_option(struct team_option **poption, const char *opt_name,
+			 uint32_t opt_port_ifindex)
 {
 	struct team_option *option;
 	int err;
@@ -106,6 +111,7 @@ static int create_option(struct team_option **poption, const char *opt_name)
 		err = -ENOMEM;
 		goto err_alloc_name;
 	}
+	option->port_ifindex = opt_port_ifindex;
 
 	*poption = option;
 	return 0;
@@ -147,17 +153,17 @@ static int do_update_option(struct team_handle *th, struct team_option *option,
 }
 
 static int update_option(struct team_handle *th, struct team_option **poption,
-			 const char *opt_name, int opt_type,
-			 const void *data, int data_len,
+			 const char *opt_name, uint32_t opt_port_ifindex,
+			 int opt_type, const void *data, int data_len,
 			 bool changed, bool changed_locally)
 {
 	struct team_option *option;
 	bool option_created = false;
 	int err;
 
-	option = find_option(th, opt_name);
+	option = find_option(th, opt_name, opt_port_ifindex);
 	if (!option) {
-		err = create_option(&option, opt_name);
+		err = create_option(&option, opt_name, opt_port_ifindex);
 		if (err)
 			return err;
 		option_created = true;
@@ -208,6 +214,7 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 		void *data;
 		int data_len;
 		char *str;
+		uint32_t opt_port_ifindex;
 		int err;
 
 		if (nla_parse_nested(option_attrs, TEAM_ATTR_OPTION_MAX,
@@ -227,6 +234,11 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 			changed = true;
 		else
 			changed = false;
+
+		if (option_attrs[TEAM_ATTR_OPTION_PORT_IFINDEX])
+			opt_port_ifindex = nla_get_u32(option_attrs[TEAM_ATTR_OPTION_PORT_IFINDEX]);
+		else
+			opt_port_ifindex = 0; /* Not a per-port option */
 
 		nla_type = nla_get_u32(option_attrs[TEAM_ATTR_OPTION_TYPE]);
 		data_len = nla_len(option_attrs[TEAM_ATTR_OPTION_DATA]);
@@ -250,8 +262,8 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 			continue;
 		}
 
-		err = update_option(th, &option, opt_name, opt_type,
-				    data, data_len, changed, false);
+		err = update_option(th, &option, opt_name, opt_port_ifindex,
+				    opt_type, data, data_len, changed, false);
 		if (err) {
 			err(th, "Failed to update option: %s", strerror(-err));
 			continue;
@@ -328,7 +340,25 @@ TEAM_EXPORT
 struct team_option *team_get_option_by_name(struct team_handle *th,
 					    const char *name)
 {
-	return find_option(th, name);
+	return find_option(th, name, 0);
+}
+
+/**
+ * team_get_port_option_by_name:
+ * @th: libteam library context
+ * @name: option name
+ * @port_ifindex: ifindex of port
+ *
+ * Get option structure referred by option @name and @port_ifindex.
+ *
+ * Returns: pointer to option structure or NULL in case option is not found.
+ **/
+TEAM_EXPORT
+struct team_option *team_get_port_option_by_name(struct team_handle *th,
+						 const char *name,
+						 uint32_t port_ifindex)
+{
+	return find_option(th, name, port_ifindex);
 }
 
 /**
@@ -359,6 +389,21 @@ TEAM_EXPORT
 char *team_get_option_name(struct team_option *option)
 {
 	return option->name;
+}
+
+/**
+ * team_get_option_port_ifindex:
+ * @option: option structure
+ *
+ * Get option port ifindex.
+ *
+ * Returns: port ifindex or 0 in case the option does not belong
+ * to any port.
+ **/
+TEAM_EXPORT
+uint32_t team_get_option_port_ifindex(struct team_option *option)
+{
+	return option->port_ifindex;
 }
 
 /**
@@ -456,11 +501,39 @@ bool team_is_option_changed(struct team_option *option)
  **/
 TEAM_EXPORT
 int team_get_option_value_by_name_u32(struct team_handle *th,
-				      const char *name, uint32_t *u32_ptr)
+				      const char *name,
+				      uint32_t *u32_ptr)
 {
 	struct team_option *option;
 
 	option = team_get_option_by_name(th, name);
+	if (!option)
+		return -ENOENT;
+	*u32_ptr = team_get_option_value_u32(option);
+	return 0;
+}
+
+/**
+ * team_get_port_option_value_by_name_u32:
+ * @th: libteam library context
+ * @name: option name
+ * @port_ifindex: ifindex of port
+ * u32_ptr: where the value will be stored
+ *
+ * Get option referred by @name and @port_ifindex and store its value
+ * as unsigned 32-bit number into @u32_ptr.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_get_port_option_value_by_name_u32(struct team_handle *th,
+					   const char *name,
+					   uint32_t port_ifindex,
+					   uint32_t *u32_ptr)
+{
+	struct team_option *option;
+
+	option = team_get_port_option_by_name(th, name, port_ifindex);
 	if (!option)
 		return -ENOENT;
 	*u32_ptr = team_get_option_value_u32(option);
@@ -480,11 +553,39 @@ int team_get_option_value_by_name_u32(struct team_handle *th,
  **/
 TEAM_EXPORT
 int team_get_option_value_by_name_string(struct team_handle *th,
-					 const char *name, char **str_ptr)
+					 const char *name,
+					 char **str_ptr)
 {
 	struct team_option *option;
 
 	option = team_get_option_by_name(th, name);
+	if (!option)
+		return -ENOENT;
+	*str_ptr = team_get_option_value_string(option);
+	return 0;
+}
+
+/**
+ * team_get_port_option_value_by_name_string:
+ * @th: libteam library context
+ * @name: option name
+ * @port_ifindex: ifindex of port
+ * str_ptr: where the value will be stored
+ *
+ * Get option referred by @name and @port_ifindex and store its value
+ * as pointer to string into @srt_ptr.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_get_port_option_value_by_name_string(struct team_handle *th,
+					      const char *name,
+					      uint32_t port_ifindex,
+					      char **str_ptr)
+{
+	struct team_option *option;
+
+	option = team_get_port_option_by_name(th, name, port_ifindex);
 	if (!option)
 		return -ENOENT;
 	*str_ptr = team_get_option_value_string(option);
@@ -504,7 +605,8 @@ int team_get_option_value_by_name_string(struct team_handle *th,
  **/
 TEAM_EXPORT
 int team_get_option_value_by_name_binary(struct team_handle *th,
-					 const char *name, void **data_ptr)
+					 const char *name,
+					 void **data_ptr)
 {
 	struct team_option *option;
 
@@ -515,23 +617,50 @@ int team_get_option_value_by_name_binary(struct team_handle *th,
 	return 0;
 }
 
+/**
+ * team_get_port_option_value_by_name_binary:
+ * @th: libteam library context
+ * @name: option name
+ * @port_ifindex: ifindex of port
+ * data_ptr: where the value will be stored
+ *
+ * Get port option referred by @name and @port_ifindex and store its value
+ * as pointer to data into @data_ptr.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_get_port_option_value_by_name_binary(struct team_handle *th,
+					      const char *name,
+					      uint32_t port_ifindex,
+					      void **data_ptr)
+{
+	struct team_option *option;
+
+	option = team_get_port_option_by_name(th, name, port_ifindex);
+	if (!option)
+		return -ENOENT;
+	*data_ptr = team_get_option_value_binary(option);
+	return 0;
+}
+
 static int local_set_option_value(struct team_handle *th, const char *opt_name,
-				  const void *data, int data_len, int opt_type)
+				  uint32_t opt_port_ifindex, int opt_type,
+				  const void *data, int data_len)
 {
 	struct team_option *option;
 	int err;
 
-	err = update_option(th, &option, opt_name, opt_type,
-			    data, data_len, true, true);
+	err = update_option(th, &option, opt_name, opt_port_ifindex,
+			    opt_type, data, data_len, true, true);
 	if (err)
 		return err;
 	return 0;
 }
 
-static int set_option_value_with_len(struct team_handle *th,
-				     const char *opt_name,
-				     const void *data, int data_len,
-				     int opt_type)
+static int set_option_value(struct team_handle *th, const char *opt_name,
+			    uint32_t opt_port_ifindex, const void *data,
+			    int data_len, int opt_type)
 {
 	struct nl_msg *msg;
 	struct nlattr *option_list;
@@ -567,6 +696,8 @@ static int set_option_value_with_len(struct team_handle *th,
 	if (!option_item)
 		goto nla_put_failure;
 	NLA_PUT_STRING(msg, TEAM_ATTR_OPTION_NAME, opt_name);
+	if (opt_port_ifindex)
+		NLA_PUT_U32(msg, TEAM_ATTR_OPTION_PORT_IFINDEX, opt_port_ifindex);
 	NLA_PUT_U32(msg, TEAM_ATTR_OPTION_TYPE, nla_type);
 	switch (nla_type) {
 		case NLA_U32:
@@ -589,19 +720,14 @@ static int set_option_value_with_len(struct team_handle *th,
 		return err;
 	}
 
-	err = local_set_option_value(th, opt_name, data, data_len, opt_type);
+	err = local_set_option_value(th, opt_name, opt_port_ifindex, opt_type,
+				     data, data_len);
 
 	return err;
 
 nla_put_failure:
 	nlmsg_free(msg);
 	return -ENOBUFS;
-}
-
-static int set_option_value(struct team_handle *th, const char *opt_name,
-			    const void *data, int opt_type)
-{
-	return set_option_value_with_len(th, opt_name, data, 0, opt_type);
 }
 
 /**
@@ -616,9 +742,34 @@ static int set_option_value(struct team_handle *th, const char *opt_name,
  **/
 TEAM_EXPORT
 int team_set_option_value_by_name_u32(struct team_handle *th,
-				      const char *name, uint32_t val)
+				      const char *name,
+				      uint32_t val)
 {
-	return set_option_value(th, name, &val, TEAM_OPTION_TYPE_U32);
+	return set_option_value(th, name, 0, &val, 0,
+				TEAM_OPTION_TYPE_U32);
+}
+
+/**
+ * team_set_port_option_value_by_name_u32:
+ * @th: libteam library context
+ * @name: option name
+ * @port_ifindex: ifindex of port
+ * @val: value to be set
+ *
+ * Set 32-bit number type port option.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_set_port_option_value_by_name_u32(struct team_handle *th,
+					   const char *name,
+					   uint32_t port_ifindex,
+					   uint32_t val)
+{
+	if (!port_ifindex)
+		return -EINVAL;
+	return set_option_value(th, name, port_ifindex, &val, 0,
+				TEAM_OPTION_TYPE_U32);
 }
 
 /**
@@ -633,9 +784,32 @@ int team_set_option_value_by_name_u32(struct team_handle *th,
  **/
 TEAM_EXPORT
 int team_set_option_value_by_name_string(struct team_handle *th,
-					 const char *name, const char *str)
+					 const char *name,
+					 const char *str)
 {
-	return set_option_value(th, name, str, TEAM_OPTION_TYPE_STRING);
+	return set_option_value(th, name, 0, str, 0,
+				TEAM_OPTION_TYPE_STRING);
+}
+
+/**
+ * team_set_port_option_value_by_name_string:
+ * @th: libteam library context
+ * @name: option name
+ * @port_ifindex: ifindex of port
+ * @str: string to be set
+ *
+ * Set string type port option.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_set_port_option_value_by_name_string(struct team_handle *th,
+					      const char *name,
+					      uint32_t port_ifindex,
+					      const char *str)
+{
+	return set_option_value(th, name, port_ifindex, str, 0,
+				TEAM_OPTION_TYPE_STRING);
 }
 
 /**
@@ -651,9 +825,33 @@ int team_set_option_value_by_name_string(struct team_handle *th,
  **/
 TEAM_EXPORT
 int team_set_option_value_by_name_binary(struct team_handle *th,
-					 const char *name, const void *data,
+					 const char *name,
+					 const void *data,
 					 unsigned int data_len)
 {
-	return set_option_value_with_len(th, name, data, data_len,
-					 TEAM_OPTION_TYPE_BINARY);
+	return set_option_value(th, name, 0, data, data_len,
+				TEAM_OPTION_TYPE_BINARY);
+}
+
+/**
+ * team_set_port_option_value_by_name_binary:
+ * @th: libteam library context
+ * @name: option name
+ * @port_ifindex: ifindex of port
+ * @data: binary data to be set
+ * @data_len: binary data length
+ *
+ * Set binary type port option.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_set_port_option_value_by_name_binary(struct team_handle *th,
+					      const char *name,
+					      uint32_t port_ifindex,
+					      const void *data,
+					      unsigned int data_len)
+{
+	return set_option_value(th, name, port_ifindex, data, data_len,
+				TEAM_OPTION_TYPE_BINARY);
 }
