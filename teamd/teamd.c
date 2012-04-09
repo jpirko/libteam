@@ -863,20 +863,35 @@ static void debug_log_option_list(struct teamd_context *ctx)
 	team_for_each_option(option, ctx->th) {
 		char *name = team_get_option_name(option);
 		bool changed = team_is_option_changed(option);
+		uint32_t port_ifindex = team_get_option_port_ifindex(option);
 
 		switch (team_get_option_type(option)) {
 		case TEAM_OPTION_TYPE_U32:
-			teamd_log_dbg("%s: \"%d\" <int>%s", name,
+			teamd_log_dbg("%s(%d): \"%d\" <int>%s", name,
+				      port_ifindex,
 				      team_get_option_value_u32(option),
 				      changed ? " changed" : "");
 			break;
 		case TEAM_OPTION_TYPE_STRING:
-			teamd_log_dbg("%s: \"%s\" <str>%s", name,
+			teamd_log_dbg("%s(%d): \"%s\" <str>%s", name,
+				      port_ifindex,
 				      team_get_option_value_string(option),
 				      changed ? " changed" : "");
 			break;
+		case TEAM_OPTION_TYPE_BINARY:
+			teamd_log_dbg("%s(%d): <bin>%s", name,
+				      port_ifindex,
+				      changed ? " changed" : "");
+			break;
+		case TEAM_OPTION_TYPE_BOOL:
+			teamd_log_dbg("%s(%d): \"%s\" <bool>%s", name,
+				      port_ifindex,
+				      team_get_option_value_bool(option) ? "true" : "false",
+				      changed ? " changed" : "");
+			break;
 		default:
-			teamd_log_dbg("%s: <unknown>%s", name,
+			teamd_log_dbg("%s(%d): <unknown>%s", name,
+				      port_ifindex,
 				      changed ? " changed" : "");
 		}
 	}
