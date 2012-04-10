@@ -91,6 +91,8 @@ static int get_option_data_size_by_type(int opt_type, const void *data,
 		return sizeof(char) * (strlen((char *) data) + 1);
 	case TEAM_OPTION_TYPE_BINARY:
 		return data_len;
+	case TEAM_OPTION_TYPE_BOOL:
+		return sizeof(bool);
 	default:
 		return -EINVAL;
 	}
@@ -209,13 +211,12 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 		char *opt_name;
 		bool changed;
 		int nla_type;
-		__u32 arg;
 		int opt_type;
 		void *data;
-		int data_len;
-		char *str;
+		int data_len = 0;
 		uint32_t opt_port_ifindex;
 		int err;
+		struct nlattr *data_attr;
 
 		if (nla_parse_nested(option_attrs, TEAM_ATTR_OPTION_MAX,
 				     nl_option, NULL)) {
@@ -224,10 +225,14 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 		}
 
 		if (!option_attrs[TEAM_ATTR_OPTION_NAME] ||
-		    !option_attrs[TEAM_ATTR_OPTION_TYPE] ||
-		    !option_attrs[TEAM_ATTR_OPTION_DATA]) {
+		    !option_attrs[TEAM_ATTR_OPTION_TYPE]) {
 			return NL_SKIP;
 		}
+		nla_type = nla_get_u32(option_attrs[TEAM_ATTR_OPTION_TYPE]);
+		data_attr = option_attrs[TEAM_ATTR_OPTION_DATA];
+		if (nla_type != NLA_FLAG && !data_attr)
+			return NL_SKIP;
+
 		opt_name = nla_get_string(option_attrs[TEAM_ATTR_OPTION_NAME]);
 
 		if (option_attrs[TEAM_ATTR_OPTION_CHANGED])
@@ -240,22 +245,32 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 		else
 			opt_port_ifindex = 0; /* Not a per-port option */
 
-		nla_type = nla_get_u32(option_attrs[TEAM_ATTR_OPTION_TYPE]);
-		data_len = nla_len(option_attrs[TEAM_ATTR_OPTION_DATA]);
 		switch (nla_type) {
 		case NLA_U32:
-			arg = nla_get_u32(option_attrs[TEAM_ATTR_OPTION_DATA]);
-			data = &arg;
+			{
+				__u32 arg = nla_get_u32(data_attr);
+				data = &arg;
+			}
 			opt_type = TEAM_OPTION_TYPE_U32;
 			break;
 		case NLA_STRING:
-			str = nla_get_string(option_attrs[TEAM_ATTR_OPTION_DATA]);
-			data = str;
+			{
+				char *arg = nla_get_string(data_attr);
+				data = arg;
+			}
 			opt_type = TEAM_OPTION_TYPE_STRING;
 			break;
 		case __NLA_BINARY:
-			data = nla_data(option_attrs[TEAM_ATTR_OPTION_DATA]);
+			data = nla_data(data_attr);
+			data_len = nla_len(data_attr);
 			opt_type = TEAM_OPTION_TYPE_BINARY;
+			break;
+		case NLA_FLAG:
+			{
+				bool arg = data_attr ? true : false;
+				data = &arg;
+			}
+			opt_type = TEAM_OPTION_TYPE_BOOL;
 			break;
 		default:
 			err(th, "Unknown nla_type received.");
@@ -463,6 +478,20 @@ void *team_get_option_value_binary(struct team_option *option)
 }
 
 /**
+ * team_get_option_value_bool:
+ * @option: option structure
+ *
+ * Get option value as bool.
+ *
+ * Returns: bool.
+ **/
+TEAM_EXPORT
+bool team_get_option_value_bool(struct team_option *option)
+{
+	return *((bool *) option->data);
+}
+
+/**
  * team_get_option_value_len:
  * @option: option structure
  *
@@ -492,7 +521,7 @@ bool team_is_option_changed(struct team_option *option)
  * team_get_option_value_by_name_u32:
  * @th: libteam library context
  * @name: option name
- * u32_ptr: where the value will be stored
+ * @u32_ptr: where the value will be stored
  *
  * Get option referred by @name and store its value as unsigned 32-bit
  * number into @u32_ptr.
@@ -518,7 +547,7 @@ int team_get_option_value_by_name_u32(struct team_handle *th,
  * @th: libteam library context
  * @name: option name
  * @port_ifindex: ifindex of port
- * u32_ptr: where the value will be stored
+ * @u32_ptr: where the value will be stored
  *
  * Get option referred by @name and @port_ifindex and store its value
  * as unsigned 32-bit number into @u32_ptr.
@@ -544,7 +573,7 @@ int team_get_port_option_value_by_name_u32(struct team_handle *th,
  * team_get_option_value_by_name_string:
  * @th: libteam library context
  * @name: option name
- * str_ptr: where the value will be stored
+ * @str_ptr: where the value will be stored
  *
  * Get option referred by @name and store its value as pointer to string
  * into @srt_ptr.
@@ -570,7 +599,7 @@ int team_get_option_value_by_name_string(struct team_handle *th,
  * @th: libteam library context
  * @name: option name
  * @port_ifindex: ifindex of port
- * str_ptr: where the value will be stored
+ * @str_ptr: where the value will be stored
  *
  * Get option referred by @name and @port_ifindex and store its value
  * as pointer to string into @srt_ptr.
@@ -596,7 +625,7 @@ int team_get_port_option_value_by_name_string(struct team_handle *th,
  * team_get_option_value_by_name_binary:
  * @th: libteam library context
  * @name: option name
- * data_ptr: where the value will be stored
+ * @data_ptr: where the value will be stored
  *
  * Get option referred by @name and store its value as pointer to data
  * into @data_ptr.
@@ -622,7 +651,7 @@ int team_get_option_value_by_name_binary(struct team_handle *th,
  * @th: libteam library context
  * @name: option name
  * @port_ifindex: ifindex of port
- * data_ptr: where the value will be stored
+ * @data_ptr: where the value will be stored
  *
  * Get port option referred by @name and @port_ifindex and store its value
  * as pointer to data into @data_ptr.
@@ -641,6 +670,57 @@ int team_get_port_option_value_by_name_binary(struct team_handle *th,
 	if (!option)
 		return -ENOENT;
 	*data_ptr = team_get_option_value_binary(option);
+	return 0;
+}
+
+/**
+ * team_get_option_value_by_name_bool:
+ * @th: libteam library context
+ * @name: option name
+ * @bool_ptr: where the value will be stored
+ *
+ * Get option referred by @name and store its value as bool into @bool_ptr.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_get_option_value_by_name_bool(struct team_handle *th,
+				       const char *name,
+				       bool *bool_ptr)
+{
+	struct team_option *option;
+
+	option = team_get_option_by_name(th, name);
+	if (!option)
+		return -ENOENT;
+	*bool_ptr = team_get_option_value_bool(option);
+	return 0;
+}
+
+/**
+ * team_get_port_option_value_by_name_bool:
+ * @th: libteam library context
+ * @name: option name
+ * @port_ifindex: ifindex of port
+ * @bool_ptr: where the value will be stored
+ *
+ * Get option referred by @name and @port_ifindex and store its value
+ * as bool into @u32_ptr.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_get_port_option_value_by_name_bool(struct team_handle *th,
+					    const char *name,
+					    uint32_t port_ifindex,
+					    bool *bool_ptr)
+{
+	struct team_option *option;
+
+	option = team_get_port_option_by_name(th, name, port_ifindex);
+	if (!option)
+		return -ENOENT;
+	*bool_ptr = team_get_option_value_bool(option);
 	return 0;
 }
 
@@ -678,6 +758,9 @@ static int set_option_value(struct team_handle *th, const char *opt_name,
 	case TEAM_OPTION_TYPE_BINARY:
 		nla_type = __NLA_BINARY;
 		break;
+	case TEAM_OPTION_TYPE_BOOL:
+		nla_type = NLA_FLAG;
+		break;
 	default:
 		return -ENOENT;
 	}
@@ -708,6 +791,10 @@ static int set_option_value(struct team_handle *th, const char *opt_name,
 			break;
 		case __NLA_BINARY:
 			NLA_PUT(msg, TEAM_ATTR_OPTION_DATA, data_len, (char *) data);
+			break;
+		case NLA_FLAG:
+			if (*((bool *) data))
+				NLA_PUT_FLAG(msg, TEAM_ATTR_OPTION_DATA);
 			break;
 		default:
 			goto nla_put_failure;
@@ -854,4 +941,46 @@ int team_set_port_option_value_by_name_binary(struct team_handle *th,
 {
 	return set_option_value(th, name, port_ifindex, data, data_len,
 				TEAM_OPTION_TYPE_BINARY);
+}
+
+/**
+ * team_set_option_value_by_name_bool:
+ * @th: libteam library context
+ * @name: option name
+ * @val: value to be set
+ *
+ * Set bool type option.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_set_option_value_by_name_bool(struct team_handle *th,
+				       const char *name,
+				       bool val)
+{
+	return set_option_value(th, name, 0, &val, 0,
+				TEAM_OPTION_TYPE_BOOL);
+}
+
+/**
+ * team_set_port_option_value_by_name_bool:
+ * @th: libteam library context
+ * @name: option name
+ * @port_ifindex: ifindex of port
+ * @val: value to be set
+ *
+ * Set bool type port option.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_set_port_option_value_by_name_bool(struct team_handle *th,
+					    const char *name,
+					    uint32_t port_ifindex,
+					    bool val)
+{
+	if (!port_ifindex)
+		return -EINVAL;
+	return set_option_value(th, name, port_ifindex, &val, 0,
+				TEAM_OPTION_TYPE_BOOL);
 }

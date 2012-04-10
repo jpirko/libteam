@@ -91,6 +91,7 @@ enum team_option_type {
 	TEAM_OPTION_TYPE_U32,
 	TEAM_OPTION_TYPE_STRING,
 	TEAM_OPTION_TYPE_BINARY,
+	TEAM_OPTION_TYPE_BOOL,
 };
 
 struct team_option;
@@ -109,6 +110,7 @@ enum team_option_type team_get_option_type(struct team_option *option);
 uint32_t team_get_option_value_u32(struct team_option *option);
 char *team_get_option_value_string(struct team_option *option);
 void *team_get_option_value_binary(struct team_option *option);
+bool team_get_option_value_bool(struct team_option *option);
 unsigned int team_get_option_value_len(struct team_option *option);
 bool team_is_option_changed(struct team_option *option);
 int team_get_option_value_by_name_u32(struct team_handle *th,
@@ -132,6 +134,13 @@ int team_get_port_option_value_by_name_binary(struct team_handle *th,
 					      const char *name,
 					      uint32_t port_ifindex,
 					      void **data_ptr);
+int team_get_option_value_by_name_bool(struct team_handle *th,
+				       const char *name,
+				       bool *bool_ptr);
+int team_get_port_option_value_by_name_bool(struct team_handle *th,
+					    const char *name,
+					    uint32_t port_ifindex,
+					    bool *bool_ptr);
 /* option setters */
 int team_set_option_value_by_name_u32(struct team_handle *th,
 				      const char *name,
@@ -156,6 +165,13 @@ int team_set_port_option_value_by_name_binary(struct team_handle *th,
 					      uint32_t port_ifindex,
 					      const void *data,
 					      unsigned int data_len);
+int team_set_option_value_by_name_bool(struct team_handle *th,
+				       const char *name,
+				       bool val);
+int team_set_port_option_value_by_name_bool(struct team_handle *th,
+					    const char *name,
+					    uint32_t port_ifindex,
+					    bool val);
 
 /*
  * team_change_handler
