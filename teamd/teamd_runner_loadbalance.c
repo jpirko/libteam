@@ -17,6 +17,8 @@
  *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+#include <sys/socket.h>
+#include <linux/netdevice.h>
 #include <jansson.h>
 #include <private/misc.h>
 #include <team.h>
@@ -47,8 +49,31 @@ static int lb_init(struct teamd_context *ctx)
 	return err;
 }
 
+static int lb_port_added(struct teamd_context *ctx, struct teamd_port *tdport)
+{
+	char tmp_hwaddr[MAX_ADDR_LEN];
+	int err;
+
+	err = team_hwaddr_get(ctx->th, ctx->ifindex, tmp_hwaddr,
+			      ctx->hwaddr_len);
+	if (err) {
+		teamd_log_err("Failed to get team device hardware address.");
+		return err;
+	}
+
+	err = team_hwaddr_set(ctx->th, tdport->ifindex, tmp_hwaddr,
+			      ctx->hwaddr_len);
+	if (err) {
+		teamd_log_err("Failed to set port \"%s\" hardware address. ",
+			      tdport->ifname);
+		return err;
+	}
+	return 0;
+}
+
 const struct teamd_runner teamd_runner_loadbalance = {
 	.name		= "loadbalance",
 	.team_mode_name	= "loadbalance",
 	.init		= lb_init,
+	.port_added	= lb_port_added,
 };
