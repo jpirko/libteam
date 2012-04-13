@@ -152,6 +152,7 @@ const struct teamd_runner teamd_runner_dummy;
 const struct teamd_runner teamd_runner_roundrobin;
 const struct teamd_runner teamd_runner_activebackup;
 const struct teamd_runner teamd_runner_loadbalance;
+const struct teamd_runner teamd_runner_lacp;
 
 bool teamd_link_watch_port_up(struct teamd_context *ctx,
 			      struct teamd_port *tdport);
