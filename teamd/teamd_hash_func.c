@@ -21,6 +21,7 @@
 #include <linux/filter.h>
 #include <jansson.h>
 #include <private/misc.h>
+#include <team.h>
 
 #include "teamd.h"
 #include "teamd_bpf_chef.h"
@@ -147,7 +148,7 @@ static const struct teamd_bpf_desc_frag *__find_frag(const char *frag_name)
 	return NULL;
 }
 
-int teamd_hash_func_init(struct sock_fprog *fprog, json_t *tx_hash_obj)
+static int teamd_hash_func_init(struct sock_fprog *fprog, json_t *tx_hash_obj)
 {
 	int i;
 	int arr_siz = json_array_size(tx_hash_obj);
@@ -182,7 +183,31 @@ release:
 	return err;
 }
 
-void teamd_hash_func_fini(struct sock_fprog *fprog)
+static void teamd_hash_func_fini(struct sock_fprog *fprog)
 {
 	teamd_bpf_desc_compile_release(fprog);
+}
+
+int teamd_hash_func_set(struct teamd_context *ctx)
+{
+	json_t *tx_hash_obj;
+	struct sock_fprog fprog;
+	int err;
+
+	err = json_unpack(ctx->config_json, "{s:o}", "tx_hash",
+			  &tx_hash_obj);
+	if (err) {
+		teamd_log_warn("No Tx hash recipe found in config.");
+		return 0;
+	}
+	err = teamd_hash_func_init(&fprog, tx_hash_obj);
+	if (err) {
+		teamd_log_err("Failed to init hash function.");
+		return err;
+	}
+	err = team_set_bpf_hash_func(ctx->th, &fprog);
+	if (err)
+		teamd_log_err("Failed to set hash function.");
+	teamd_hash_func_fini(&fprog);
+	return err;
 }
