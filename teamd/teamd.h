@@ -26,9 +26,10 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <jansson.h>
+#include <linux/filter.h>
+#include <dbus/dbus.h>
 #include <team.h>
 #include <private/list.h>
-#include <dbus/dbus.h>
 
 #define teamd_log_err(args...) daemon_log(LOG_ERR, ##args)
 #define teamd_log_warn(args...) daemon_log(LOG_WARNING, ##args)
@@ -166,6 +167,10 @@ void teamd_dbus_fini(struct teamd_context *ctx);
 
 int teamd_hash_func_init(struct sock_fprog *fprog, json_t *tx_hash_obj);
 void teamd_hash_func_fini(struct sock_fprog *fprog);
+
+int teamd_packet_sock_open(int *sock_p, const uint32_t ifindex,
+			   const unsigned short family,
+			   const struct sock_fprog *fprog);
 
 /* Various helpers */
 char *dev_name(const struct teamd_context *ctx, uint32_t ifindex);

@@ -231,49 +231,6 @@ static char *str_sockaddr_in6(struct sockaddr_in6 *sin6)
 			      sizeof(*sin6), AF_INET6);
 }
 
-static int packet_sock_open(int *sock_p, const uint32_t ifindex,
-			    const unsigned short family,
-			    const struct sock_fprog *fprog)
-{
-	struct sockaddr_ll ll_my;
-	int sock;
-	int ret;
-	int err;
-
-	sock = socket(PF_PACKET, SOCK_DGRAM, 0);
-	if (sock == -1) {
-		teamd_log_err("Failed to create packet socket.");
-		return -errno;
-	}
-
-	if (fprog) {
-		ret = setsockopt(sock, SOL_SOCKET, SO_ATTACH_FILTER,
-				 fprog, sizeof(*fprog));
-		if (ret == -1) {
-			teamd_log_err("Failed to attach filter.");
-			err = -errno;
-			goto close_sock;
-		}
-	}
-
-	memset(&ll_my, 0, sizeof(ll_my));
-	ll_my.sll_family = AF_PACKET;
-	ll_my.sll_ifindex = ifindex;
-	ll_my.sll_protocol = family;
-	ret = bind(sock, (struct sockaddr *) &ll_my, sizeof(ll_my));
-	if (ret == -1) {
-		teamd_log_err("Failed to bind socket.");
-		err = -errno;
-		goto close_sock;
-	}
-
-	*sock_p = sock;
-	return 0;
-close_sock:
-	close(sock);
-	return err;
-}
-
 static int getsockname_hwaddr(int sock, struct sockaddr_ll *addr,
 			      size_t expected_len)
 {
@@ -569,8 +526,9 @@ const struct sock_fprog arp_rpl_fprog = {
 
 static int lw_ap_sock_open(struct lw_psr_port_priv *port_priv)
 {
-	return packet_sock_open(&port_priv->sock, port_priv->tdport->ifindex,
-				htons(ETH_P_ARP), &arp_rpl_fprog);
+	return teamd_packet_sock_open(&port_priv->sock,
+				      port_priv->tdport->ifindex,
+				      htons(ETH_P_ARP), &arp_rpl_fprog);
 }
 
 static void lw_ap_sock_close(struct lw_psr_port_priv *port_priv)
@@ -831,8 +789,9 @@ static int lw_nsnap_sock_open(struct lw_psr_port_priv *port_priv)
 	 * deliver incoming ICMP6 packet on inactive ports into userspace.
 	 * So we use packet socket to get these packets.
 	 */
-	err = packet_sock_open(&port_priv->sock, port_priv->tdport->ifindex,
-			       htons(ETH_P_IPV6), &na_fprog);
+	err = teamd_packet_sock_open(&port_priv->sock,
+				     port_priv->tdport->ifindex,
+				     htons(ETH_P_IPV6), &na_fprog);
 	if (err)
 		return err;
 	err = icmp6_sock_open(&nsnap_port_priv->tx_sock);
