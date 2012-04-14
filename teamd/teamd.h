@@ -27,6 +27,7 @@
 #include <sys/time.h>
 #include <jansson.h>
 #include <linux/filter.h>
+#include <linux/if_packet.h>
 #include <dbus/dbus.h>
 #include <team.h>
 #include <private/list.h>
@@ -170,6 +171,8 @@ int teamd_hash_func_set(struct teamd_context *ctx);
 int teamd_packet_sock_open(int *sock_p, const uint32_t ifindex,
 			   const unsigned short family,
 			   const struct sock_fprog *fprog);
+int teamd_getsockname_hwaddr(int sock, struct sockaddr_ll *addr,
+			     size_t expected_len);
 
 /* Various helpers */
 char *dev_name(const struct teamd_context *ctx, uint32_t ifindex);

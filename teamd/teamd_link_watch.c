@@ -231,25 +231,6 @@ static char *str_sockaddr_in6(struct sockaddr_in6 *sin6)
 			      sizeof(*sin6), AF_INET6);
 }
 
-static int getsockname_hwaddr(int sock, struct sockaddr_ll *addr,
-			      size_t expected_len)
-{
-	socklen_t addr_len;
-	int ret;
-
-	addr_len = sizeof(*addr);
-	ret = getsockname(sock, (struct sockaddr *) addr, &addr_len);
-	if (ret == -1) {
-		teamd_log_err("Failed to getsockname.");
-		return -errno;
-	}
-	if (expected_len && addr->sll_halen != expected_len) {
-		teamd_log_err("Unexpected length of hw address.");
-		return -ENOTSUP;
-	}
-	return 0;
-}
-
 /*
  * Ethtool link watch
  */
@@ -592,7 +573,7 @@ static int lw_ap_send(struct lw_psr_port_priv *port_priv)
 	struct arphdr ah;
 	int ret;
 
-	err = getsockname_hwaddr(port_priv->sock, &ll_my, 0);
+	err = teamd_getsockname_hwaddr(port_priv->sock, &ll_my, 0);
 	if (err)
 		return err;
 	ll_bcast = ll_my;
@@ -646,7 +627,7 @@ static int lw_ap_receive(struct lw_psr_port_priv *port_priv)
 	struct in_addr dst;
 	char *pos;
 
-	err = getsockname_hwaddr(port_priv->sock, &ll_my, 0);
+	err = teamd_getsockname_hwaddr(port_priv->sock, &ll_my, 0);
 	if (err)
 		return err;
 
@@ -856,7 +837,8 @@ static int lw_nsnap_send(struct lw_psr_port_priv *port_priv)
 	struct ns_packet nsp;
 	int ret;
 
-	err = getsockname_hwaddr(port_priv->sock, &ll_my, sizeof(nsp.hwaddr));
+	err = teamd_getsockname_hwaddr(port_priv->sock, &ll_my,
+				       sizeof(nsp.hwaddr));
 	if (err)
 		return err;
 

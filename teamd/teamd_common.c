@@ -69,3 +69,22 @@ close_sock:
 	close(sock);
 	return err;
 }
+
+int teamd_getsockname_hwaddr(int sock, struct sockaddr_ll *addr,
+			     size_t expected_len)
+{
+	socklen_t addr_len;
+	int ret;
+
+	addr_len = sizeof(*addr);
+	ret = getsockname(sock, (struct sockaddr *) addr, &addr_len);
+	if (ret == -1) {
+		teamd_log_err("Failed to getsockname.");
+		return -errno;
+	}
+	if (expected_len && addr->sll_halen != expected_len) {
+		teamd_log_err("Unexpected length of hw address.");
+		return -ENOTSUP;
+	}
+	return 0;
+}
