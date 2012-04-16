@@ -194,7 +194,7 @@ int teamd_hash_func_set(struct teamd_context *ctx)
 	struct sock_fprog fprog;
 	int err;
 
-	err = json_unpack(ctx->config_json, "{s:o}", "tx_hash",
+	err = json_unpack(ctx->config_json, "{s:{s:o}}", "runner", "tx_hash",
 			  &tx_hash_obj);
 	if (err) {
 		teamd_log_warn("No Tx hash recipe found in config.");
