@@ -787,7 +787,8 @@ static int teamd_runner_init(struct teamd_context *ctx)
 	int err;
 	const char *runner_name;
 
-	err = json_unpack(ctx->config_json, "{s:s}", "runner", &runner_name);
+	err = json_unpack(ctx->config_json, "{s:{s:s}}", "runner", "name",
+							 &runner_name);
 	if (err) {
 		teamd_log_err("Failed to get team runner name from config.");
 		return -ENOENT;
