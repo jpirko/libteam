@@ -426,8 +426,7 @@ static dbus_bool_t add_timeout(DBusTimeout *timeout, void *priv)
 	struct teamd_context *ctx = priv;
 	int err;
 	char *cb_name;
-	time_t sec;
-	long nsec;
+	struct timespec ts;
 
 	err = asprintf(&cb_name, "dbus_timeout_%p", timeout);
 	if (err == -1)
@@ -435,8 +434,8 @@ static dbus_bool_t add_timeout(DBusTimeout *timeout, void *priv)
 
 	dbus_timeout_set_data(timeout, cb_name, free);
 
-	convert_ms(&sec, &nsec, dbus_timeout_get_interval(timeout));
-	err = teamd_loop_callback_timer_add(ctx, cb_name, 0, 0, sec, nsec,
+	ms_to_timespec(&ts, dbus_timeout_get_interval(timeout));
+	err = teamd_loop_callback_timer_add(ctx, cb_name, NULL, &ts,
 					    callback_timeout, timeout);
 	if (err)
 		return FALSE;

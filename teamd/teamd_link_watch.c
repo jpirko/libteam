@@ -342,15 +342,13 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 		return -ENOENT;
 	}
 	teamd_log_dbg("Using interval \"%d\".", tmp);
-	convert_ms(&port_priv->interval.tv_sec,
-		   &port_priv->interval.tv_nsec, tmp);
+	ms_to_timespec(&port_priv->interval, tmp);
 
 	err = json_unpack(tdport->link_watch_json, "{s:i}",
 			  "init_wait", &tmp);
 	if (!err) {
 		teamd_log_dbg("Using init_wait \"%d\".", tmp);
-		convert_ms(&port_priv->init_wait.tv_sec,
-			   &port_priv->init_wait.tv_nsec, tmp);
+		ms_to_timespec(&port_priv->init_wait, tmp);
 	} else {
 		port_priv->init_wait = port_priv->ops->default_init_wait;
 	}
@@ -422,10 +420,8 @@ static int lw_psr_port_added(struct teamd_context *ctx,
 	}
 
 	err = teamd_loop_callback_timer_add(ctx, port_priv->cb_name_periodic,
-					    port_priv->interval.tv_sec,
-					    port_priv->interval.tv_nsec,
-					    port_priv->init_wait.tv_sec,
-					    port_priv->init_wait.tv_nsec,
+					    &port_priv->interval,
+					    &port_priv->init_wait,
 					    lw_psr_callback_periodic,
 					    port_priv);
 	if (err) {

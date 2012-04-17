@@ -128,8 +128,8 @@ int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 			       void *func_priv);
 int teamd_loop_callback_timer_add(struct teamd_context *ctx,
 				  const char *cb_name,
-				  time_t i_sec, long i_nsec,
-				  time_t v_sec, long v_nsec,
+				  struct timespec *interval,
+				  struct timespec *initial,
 				  teamd_loop_callback_func_t func,
 				  void *func_priv);
 void teamd_loop_callback_del(struct teamd_context *ctx, const char *cb_name);
@@ -177,10 +177,10 @@ int teamd_getsockname_hwaddr(int sock, struct sockaddr_ll *addr,
 /* Various helpers */
 char *dev_name(const struct teamd_context *ctx, uint32_t ifindex);
 char *dev_name_dup(const struct teamd_context *ctx, uint32_t ifindex);
-static inline void convert_ms(time_t *sec, long *nsec, int ms)
+static inline void ms_to_timespec(struct timespec *ts, int ms)
 {
-	*sec = ms / 1000;
-	*nsec = (ms % 1000) * 1000000;
+	ts->tv_sec = ms / 1000;
+	ts->tv_nsec = (ms % 1000) * 1000000;
 }
 
 
