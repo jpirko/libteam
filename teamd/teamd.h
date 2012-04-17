@@ -126,12 +126,20 @@ int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 			       int fd, int fd_event,
 			       teamd_loop_callback_func_t func,
 			       void *func_priv);
+int teamd_loop_callback_timer_add_set(struct teamd_context *ctx,
+				      const char *cb_name,
+				      struct timespec *interval,
+				      struct timespec *initial,
+				      teamd_loop_callback_func_t func,
+				      void *func_priv);
 int teamd_loop_callback_timer_add(struct teamd_context *ctx,
 				  const char *cb_name,
-				  struct timespec *interval,
-				  struct timespec *initial,
 				  teamd_loop_callback_func_t func,
 				  void *func_priv);
+int teamd_loop_callback_timer_set(struct teamd_context *ctx,
+				  const char *cb_name,
+				  struct timespec *interval,
+				  struct timespec *initial);
 void teamd_loop_callback_del(struct teamd_context *ctx, const char *cb_name);
 int teamd_loop_callback_enable(struct teamd_context *ctx, const char *cb_name);
 int teamd_loop_callback_disable(struct teamd_context *ctx, const char *cb_name);

@@ -357,24 +357,6 @@ void teamd_run_loop_restart(struct teamd_context *ctx)
 	teamd_run_loop_sent_ctrl_byte(ctx, 'r');
 }
 
-static int get_timerfd(int *pfd, struct itimerspec *its_p)
-{
-	int fd;
-
-	fd = timerfd_create(CLOCK_MONOTONIC, 0);
-	if (fd < 0) {
-		teamd_log_err("Failed to create timerfd.");
-		return -errno;
-	}
-	*pfd = fd;
-	if (timerfd_settime(fd, 0, its_p, NULL) < 0) {
-		teamd_log_err("Failed to set timerfd.");
-		close(fd);
-		return -errno;
-	}
-	return 0;
-}
-
 static struct teamd_loop_callback *get_lcb(struct teamd_context *ctx,
 					   const char *cb_name)
 {
@@ -422,15 +404,9 @@ lcb_free:
 	return err;
 }
 
-int teamd_loop_callback_timer_add(struct teamd_context *ctx,
-				  const char *cb_name,
-				  struct timespec *interval,
-				  struct timespec *initial,
-				  teamd_loop_callback_func_t func,
-				  void *func_priv)
+static int __timerfd_reset(int fd, struct timespec *interval,
+			   struct timespec *initial)
 {
-	int err;
-	int fd = fd;
 	struct itimerspec its;
 
 	memset(&its, 0, sizeof(its));
@@ -440,10 +416,35 @@ int teamd_loop_callback_timer_add(struct teamd_context *ctx,
 		its.it_value = *initial;
 	else
 		its.it_value.tv_nsec = 1; /* to enable that */
+	if (timerfd_settime(fd, 0, &its, NULL) < 0) {
+		teamd_log_err("Failed to set timerfd.");
+		return -errno;
+	}
+	return 0;
+}
 
-	err = get_timerfd(&fd, &its);
-	if (err)
-		return err;
+int teamd_loop_callback_timer_add_set(struct teamd_context *ctx,
+				      const char *cb_name,
+				      struct timespec *interval,
+				      struct timespec *initial,
+				      teamd_loop_callback_func_t func,
+				      void *func_priv)
+{
+	int err;
+	int fd = fd;
+
+	fd = timerfd_create(CLOCK_MONOTONIC, 0);
+	if (fd < 0) {
+		teamd_log_err("Failed to create timerfd.");
+		return -errno;
+	}
+	if (interval || initial) {
+		err = __timerfd_reset(fd, interval, initial);
+		if (err) {
+			close(fd);
+			return err;
+		}
+	}
 	err = teamd_loop_callback_fd_add(ctx, cb_name, fd,
 					 TEAMD_LOOP_FD_EVENT_READ,
 					 func, func_priv);
@@ -453,6 +454,34 @@ int teamd_loop_callback_timer_add(struct teamd_context *ctx,
 	}
 	get_lcb(ctx, cb_name)->is_period = true;
 	return 0;
+}
+
+int teamd_loop_callback_timer_add(struct teamd_context *ctx,
+				  const char *cb_name,
+				  teamd_loop_callback_func_t func,
+				  void *func_priv)
+{
+	return teamd_loop_callback_timer_add_set(ctx, cb_name, NULL, NULL,
+						 func, func_priv);
+}
+
+int teamd_loop_callback_timer_set(struct teamd_context *ctx,
+				  const char *cb_name,
+				  struct timespec *interval,
+				  struct timespec *initial)
+{
+	struct teamd_loop_callback *lcb;
+
+	lcb = get_lcb(ctx, cb_name);
+	if (!lcb) {
+		teamd_log_err("Callback named \"%s\" not found.", cb_name);
+		return -ENOENT;
+	}
+	if (!lcb->is_period) {
+		teamd_log_err("Can't reset non-periodic callback.");
+		return -EINVAL;
+	}
+	return __timerfd_reset(lcb->fd, interval, initial);
 }
 
 void teamd_loop_callback_del(struct teamd_context *ctx, const char *cb_name)

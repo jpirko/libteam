@@ -435,8 +435,8 @@ static dbus_bool_t add_timeout(DBusTimeout *timeout, void *priv)
 	dbus_timeout_set_data(timeout, cb_name, free);
 
 	ms_to_timespec(&ts, dbus_timeout_get_interval(timeout));
-	err = teamd_loop_callback_timer_add(ctx, cb_name, NULL, &ts,
-					    callback_timeout, timeout);
+	err = teamd_loop_callback_timer_add_set(ctx, cb_name, NULL, &ts,
+						callback_timeout, timeout);
 	if (err)
 		return FALSE;
 	if (dbus_timeout_get_enabled(timeout))

@@ -419,11 +419,12 @@ static int lw_psr_port_added(struct teamd_context *ctx,
 		goto socket_callback_del;
 	}
 
-	err = teamd_loop_callback_timer_add(ctx, port_priv->cb_name_periodic,
-					    &port_priv->interval,
-					    &port_priv->init_wait,
-					    lw_psr_callback_periodic,
-					    port_priv);
+	err = teamd_loop_callback_timer_add_set(ctx,
+						port_priv->cb_name_periodic,
+						&port_priv->interval,
+						&port_priv->init_wait,
+						lw_psr_callback_periodic,
+						port_priv);
 	if (err) {
 		teamd_log_err("Failed add callback timer");
 		goto free_periodic_cb_name;
