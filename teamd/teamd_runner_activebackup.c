@@ -111,8 +111,8 @@ static void change_active_port(struct teamd_context *ctx,
 
 static int link_watch_handler(struct teamd_context *ctx)
 {
-	struct team_port *port;
 	uint32_t ifindex;
+	struct teamd_port *tdport;
 	struct teamd_port *active_tdport;
 	struct teamd_port *best_tdport = NULL;
 	uint32_t best_speed = 0;
@@ -131,10 +131,9 @@ static int link_watch_handler(struct teamd_context *ctx)
 			      active_tdport->ifname, active_tdport->ifindex,
 			      get_port_prio(ctx, active_tdport->ifname));
 
-	team_for_each_port(port, ctx->th) {
-		struct teamd_port *tdport;
+	teamd_for_each_tdport(tdport, ctx) {
+		struct team_port *port = tdport->team_port;
 
-		tdport = teamd_get_port(ctx, team_get_port_ifindex(port));
 		if (teamd_link_watch_port_up(ctx, tdport)) {
 			uint32_t speed = team_get_port_speed(port);
 			uint8_t duplex = team_get_port_duplex(port);
