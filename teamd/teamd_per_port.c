@@ -39,7 +39,8 @@ struct port_priv_item {
 #define _port(ppitem) (&(ppitem)->port)
 
 static struct port_priv_item *alloc_ppitem(struct teamd_context *ctx,
-					   uint32_t ifindex)
+					   uint32_t ifindex,
+					   struct team_port *team_port)
 {
 	struct port_priv_item *ppitem;
 	struct teamd_port *tdport;
@@ -50,6 +51,7 @@ static struct port_priv_item *alloc_ppitem(struct teamd_context *ctx,
 	tdport = _port(ppitem);
 	tdport->ifindex = ifindex;
 	tdport->ifname = dev_name_dup(ctx, ifindex);
+	tdport->team_port = team_port;
 	if (!tdport->ifname)
 		goto free_ppitem;
 	if (ctx->runner->port_priv_size) {
@@ -88,13 +90,14 @@ static void ppitem_free(struct port_priv_item *ppitem)
 
 static int create_ppitem(struct teamd_context *ctx,
 			 struct port_priv_item **p_ppitem,
-			 uint32_t ifindex)
+			 uint32_t ifindex,
+			 struct team_port *team_port)
 {
 	struct port_priv_item *ppitem;
 	struct teamd_port *tdport;
 	int err;
 
-	ppitem = alloc_ppitem(ctx, ifindex);
+	ppitem = alloc_ppitem(ctx, ifindex, team_port);
 	if (!ppitem)
 		return -ENOMEM;
 	tdport = _port(ppitem);
@@ -195,7 +198,7 @@ static int port_priv_change_handler_func(struct team_handle *th, void *arg,
 
 		ppitem = get_ppitem(ctx, ifindex);
 		if (!ppitem) {
-			err = create_ppitem(ctx, &ppitem, ifindex);
+			err = create_ppitem(ctx, &ppitem, ifindex, port);
 			if (err)
 				return err;
 		}

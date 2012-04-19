@@ -84,6 +84,7 @@ struct teamd_context {
 struct teamd_port {
 	uint32_t			ifindex;
 	char *				ifname; /* device name in time it joined team */
+	struct team_port *		team_port;
 	const struct teamd_link_watch *	link_watch;
 	json_t *			link_watch_json;
 };
