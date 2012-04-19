@@ -237,3 +237,16 @@ struct teamd_port *teamd_get_port(struct teamd_context *ctx, uint32_t ifindex)
 		return NULL;
 	return _port(ppitem);
 }
+
+struct teamd_port *teamd_get_next_tdport(struct teamd_context *ctx,
+					 struct teamd_port *tdport)
+{
+	struct port_priv_item *ppitem = NULL;
+
+	if (tdport)
+		ppitem = get_container(tdport, struct port_priv_item, port);
+	ppitem = list_get_next_node_entry(&ctx->port_priv_list, ppitem, list);
+	if (!ppitem)
+		return NULL;
+	return _port(ppitem);
+}

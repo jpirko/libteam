@@ -169,6 +169,11 @@ static inline void teamd_link_watch_set_handler(struct teamd_context *ctx,
 int teamd_per_port_init(struct teamd_context *ctx);
 void teamd_per_port_fini(struct teamd_context *ctx);
 struct teamd_port *teamd_get_port(struct teamd_context *ctx, uint32_t ifindex);
+struct teamd_port *teamd_get_next_tdport(struct teamd_context *ctx,
+					 struct teamd_port *tdport);
+#define teamd_for_each_tdport(tdport, ctx)				\
+	for (tdport = teamd_get_next_tdport(ctx, NULL); tdport;		\
+	     tdport = teamd_get_next_tdport(ctx, tdport))
 
 void *teamd_get_runner_port_priv(struct teamd_port *tdport);
 void *teamd_get_link_watch_port_priv(struct teamd_port *tdport);

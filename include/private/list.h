@@ -83,10 +83,13 @@ static inline struct list_item *list_get_next_node(struct list_item *head,
 #define in_struct_offset(struct_type, struct_member) \
 	((size_t) (&((struct_type *) 0)->struct_member))
 
-#define list_get_node_entry(node, struct_type, struct_member)		\
-	((struct_type *) (						\
-		((size_t) node) -					\
+#define get_container(ptr, struct_type, struct_member)		\
+	((struct_type *) (					\
+		((size_t) ptr) -				\
 		in_struct_offset(struct_type, struct_member)))
+
+#define list_get_node_entry(node, struct_type, struct_member)		\
+	get_container(node, struct_type, struct_member)
 
 #define list_for_each_node_entry(entry, head, struct_member)			\
 	for (entry = list_get_node_entry((head)->next, typeof(*entry),		\
