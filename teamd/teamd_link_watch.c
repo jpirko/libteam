@@ -602,8 +602,8 @@ static int lw_ap_send(struct lw_psr_port_priv *port_priv)
 		     (struct sockaddr *) &ll_bcast, sizeof(ll_bcast));
 	free(buf);
 	if (ret == -1) {
-		teamd_log_err("sendto failed.");
-		return -errno;
+		teamd_log_warn("sendto failed. %s", strerror(errno));
+		return 0;
 	}
 	return 0;
 }
@@ -631,8 +631,8 @@ static int lw_ap_receive(struct lw_psr_port_priv *port_priv)
 	ret = recvfrom(port_priv->sock, buf, sizeof(buf), 0,
 		       (struct sockaddr *) &ll_from, &addr_len);
 	if (ret == -1) {
-		teamd_log_err("recvfrom failed.");
-		return -errno;
+		teamd_log_warn("recvfrom failed. %s", strerror(errno));
+		return 0;
 	}
 
 	if (ll_from.sll_pkttype != PACKET_HOST)
@@ -855,8 +855,8 @@ static int lw_nsnap_send(struct lw_psr_port_priv *port_priv)
 	ret = sendto(nsnap_port_priv->tx_sock, &nsp, sizeof(nsp), 0,
 		     (struct sockaddr *) &sendto_addr, sizeof(sendto_addr));
 	if (ret == -1) {
-		teamd_log_err("sendto failed.");
-		return -errno;
+		teamd_log_warn("sendto failed. %s", strerror(errno));
+		return 0;
 	}
 
 	return 0;
@@ -880,8 +880,8 @@ static int lw_nsnap_receive(struct lw_psr_port_priv *port_priv)
 	ret = recvfrom(port_priv->sock, &nap, sizeof(nap), 0,
 		       (struct sockaddr *) &ll_from, &addr_len);
 	if (ret == -1) {
-		teamd_log_err("recvfrom failed.");
-		return -errno;
+		teamd_log_warn("recvfrom failed. %s", strerror(errno));
+		return 0;
 	}
 
 	/* check IPV6 header */
