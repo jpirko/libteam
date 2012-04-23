@@ -652,6 +652,73 @@ int team_process_event(struct team_handle *th)
 	return check_call_change_handlers(th, TEAM_ANY_CHANGE);
 }
 
+struct team_eventfd {
+	int (*get_fd)(struct team_handle *th);
+	int (*event_handler)(struct team_handle *th);
+};
+
+static const struct team_eventfd team_eventfds[] = {
+	{
+		.get_fd = team_get_event_fd,
+		.event_handler = team_process_event,
+	},
+};
+#define TEAM_EVENT_FDS_COUNT ARRAY_SIZE(team_eventfds)
+
+/**
+ * team_get_next_eventfd:
+ * @th: libteam library context
+ * @eventfd: eventfd structure
+ *
+ * Get next eventfd in list.
+ *
+ * Returns: eventfd next to @eventfd passed.
+ **/
+TEAM_EXPORT
+const struct team_eventfd *team_get_next_eventfd(struct team_handle *th,
+						 const struct team_eventfd *eventfd)
+{
+	if (!eventfd)
+		return &team_eventfds[0];
+	eventfd++;
+	if (eventfd < &team_eventfds[0] ||
+	    eventfd > &team_eventfds[TEAM_EVENT_FDS_COUNT - 1])
+		return NULL;
+	return eventfd;
+}
+
+/**
+ * team_get_eventfd_fd:
+ * @th: libteam library context
+ * @eventfd: eventfd structure
+ *
+ * Get eventfd filedesctiptor.
+ *
+ * Returns: fd.
+ **/
+TEAM_EXPORT
+int team_get_eventfd_fd(struct team_handle *th,
+			const struct team_eventfd *eventfd)
+{
+	return eventfd->get_fd(th);
+}
+
+/**
+ * team_call_eventfd_handler:
+ * @th: libteam library context
+ * @eventfd: eventfd structure
+ *
+ * Call eventfd handler.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_call_eventfd_handler(struct team_handle *th,
+			      const struct team_eventfd *eventfd)
+{
+	return eventfd->event_handler(th);
+}
+
 /**
  * team_check_events:
  * @th: libteam library context

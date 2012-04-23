@@ -61,6 +61,23 @@ int team_get_bpf_hash_func(struct team_handle *th, struct sock_fprog *fp);
 int team_set_bpf_hash_func(struct team_handle *th, const struct sock_fprog *fp);
 
 /*
+ * team_eventfd
+ *
+ * access to list of event handlers
+ */
+struct team_eventfd;
+
+const struct team_eventfd *team_get_next_eventfd(struct team_handle *th,
+						 const struct team_eventfd *eventfd);
+#define team_for_each_event_fd(eventfd, th)				\
+	for (eventfd = team_get_next_eventfd(th, NULL); eventfd;	\
+	     eventfd = team_get_next_eventfd(th, eventfd))
+int team_get_eventfd_fd(struct team_handle *th,
+			const struct team_eventfd *eventfd);
+int team_call_eventfd_handler(struct team_handle *th,
+			      const struct team_eventfd *eventfd);
+
+/*
  * team_port
  *
  * access to port_list and individual port
