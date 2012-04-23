@@ -734,23 +734,32 @@ int team_check_events(struct team_handle *th)
 {
 	int err;
 	fd_set rfds;
-	int tfd = team_get_event_fd(th);
-	int fdmax = tfd + 1;
+	int fdmax;
 	struct timeval tv;
+	const struct team_eventfd *eventfd;
 
 	while (true) {
 		tv.tv_sec = tv.tv_usec = 0;
 		FD_ZERO(&rfds);
-		FD_SET(tfd, &rfds);
+		fdmax = 0;
+		team_for_each_event_fd(eventfd, th) {
+			int fd = team_get_eventfd_fd(th, eventfd);
+			FD_SET(fd, &rfds);
+			if (fd > fdmax)
+				fdmax = fd;
+		}
+		fdmax++;
 		err = select(fdmax, &rfds, NULL, NULL, &tv);
 		if (err == -1 && errno == EINTR)
 			continue;
-		if (err != -1 && FD_ISSET(tfd, &rfds)) {
-			err = team_process_event(th);
-			if (err)
-				return err;
-		} else {
-			break;
+		if (err == -1)
+			return -errno;
+		team_for_each_event_fd(eventfd, th) {
+			if (FD_ISSET(team_get_eventfd_fd(th, eventfd), &rfds)) {
+				err = team_call_eventfd_handler(th, eventfd);
+				if (err)
+					return err;
+			}
 		}
 	}
 	return 0;
