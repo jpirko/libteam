@@ -358,16 +358,47 @@ void teamd_run_loop_restart(struct teamd_context *ctx)
 	teamd_run_loop_sent_ctrl_byte(ctx, 'r');
 }
 
+static struct teamd_loop_callback *__get_lcb(struct teamd_context *ctx,
+					     const char *cb_name,
+					     struct teamd_loop_callback *last,
+					     bool wildcard_enabled)
+{
+	struct teamd_loop_callback *lcb;
+	size_t len;
+	bool last_found;
+
+	if (!wildcard_enabled && strchr(cb_name, '*')) {
+		teamd_log_err("Wildcard callback named \"%s\" not permitted.",
+			      cb_name);
+		return NULL;
+	}
+	last_found = last == NULL ? true: false;
+	len = strchrnul(cb_name, '*') - cb_name;
+	list_for_each_node_entry(lcb, &ctx->run_loop.callback_list, list) {
+		if (last_found && !strncmp(lcb->name, cb_name, len))
+			return lcb;
+		if (lcb == last)
+			last_found = true;
+	}
+	return NULL;
+}
+
 static struct teamd_loop_callback *get_lcb(struct teamd_context *ctx,
 					   const char *cb_name)
 {
-	struct teamd_loop_callback *lcb;
-
-	list_for_each_node_entry(lcb, &ctx->run_loop.callback_list, list)
-		if (!strcmp(lcb->name, cb_name))
-			return lcb;
-	return NULL;
+	return __get_lcb(ctx, cb_name, NULL, false);
 }
+
+static struct teamd_loop_callback *get_lcb_multi(struct teamd_context *ctx,
+						 struct teamd_loop_callback *last,
+						 const char *cb_name)
+{
+	return __get_lcb(ctx, cb_name, last, true);
+}
+
+#define for_each_lcb_multi_match(lcb, ctx, cb_name)		\
+	for (lcb = get_lcb_multi(ctx, NULL, cb_name); lcb;	\
+	     lcb = get_lcb_multi(ctx, lcb, cb_name))
 
 int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 			       const char *cb_name,
@@ -488,28 +519,33 @@ int teamd_loop_callback_timer_set(struct teamd_context *ctx,
 void teamd_loop_callback_del(struct teamd_context *ctx, const char *cb_name)
 {
 	struct teamd_loop_callback *lcb;
+	bool found = false;
 
-	lcb = get_lcb(ctx, cb_name);
-	if (!lcb) {
-		teamd_log_dbg("Callback named \"%s\" not found.", cb_name);
-		return;
+	for_each_lcb_multi_match(lcb, ctx, cb_name) {
+		list_del(&lcb->list);
+		if (lcb->is_period)
+			close(lcb->fd);
+		free(lcb);
+		free(lcb->name);
+		found = true;
 	}
-	list_del(&lcb->list);
-	teamd_run_loop_restart(ctx);
-	if (lcb->is_period)
-		close(lcb->fd);
-	free(lcb);
-	free(lcb->name);
+	if (found)
+		teamd_run_loop_restart(ctx);
+	else
+		teamd_log_dbg("Callback named \"%s\" not found.", cb_name);
 }
 
 int teamd_loop_callback_enable(struct teamd_context *ctx, const char *cb_name)
 {
 	struct teamd_loop_callback *lcb;
+	bool found = false;
 
-	lcb = get_lcb(ctx, cb_name);
-	if (!lcb)
+	for_each_lcb_multi_match(lcb, ctx, cb_name) {
+		lcb->enabled = true;
+		found = true;
+	}
+	if (!found)
 		return -ENOENT;
-	lcb->enabled = true;
 	teamd_run_loop_restart(ctx);
 	return 0;
 }
@@ -517,11 +553,14 @@ int teamd_loop_callback_enable(struct teamd_context *ctx, const char *cb_name)
 int teamd_loop_callback_disable(struct teamd_context *ctx, const char *cb_name)
 {
 	struct teamd_loop_callback *lcb;
+	bool found = false;
 
-	lcb = get_lcb(ctx, cb_name);
-	if (!lcb)
+	for_each_lcb_multi_match(lcb, ctx, cb_name) {
+		lcb->enabled = false;
+		found = true;
+	}
+	if (!found)
 		return -ENOENT;
-	lcb->enabled = false;
 	teamd_run_loop_restart(ctx);
 	return 0;
 }
