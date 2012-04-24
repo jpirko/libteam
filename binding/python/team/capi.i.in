@@ -75,7 +75,7 @@ int team_hwaddr_get(struct team_handle *th, uint32_t ifindex, char *addr, unsign
     }
 }
 
-%exception team_process_event {
+%exception team_call_eventfd_handler {
     $action
     if (PyErr_Occurred() != NULL) {
         return NULL;

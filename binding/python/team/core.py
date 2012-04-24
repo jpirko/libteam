@@ -115,6 +115,60 @@ class TeamNetDevice(object):
         if err:
             raise TeamLibError("Failed to set hardware address", err)
 
+class TeamEventfd(object):
+    """
+    Class stores event filedesctiptor info.
+    """
+    def __init__(self, th, eventfd):
+        self._th = th
+        self._eventfd = eventfd
+
+    def get_fd(self):
+        return capi.team_get_eventfd_fd(self._th, self._eventfd)
+
+    def call_handler(self):
+        return capi.team_call_eventfd_handler(self._th, self._eventfd)
+
+class TeamEventfdListIterator(object):
+    """
+    Iterator class for TeamEventfdList class for iterating over all listed event
+    filedescriptors.
+    """
+    def __init__(self, eventfds):
+        self._eventfds = eventfds
+        self._cursor = 0
+
+    def __iter__(self):
+        iter
+
+    def next(self):
+        """ Get next item in list """
+        if self._cursor == len(self._eventfds):
+            raise StopIteration
+        else:
+            eventfd = self._eventfds[self._cursor]
+            self._cursor += 1
+            return eventfd
+
+class TeamEventfdList(object):
+    """
+    Class contains list of event filedesctiptor info.
+    """
+    def __init__(self, th):
+        self._th = th
+        self._eventfds = []
+        lib_eventfd = capi.team_get_next_eventfd(self._th, None)
+        while lib_eventfd:
+            eventfd = TeamEventfd(self._th, lib_eventfd)
+            self._eventfds.append(eventfd)
+            lib_eventfd = capi.team_get_next_eventfd(self._th, lib_eventfd)
+
+    def __len__(self):
+        return len(self._ports)
+
+    def __iter__(self):
+        return TeamEventfdListIterator(self._eventfds)
+
 class TeamPort(TeamNetDevice):
     """
     Class stores port data and serves for port modification.
@@ -368,6 +422,7 @@ class Team(TeamNetDevice):
         self.ifindex = ifindex
         self._destroy = destroy
         self._change_handler_list = TeamChangeHandlerList()
+        self._eventfd_list = TeamEventfdList(th)
         self._port_list = TeamPortList(th)
         self._option_list = TeamOptionList(th)
 
@@ -393,12 +448,13 @@ class Team(TeamNetDevice):
 
     def loop_forever(self):
         self._kill_loop = False
-        fd = self.get_event_fd()
+        fds = [eventfd.get_fd() for eventfd in self._eventfd_list]
         while True:
             try:
-                ret = select.select([fd],[],[])
-                if fd in ret[0]:
-                    self.process_event()
+                ret = select.select(fds, [], [])
+                for eventfd in self._eventfd_list:
+                    if eventfd.get_fd() in ret[0]:
+                        eventfd.call_handler()
             except KeyboardInterrupt:
                 return
             except select.error as e:
@@ -407,12 +463,6 @@ class Team(TeamNetDevice):
                         return
             except:
                 raise
-
-    def get_event_fd(self):
-        return capi.team_get_event_fd(self._th)
-
-    def process_event(self):
-        capi.team_process_event(self._th)
 
     def check_events(self):
         capi.team_check_events(self._th)
