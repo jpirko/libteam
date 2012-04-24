@@ -603,12 +603,15 @@ static int callback_daemon_signal(struct teamd_context *ctx, int events,
 static int callback_libteam_event(struct teamd_context *ctx, int events,
 				  void *func_priv)
 {
-	return team_process_event(ctx->th);
+	const struct team_eventfd *eventfd = func_priv;
+
+	return team_call_eventfd_handler(ctx->th, eventfd);
 }
 
 static int teamd_run_loop_init(struct teamd_context *ctx)
 {
 	int fds[2];
+	const struct team_eventfd *eventfd;
 	int err;
 
 	list_init(&ctx->run_loop.callback_list);
@@ -627,22 +630,36 @@ static int teamd_run_loop_init(struct teamd_context *ctx)
 		goto close_pipe;
 	}
 
-	err = teamd_loop_callback_fd_add(ctx, "libteam_events",
-					 team_get_event_fd(ctx->th),
-					 TEAMD_LOOP_FD_EVENT_READ,
-					 callback_libteam_event, NULL);
-	if (err) {
-		teamd_log_err("Failed to add libteam event loop callback");
-		goto del_daemon_cb;
+	team_for_each_event_fd(eventfd, ctx->th) {
+		int fd = team_get_eventfd_fd(ctx->th, eventfd);
+		char *cb_name;
+
+		err = asprintf(&cb_name, "libteam_events_%d", fd);
+		if (err == -1) {
+			teamd_log_err("Failed generate callback name.");
+			err = -ENOMEM;
+			goto unroll_libteam_events_callbacks;
+		}
+		err = teamd_loop_callback_fd_add(ctx, cb_name, fd,
+						 TEAMD_LOOP_FD_EVENT_READ,
+						 callback_libteam_event,
+						 (void *) eventfd);
+		free(cb_name);
+		if (err) {
+			teamd_log_err("Failed to add libteam event loop callback");
+			goto unroll_libteam_events_callbacks;
+		}
 	}
 
 	teamd_loop_callback_enable(ctx, "daemon");
-	teamd_loop_callback_enable(ctx, "libteam_events");
+	teamd_loop_callback_enable(ctx, "libteam_events_*");
 
 	return 0;
 
-del_daemon_cb:
+unroll_libteam_events_callbacks:
+	teamd_loop_callback_del(ctx, "libteam_events_*");
 	teamd_loop_callback_del(ctx, "daemon");
+
 close_pipe:
 	close(ctx->run_loop.ctrl_pipe_r);
 	close(ctx->run_loop.ctrl_pipe_w);
@@ -651,7 +668,7 @@ close_pipe:
 
 static void teamd_run_loop_fini(struct teamd_context *ctx)
 {
-	teamd_loop_callback_del(ctx, "libteam_events");
+	teamd_loop_callback_del(ctx, "libteam_events_*");
 	teamd_loop_callback_del(ctx, "daemon");
 	close(ctx->run_loop.ctrl_pipe_r);
 	close(ctx->run_loop.ctrl_pipe_w);
