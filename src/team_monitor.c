@@ -45,13 +45,17 @@ static void do_main_loop(struct team_handle *th)
 	fd_set rfds_tmp;
 	int fdmax;
 	int ret;
-	int tfd = team_get_event_fd(th);
-	int i;
+	const struct team_eventfd *eventfd;
 
 	FD_ZERO(&rfds);
-	FD_SET(tfd, &rfds);
-
-	fdmax = tfd + 1;
+	fdmax = 0;
+	team_for_each_event_fd(eventfd, th) {
+		int fd = team_get_eventfd_fd(th, eventfd);
+		FD_SET(fd, &rfds);
+		if (fd > fdmax)
+			fdmax = fd;
+	}
+	fdmax++;
 
 	while (1) {
 		rfds_tmp = rfds;
@@ -61,14 +65,11 @@ static void do_main_loop(struct team_handle *th)
 		if (ret == -1) {
 			perror("select()");
 		}
-		for (i = 0; i < fdmax; i++) {
-			if (FD_ISSET(i, &rfds_tmp)) {
-				if (i == tfd)
-					team_process_event(th);
-			}
+		team_for_each_event_fd(eventfd, th) {
+			if (FD_ISSET(team_get_eventfd_fd(th, eventfd), &rfds))
+				team_call_eventfd_handler(th, eventfd);
 		}
 	}
-
 }
 
 static int port_change_handler_func(struct team_handle *th, void *arg,
