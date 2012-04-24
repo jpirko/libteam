@@ -39,16 +39,45 @@ struct team_port {
 	bool			linkup;
 	bool			changed;
 	bool			removed;
+	struct team_ifinfo *	ifinfo;
 };
+
+static struct team_port *port_create(struct team_handle *th,
+				     uint32_t ifindex)
+{
+	struct team_port *port;
+	int err;
+
+	port = myzalloc(sizeof(struct team_port));
+	if (!port) {
+		err(th, "Malloc failed.");
+		return NULL;
+	}
+	err = ifinfo_create(th, ifindex, port, &port->ifinfo);
+	if (err) {
+		err(th, "Failed to create ifinfo.");
+		free(port);
+		return NULL;
+	}
+	port->ifindex = ifindex;
+	list_add(&th->port_list, &port->list);
+	return port;
+}
+
+static void port_destroy(struct team_handle *th,
+			 struct team_port *port)
+{
+	ifinfo_destroy(th, port->ifindex);
+	list_del(&port->list);
+	free(port);
+}
 
 static void flush_port_list(struct team_handle *th)
 {
 	struct team_port *port, *tmp;
 
-	list_for_each_node_entry_safe(port, tmp, &th->port_list, list) {
-		list_del(&port->list);
-		free(port);
-	}
+	list_for_each_node_entry_safe(port, tmp, &th->port_list, list)
+		port_destroy(th, port);
 }
 
 static void port_list_cleanup_last_state(struct team_handle *th)
@@ -57,10 +86,8 @@ static void port_list_cleanup_last_state(struct team_handle *th)
 
 	list_for_each_node_entry(port, &th->port_list, list) {
 		port->changed = false;
-		if (port->removed) {
-			list_del(&port->list);
-			free(port);
-		}
+		if (port->removed)
+			port_destroy(th, port);
 	}
 }
 
@@ -73,7 +100,6 @@ static struct team_port *find_port(struct team_handle *th, uint32_t ifindex)
 			return port;
 	return NULL;
 }
-
 
 int get_port_list_handler(struct nl_msg *msg, void *arg)
 {
@@ -114,13 +140,9 @@ int get_port_list_handler(struct nl_msg *msg, void *arg)
 		ifindex = nla_get_u32(port_attrs[TEAM_ATTR_PORT_IFINDEX]);
 		port = find_port(th, ifindex);
 		if (!port) {
-			port = myzalloc(sizeof(struct team_port));
-			if (!port) {
-				err(th, "Malloc failed.");
+			port = port_create(th, ifindex);
+			if (!port)
 				return NL_SKIP;
-			}
-			port->ifindex = ifindex;
-			list_add(&th->port_list, &port->list);
 		}
 		port->changed = port_attrs[TEAM_ATTR_PORT_CHANGED] ? true : false;
 		port->linkup = port_attrs[TEAM_ATTR_PORT_LINKUP] ? true : false;
@@ -282,4 +304,18 @@ TEAM_EXPORT
 bool team_is_port_removed(struct team_port *port)
 {
 	return port->removed;
+}
+
+/**
+ * team_get_port_ifinfo:
+ * @port: port structure
+ *
+ * Get port rtnetlink interface info.
+ *
+ * Returns: pointer to appropriate team_ifinfo structure.
+ **/
+TEAM_EXPORT
+struct team_ifinfo *team_get_port_ifinfo(struct team_port *port)
+{
+	return port->ifinfo;
 }

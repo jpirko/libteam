@@ -81,7 +81,7 @@ static int log_priority(const char *priority)
  * @short_description: various libnl helper functions
  */
 
-static int nl2syserr(int nl_error)
+int nl2syserr(int nl_error)
 {
 	switch (abs(nl_error)) {
 	case 0:				return 0;
@@ -285,6 +285,11 @@ static int event_handler(struct nl_msg *msg, void *arg)
 	return NL_SKIP;
 }
 
+static int cli_event_handler(struct nl_msg *msg, void *arg)
+{
+	return ifinfo_event_handler(msg, arg);
+}
+
 /**
  * team_alloc:
  *
@@ -314,6 +319,7 @@ struct team_handle *team_alloc(void)
 	dbg(th, "log_priority=%d", th->log_priority);
 
 	list_init(&th->change_handler.list);
+	list_init(&th->ifinfo_list);
 
 	err = port_list_alloc(th);
 	if (err)
@@ -329,6 +335,10 @@ struct team_handle *team_alloc(void)
 	th->nl_sock_event = nl_socket_alloc();
 	if (!th->nl_sock_event)
 		goto err_sk_event_alloc;
+
+	th->nl_cli.sock_event = nl_cli_alloc_socket();
+	if (!th->nl_cli.sock_event)
+		goto err_cli_sk_event_alloc;
 
 	th->nl_cli.sock = nl_cli_alloc_socket();
 	if (!th->nl_cli.sock)
@@ -347,6 +357,9 @@ err_cli_connect:
 	nl_socket_free(th->nl_cli.sock);
 
 err_cli_sk_alloc:
+	nl_socket_free(th->nl_cli.sock_event);
+
+err_cli_sk_event_alloc:
 	nl_socket_free(th->nl_sock_event);
 
 err_sk_event_alloc:
@@ -515,6 +528,16 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 	nl_socket_modify_cb(th->nl_sock_event, NL_CB_VALID, NL_CB_CUSTOM,
 			    event_handler, th);
 
+	nl_socket_disable_seq_check(th->nl_cli.sock_event);
+	nl_socket_modify_cb(th->nl_cli.sock_event, NL_CB_VALID,
+			    NL_CB_CUSTOM, cli_event_handler, th);
+	nl_cli_connect(th->nl_cli.sock_event, NETLINK_ROUTE);
+	err = nl_socket_add_membership(th->nl_cli.sock_event, RTNLGRP_LINK);
+	if (err < 0) {
+		err(th, "Failed to add netlink membership.");
+		return -nl2syserr(err);
+	}
+
 	err = port_list_init(th);
 	if (err) {
 		err(th, "Failed to init port list.");
@@ -524,6 +547,12 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 	err = option_list_init(th);
 	if (err) {
 		err(th, "Failed to init option list.");
+		return err;
+	}
+
+	err = ifinfo_create(th, ifindex, NULL, NULL);
+	if (err) {
+		err(th, "Failed create interface info.");
 		return err;
 	}
 
@@ -544,6 +573,7 @@ void team_free(struct team_handle *th)
 	option_list_free(th);
 	nl_cache_free(th->nl_cli.link_cache);
 	nl_socket_free(th->nl_cli.sock);
+	nl_socket_free(th->nl_cli.sock_event);
 	nl_socket_free(th->nl_sock_event);
 	nl_socket_free(th->nl_sock);
 	free(th);
@@ -628,7 +658,19 @@ static int get_sock_event_fd(struct team_handle *th)
 static int sock_event_handler(struct team_handle *th)
 {
 	nl_recvmsgs_default(th->nl_sock_event);
-	return check_call_change_handlers(th, TEAM_ANY_CHANGE);
+	return check_call_change_handlers(th, TEAM_PORT_CHANGE |
+					      TEAM_OPTION_CHANGE);
+}
+
+static int get_cli_sock_event_fd(struct team_handle *th)
+{
+	return nl_socket_get_fd(th->nl_cli.sock_event);
+}
+
+static int cli_sock_event_handler(struct team_handle *th)
+{
+	nl_recvmsgs_default(th->nl_cli.sock_event);
+	return check_call_change_handlers(th, TEAM_IFINFO_CHANGE);
 }
 
 struct team_eventfd {
@@ -640,6 +682,10 @@ static const struct team_eventfd team_eventfds[] = {
 	{
 		.get_fd = get_sock_event_fd,
 		.event_handler = sock_event_handler,
+	},
+	{
+		.get_fd = get_cli_sock_event_fd,
+		.event_handler = cli_sock_event_handler,
 	},
 };
 #define TEAM_EVENT_FDS_COUNT ARRAY_SIZE(team_eventfds)

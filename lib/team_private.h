@@ -40,6 +40,7 @@ struct team_handle {
 	int			family;
 	uint32_t		ifindex;
 	struct list_item	port_list;
+	struct list_item	ifinfo_list;
 	struct list_item	option_list;
 	struct {
 		struct list_item		list;
@@ -48,6 +49,7 @@ struct team_handle {
 	struct {
 		struct nl_sock *	sock;
 		struct nl_cache *	link_cache;
+		struct nl_sock *	sock_event;
 	} nl_cli;
 	void (*log_fn)(struct team_handle *th, int priority,
 		       const char *file, int line, const char *fn,
@@ -100,10 +102,15 @@ int get_port_list_handler(struct nl_msg *msg, void *arg);
 int port_list_alloc(struct team_handle *th);
 int port_list_init(struct team_handle *th);
 void port_list_free(struct team_handle *th);
+int ifinfo_event_handler(struct nl_msg *msg, void *arg);
+int ifinfo_create(struct team_handle *th, uint32_t ifindex,
+		  struct team_port *port, struct team_ifinfo **p_ifinfo);
+void ifinfo_destroy(struct team_handle *th, uint32_t ifindex);
 int get_options_handler(struct nl_msg *msg, void *arg);
 int option_list_alloc(struct team_handle *th);
 int option_list_init(struct team_handle *th);
 void option_list_free(struct team_handle *th);
+int nl2syserr(int nl_error);
 int send_and_recv(struct team_handle *th, struct nl_msg *msg,
 		  int (*valid_handler)(struct nl_msg *, void *),
 		  void *valid_data);

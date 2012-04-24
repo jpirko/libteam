@@ -94,6 +94,29 @@ uint8_t team_get_port_duplex(struct team_port *port);
 bool team_is_port_link_up(struct team_port *port);
 bool team_is_port_changed(struct team_port *port);
 bool team_is_port_removed(struct team_port *port);
+struct team_ifinfo;
+struct team_ifinfo *team_get_port_ifinfo(struct team_port *port);
+
+/*
+ * team_ifinfo
+ *
+ * access to list of ifinfo_list
+ */
+
+struct team_ifinfo *team_get_next_ifinfo(struct team_handle *th,
+					 struct team_ifinfo *ifinfo);
+#define team_for_each_ifinfo(ifinfo, th)			\
+	for (ifinfo = team_get_next_ifinfo(th, NULL); ifinfo;	\
+	     ifinfo = team_get_next_ifinfo(th, ifinfo))
+/* ifinfo getters */
+uint32_t team_get_ifinfo_ifindex(struct team_ifinfo *ifinfo);
+struct team_port *team_get_ifinfo_port(struct team_ifinfo *ifinfo);
+char *team_get_ifinfo_hwaddr(struct team_ifinfo *ifinfo);
+bool team_is_ifinfo_hwaddr_changed(struct team_ifinfo *ifinfo);
+size_t team_get_ifinfo_hwaddr_len(struct team_ifinfo *ifinfo);
+bool team_is_ifinfo_hwaddr_len_changed(struct team_ifinfo *ifinfo);
+char *team_get_ifinfo_ifname(struct team_ifinfo *ifinfo);
+bool team_is_ifinfo_ifname_changed(struct team_ifinfo *ifinfo);
 
 /*
  * team_option
@@ -196,7 +219,10 @@ int team_set_port_option_value_by_name_bool(struct team_handle *th,
 enum {
 	TEAM_PORT_CHANGE	= 0x1,
 	TEAM_OPTION_CHANGE	= 0x2,
-	TEAM_ANY_CHANGE		= TEAM_PORT_CHANGE | TEAM_OPTION_CHANGE,
+	TEAM_IFINFO_CHANGE	= 0x4,
+	TEAM_ANY_CHANGE		= TEAM_PORT_CHANGE |
+				  TEAM_OPTION_CHANGE |
+				  TEAM_IFINFO_CHANGE,
 };
 
 typedef unsigned int team_change_type_mask_t;
