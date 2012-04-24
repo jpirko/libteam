@@ -620,33 +620,12 @@ void team_set_user_priv(struct team_handle *th, void *priv)
 	th->user_priv = priv;
 }
 
-/**
- * team_get_event_fd:
- * @th: libteam library context
- *
- * Get file descriptor of event socket. This allows library user
- * to put the fd to poll for example.
- *
- * Returns: socket file descriptor.
- **/
-TEAM_EXPORT
-int team_get_event_fd(struct team_handle *th)
+static int get_sock_event_fd(struct team_handle *th)
 {
 	return nl_socket_get_fd(th->nl_sock_event);
 }
 
-/**
- * team_process_event:
- * @th: libteam library context
- *
- * Process event which happened on event socket. Beware this calls
- * nl_recvmsgs_default() which blocks so be sure to call this only
- * if there are some data to read on event socket file descriptor.
- *
- * Returns: zero on success or negative number in case of an error.
- **/
-TEAM_EXPORT
-int team_process_event(struct team_handle *th)
+static int sock_event_handler(struct team_handle *th)
 {
 	nl_recvmsgs_default(th->nl_sock_event);
 	return check_call_change_handlers(th, TEAM_ANY_CHANGE);
@@ -659,8 +638,8 @@ struct team_eventfd {
 
 static const struct team_eventfd team_eventfds[] = {
 	{
-		.get_fd = team_get_event_fd,
-		.event_handler = team_process_event,
+		.get_fd = get_sock_event_fd,
+		.event_handler = sock_event_handler,
 	},
 };
 #define TEAM_EVENT_FDS_COUNT ARRAY_SIZE(team_eventfds)
