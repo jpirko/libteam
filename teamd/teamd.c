@@ -987,6 +987,28 @@ static void debug_log_option_list(struct teamd_context *ctx)
 	teamd_log_dbg("</option_list>");
 }
 
+static void debug_log_ifinfo_list(struct teamd_context *ctx)
+{
+	struct team_ifinfo *ifinfo;
+
+	teamd_log_dbg("<ifinfo_list>");
+	team_for_each_ifinfo(ifinfo, ctx->th) {
+		uint32_t ifindex = team_get_ifinfo_ifindex(ifinfo);
+		size_t hwaddr_len = team_get_ifinfo_hwaddr_len(ifinfo);
+		char str[hwaddr_len];
+
+		hwaddr_str(str, team_get_ifinfo_hwaddr(ifinfo), hwaddr_len);
+		teamd_log_dbg("%d: hwaddr: %s%s", ifindex, str,
+			      team_is_ifinfo_hwaddr_changed(ifinfo) ? " changed" : "");
+		teamd_log_dbg("%d: hwaddr_len: %lu%s", ifindex, hwaddr_len,
+			      team_is_ifinfo_hwaddr_len_changed(ifinfo) ? " changed" : "");
+		teamd_log_dbg("%d: ifname: %s%s", ifindex,
+			      team_get_ifinfo_ifname(ifinfo),
+			      team_is_ifinfo_ifname_changed(ifinfo) ? " changed" : "");
+	}
+	teamd_log_dbg("</ifinfo_list>");
+}
+
 static int debug_change_handler_func(struct team_handle *th, void *arg,
 				     team_change_type_mask_t type_mask)
 {
@@ -996,12 +1018,14 @@ static int debug_change_handler_func(struct team_handle *th, void *arg,
 		debug_log_port_list(ctx);
 	if (type_mask & TEAM_OPTION_CHANGE)
 		debug_log_option_list(ctx);
+	if (type_mask & TEAM_IFINFO_CHANGE)
+		debug_log_ifinfo_list(ctx);
 	return 0;
 }
 
 static struct team_change_handler debug_change_handler = {
 	.func = debug_change_handler_func,
-	.type_mask = TEAM_PORT_CHANGE | TEAM_OPTION_CHANGE,
+	.type_mask = TEAM_PORT_CHANGE | TEAM_OPTION_CHANGE | TEAM_IFINFO_CHANGE,
 };
 
 static int teamd_register_default_handlers(struct teamd_context *ctx)

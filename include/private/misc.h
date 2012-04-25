@@ -20,6 +20,7 @@
 #ifndef _T_MISC_H_
 #define _T_MISC_H_
 
+#include <stdio.h>
 #include <stdlib.h>
 
 static inline void *myzalloc(size_t size)
@@ -28,5 +29,16 @@ static inline void *myzalloc(size_t size)
 }
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
+static inline void hwaddr_str(char *str, char *hwaddr, size_t len)
+{
+	int i;
+
+	for (i = 0; i < len; i++) {
+		sprintf(str, "%02x:", (unsigned char) hwaddr[i]);
+		str += 3;
+	}
+	*(str - 1) = '\0';
+}
 
 #endif /* _T_MISC_H_ */
