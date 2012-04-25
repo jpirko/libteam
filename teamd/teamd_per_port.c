@@ -108,7 +108,7 @@ static int create_ppitem(struct teamd_context *ctx,
 			goto list_del;
 		}
 	}
-	if (ctx->runner->port_added) {
+	if (ctx->runner && ctx->runner->port_added) {
 		err = ctx->runner->port_added(ctx, tdport);
 		if (err) {
 			teamd_log_err("Runner port_added failed: %s.",
@@ -132,7 +132,7 @@ static void ppitem_destroy(struct teamd_context *ctx,
 {
 	struct teamd_port *tdport = _port(ppitem);
 
-	if (ctx->runner->port_removed)
+	if (ctx->runner && ctx->runner->port_removed)
 		ctx->runner->port_removed(ctx, tdport);
 	if (tdport->link_watch && tdport->link_watch->port_removed)
 		tdport->link_watch->port_removed(ctx, tdport);

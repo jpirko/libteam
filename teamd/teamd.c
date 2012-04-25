@@ -904,6 +904,7 @@ static void teamd_runner_fini(struct teamd_context *ctx)
 	if (ctx->runner->fini)
 		ctx->runner->fini(ctx);
 	free(ctx->runner_priv);
+	ctx->runner = NULL;
 }
 
 static void debug_log_port_list(struct teamd_context *ctx)
