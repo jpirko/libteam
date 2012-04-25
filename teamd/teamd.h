@@ -83,8 +83,9 @@ struct teamd_context {
 
 struct teamd_port {
 	uint32_t			ifindex;
-	char *				ifname; /* device name in time it joined team */
+	char *				ifname;
 	struct team_port *		team_port;
+	struct team_ifinfo *		team_ifinfo;
 	const struct teamd_link_watch *	link_watch;
 	json_t *			link_watch_json;
 };
@@ -190,8 +191,6 @@ int teamd_getsockname_hwaddr(int sock, struct sockaddr_ll *addr,
 			     size_t expected_len);
 
 /* Various helpers */
-char *dev_name(const struct teamd_context *ctx, uint32_t ifindex);
-char *dev_name_dup(const struct teamd_context *ctx, uint32_t ifindex);
 static inline void ms_to_timespec(struct timespec *ts, int ms)
 {
 	ts->tv_sec = ms / 1000;

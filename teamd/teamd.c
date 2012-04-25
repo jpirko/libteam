@@ -44,23 +44,6 @@
 
 #include "teamd.h"
 
-/* For purpose of immediate use, e.g. print */
-char *dev_name(const struct teamd_context *ctx, uint32_t ifindex)
-{
-	static char ifname[IFNAMSIZ];
-
-	return team_ifindex2ifname(ctx->th, ifindex, ifname, sizeof(ifname));
-}
-
-char *dev_name_dup(const struct teamd_context *ctx, uint32_t ifindex)
-{
-	char *ifname = dev_name(ctx, ifindex);
-
-	if (!ifname)
-		return NULL;
-	return strdup(ifname);
-}
-
 static const struct teamd_runner *teamd_runner_list[] = {
 	&teamd_runner_dummy,
 	&teamd_runner_roundrobin,
@@ -930,11 +913,10 @@ static void debug_log_port_list(struct teamd_context *ctx)
 	teamd_log_dbg("<port_list>");
 	team_for_each_port(port, ctx->th) {
 		uint32_t ifindex = team_get_port_ifindex(port);
-		struct teamd_port *tdport;
+		struct team_ifinfo *ifinfo = team_get_port_ifinfo(port);
 
-		tdport = teamd_get_port(ctx, ifindex);
-		teamd_log_dbg("%d: %s(%s): %s %u %s%s%s", ifindex,
-			      dev_name(ctx, ifindex), tdport ? tdport->ifname : "",
+		teamd_log_dbg("%d: %s: %s %u %s%s%s", ifindex,
+			      team_get_ifinfo_ifname(ifinfo),
 			      team_is_port_link_up(port) ? "up": "down",
 			      team_get_port_speed(port),
 			      team_get_port_duplex(port) ? "fullduplex" : "halfduplex",

@@ -44,20 +44,21 @@ static struct port_priv_item *alloc_ppitem(struct teamd_context *ctx,
 {
 	struct port_priv_item *ppitem;
 	struct teamd_port *tdport;
+	struct team_ifinfo *team_ifinfo;
 
 	ppitem = myzalloc(sizeof(*ppitem));
 	if (!ppitem)
 		goto err_out;
 	tdport = _port(ppitem);
 	tdport->ifindex = ifindex;
-	tdport->ifname = dev_name_dup(ctx, ifindex);
+	team_ifinfo = team_get_port_ifinfo(team_port);
+	tdport->ifname = team_get_ifinfo_ifname(team_ifinfo);
 	tdport->team_port = team_port;
-	if (!tdport->ifname)
-		goto free_ppitem;
+	tdport->team_ifinfo = team_ifinfo;
 	if (ctx->runner->port_priv_size) {
 		ppitem->runner_priv = myzalloc(ctx->runner->port_priv_size);
 		if (!ppitem->runner_priv)
-			goto free_ifname;
+			goto free_ppitem;
 	}
 	teamd_link_watch_select(ctx, tdport);
 	if (tdport->link_watch && tdport->link_watch->port_priv_size) {
@@ -70,8 +71,6 @@ static struct port_priv_item *alloc_ppitem(struct teamd_context *ctx,
 
 free_runner_priv:
 	free(ppitem->runner_priv);
-free_ifname:
-	free(_port(ppitem)->ifname);
 free_ppitem:
 	free(ppitem);
 err_out:
@@ -84,7 +83,6 @@ static void ppitem_free(struct port_priv_item *ppitem)
 	list_del(&ppitem->list);
 	free(ppitem->link_watch_priv);
 	free(ppitem->runner_priv);
-	free(_port(ppitem)->ifname);
 	free(ppitem);
 }
 
