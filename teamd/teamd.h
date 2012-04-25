@@ -176,6 +176,10 @@ struct teamd_port *teamd_get_next_tdport(struct teamd_context *ctx,
 #define teamd_for_each_tdport(tdport, ctx)				\
 	for (tdport = teamd_get_next_tdport(ctx, NULL); tdport;		\
 	     tdport = teamd_get_next_tdport(ctx, tdport))
+static inline bool teamd_has_ports(struct teamd_context *ctx)
+{
+	return !list_empty(&ctx->port_priv_list);
+}
 
 void *teamd_get_runner_port_priv(struct teamd_port *tdport);
 void *teamd_get_link_watch_port_priv(struct teamd_port *tdport);

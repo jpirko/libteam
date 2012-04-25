@@ -268,6 +268,23 @@ static int teamd_run_loop_do_callbacks(struct list_item *lcb_list, fd_set *fds,
 	return 0;
 }
 
+static int teamd_flush_ports(struct teamd_context *ctx)
+{
+	struct teamd_port *tdport;
+	int err;
+
+	teamd_for_each_tdport(tdport, ctx) {
+		teamd_log_dbg("Removing port \"%s\".", tdport->ifname);
+		err = team_port_remove(ctx->th, tdport->ifindex);
+		if (err) {
+			teamd_log_err("Failed to remove port \"%s\".",
+				      tdport->ifname);
+			return err;
+		}
+	}
+	return 0;
+}
+
 static int teamd_run_loop_run(struct teamd_context *ctx)
 {
 	int err;
@@ -276,8 +293,18 @@ static int teamd_run_loop_run(struct teamd_context *ctx)
 	int fdmax;
 	char ctrl_byte;
 	int i;
+	bool quit_in_progress = false;
+
+	/*
+	 * To process all things correctly during cleanup, on quit command
+	 * received via control pipe ('q') do flush all existing ports.
+	 * After that wait until all ports are gone and return.
+	 */
 
 	while (true) {
+		if (quit_in_progress && !teamd_has_ports(ctx))
+			return ctx->run_loop.err;
+
 		for (i = 0; i < 3; i++)
 			FD_ZERO(&fds[i]);
 		FD_SET(ctrl_fd, &fds[0]);
@@ -299,7 +326,13 @@ static int teamd_run_loop_run(struct teamd_context *ctx)
 			if (err != -1) {
 				switch(ctrl_byte) {
 				case 'q':
-					return ctx->run_loop.err;
+					if (quit_in_progress)
+						continue;
+					err = teamd_flush_ports(ctx);
+					if (err)
+						return err;
+					quit_in_progress = true;
+					continue;
 				case 'r':
 					continue;
 				}
