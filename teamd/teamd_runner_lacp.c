@@ -454,10 +454,9 @@ static int lacp_port_actor_update(struct lacp_port *lacp_port)
 		state |= INFO_STATE_LACP_ACTIVITY;
 	if (lacp_port->lacp->cfg.fast_rate)
 		state |= INFO_STATE_LACP_TIMEOUT;
-	if (lacp_port->selected) {
+	if (lacp_port->selected)
 		state |= INFO_STATE_SYNCHRONIZATION;
-		state |= INFO_STATE_COLLECTING | INFO_STATE_DISTRIBUTING;
-	}
+	state |= INFO_STATE_COLLECTING | INFO_STATE_DISTRIBUTING;
 	if (lacp_port->state == PORT_STATE_EXPIRED)
 		state |= INFO_STATE_EXPIRED;
 	if (lacp_port->state == PORT_STATE_DEFAULTED)
