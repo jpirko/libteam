@@ -32,7 +32,6 @@
 
 struct abl_priv {
 	char		old_active_hwaddr[MAX_ADDR_LEN];
-	char		tmp_hwaddr[MAX_ADDR_LEN];
 };
 
 static struct abl_priv *abl_priv(struct teamd_context *ctx)
@@ -90,19 +89,11 @@ static void change_active_port(struct teamd_context *ctx,
 	if (err)
 		teamd_log_err("Failed to set active port: %s", strerror(-err));
 
-	err = team_hwaddr_get(ctx->th, ctx->ifindex, abl_priv(ctx)->tmp_hwaddr,
-			      ctx->hwaddr_len);
-	if (err)
-		teamd_log_err("Failed to get team device hardware address: %s",
-			      strerror(-err));
+	memcpy(abl_priv(ctx)->old_active_hwaddr,
+	       team_get_ifinfo_hwaddr(new_tdport->team_ifinfo),
+	       ctx->hwaddr_len);
 
-	err = team_hwaddr_get(ctx->th, new_active_ifindex, abl_priv(ctx)->old_active_hwaddr,
-			      ctx->hwaddr_len);
-	if (err)
-		teamd_log_err("Failed to get new active device hardware address: %s",
-			      strerror(-err));
-
-	err = team_hwaddr_set(ctx->th, new_active_ifindex, abl_priv(ctx)->tmp_hwaddr,
+	err = team_hwaddr_set(ctx->th, new_active_ifindex, ctx->hwaddr,
 			      ctx->hwaddr_len);
 	if (err)
 		teamd_log_err("Failed to set new active hardware address: %s",

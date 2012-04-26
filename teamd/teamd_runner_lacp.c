@@ -444,16 +444,7 @@ static int lacp_port_actor_update(struct lacp_port *lacp_port)
 	int err;
 	uint8_t state = 0;
 
-	/*
-	 * HW addr get needs to be changed. Probably ctx should already
-	 * contain the correct one.
-	 */
-	err = team_hwaddr_get(lacp_port->ctx->th, lacp_port->ctx->ifindex,
-			      (char *) actor->system, ETH_ALEN);
-	if (err) {
-		teamd_log_err("Failed to get team device hardware address.");
-		return err;
-	}
+	memcpy(actor->system, lacp_port->ctx->hwaddr, ETH_ALEN);
 	if (lacp_port->lacp->cfg.active)
 		state |= INFO_STATE_LACP_ACTIVITY;
 	if (lacp_port->lacp->cfg.fast_rate)
@@ -672,17 +663,9 @@ static int lacp_callback_socket(struct teamd_context *ctx, int events,
 static int lacp_port_set_mac(struct teamd_context *ctx,
 			     struct teamd_port *tdport)
 {
-	char tmp_hwaddr[MAX_ADDR_LEN];
 	int err;
 
-	err = team_hwaddr_get(ctx->th, ctx->ifindex, tmp_hwaddr,
-			      ctx->hwaddr_len);
-	if (err) {
-		teamd_log_err("Failed to get team device hardware address.");
-		return err;
-	}
-
-	err = team_hwaddr_set(ctx->th, tdport->ifindex, tmp_hwaddr,
+	err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
 			      ctx->hwaddr_len);
 	if (err) {
 		teamd_log_err("%s: Failed to set hardware address. ",

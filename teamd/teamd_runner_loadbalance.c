@@ -30,17 +30,9 @@ static int lb_init(struct teamd_context *ctx)
 
 static int lb_port_added(struct teamd_context *ctx, struct teamd_port *tdport)
 {
-	char tmp_hwaddr[MAX_ADDR_LEN];
 	int err;
 
-	err = team_hwaddr_get(ctx->th, ctx->ifindex, tmp_hwaddr,
-			      ctx->hwaddr_len);
-	if (err) {
-		teamd_log_err("Failed to get team device hardware address.");
-		return err;
-	}
-
-	err = team_hwaddr_set(ctx->th, tdport->ifindex, tmp_hwaddr,
+	err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
 			      ctx->hwaddr_len);
 	if (err) {
 		teamd_log_err("Failed to set port \"%s\" hardware address. ",
