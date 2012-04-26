@@ -142,7 +142,6 @@ struct lacp_port {
 	struct lacpdu_info partner;
 	struct lacpdu_info __partner_last; /* last state before update */
 	bool selected;
-	bool __selected_last;
 	enum lacp_port_state state;
 	struct {
 		uint32_t speed;
@@ -243,26 +242,56 @@ static bool lacp_port_selectable(struct lacp_port *lacp_port)
 	return false;
 }
 
-static int lacp_port_update_selected(struct lacp_port *lacp_port)
+static int lacp_port_should_be_enabled(struct lacp_port *lacp_port)
+{
+	if (lacp_port->selected &&
+	    lacp_port->partner.state & INFO_STATE_SYNCHRONIZATION)
+		return true;
+	return false;
+}
+
+static int lacp_port_should_be_disabled(struct lacp_port *lacp_port)
+{
+	if (!lacp_port->selected)
+		return true;
+	return false;
+}
+
+static int lacp_port_update_enabled(struct lacp_port *lacp_port)
 {
 	struct teamd_port *tdport = lacp_port->tdport;
 	int err;
+	bool new_enabled_state;
+	bool curr_enabled_state;
 
-	if (lacp_port->selected == lacp_port->__selected_last)
+	err = team_get_port_option_value_by_name_bool(lacp_port->ctx->th,
+						      "enabled",
+						      tdport->ifindex,
+						      &curr_enabled_state);
+	if (err) {
+		teamd_log_err("%s: Failed to get \"enabled\" option.",
+			      tdport->ifname);
+		return err;;
+	}
+
+	if (!curr_enabled_state && lacp_port_should_be_enabled(lacp_port))
+		new_enabled_state = true;
+	else if (curr_enabled_state && lacp_port_should_be_disabled(lacp_port))
+		new_enabled_state = false;
+	else
 		return 0;
 
 	teamd_log_dbg("%s: %s port.", tdport->ifname,
-		      lacp_port->selected ? "Enabling": "Disabling");
+		      new_enabled_state ? "Enabling": "Disabling");
 	err = team_set_port_option_value_by_name_bool(lacp_port->ctx->th,
 						      "enabled",
 						      tdport->ifindex,
-						      lacp_port->selected);
+						      new_enabled_state);
 	if (err) {
 		teamd_log_err("%s: Failed to %s port.", tdport->ifname,
-			      lacp_port->selected ? "enable": "disable");
+			      new_enabled_state ? "enable": "disable");
 		return err;;
 	}
-	lacp_port->__selected_last = lacp_port->selected;
 	return 0;
 }
 
@@ -308,7 +337,6 @@ static int lacp_update_selected(struct lacp *lacp)
 	 */
 	teamd_for_each_tdport(tdport, lacp->ctx) {
 		lacp_port = teamd_get_runner_port_priv(tdport);
-		lacp_port->__selected_last = lacp_port->selected;
 		lacp_port->selected = false;
 	}
 
@@ -320,7 +348,7 @@ static int lacp_update_selected(struct lacp *lacp)
 		    lacp_ports_aggregable(lacp_port, best_lacp_port)) {
 			lacp_port->selected = true;
 		}
-		err = lacp_port_update_selected(lacp_port);
+		err = lacp_port_update_enabled(lacp_port);
 		if (err)
 			return err;
 	}
