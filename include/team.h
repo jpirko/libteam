@@ -57,6 +57,8 @@ int team_get_active_port(struct team_handle *th, uint32_t *ifindex);
 int team_set_active_port(struct team_handle *th, uint32_t ifindex);
 int team_get_bpf_hash_func(struct team_handle *th, struct sock_fprog *fp);
 int team_set_bpf_hash_func(struct team_handle *th, const struct sock_fprog *fp);
+struct team_ifinfo;
+struct team_ifinfo *team_get_ifinfo(struct team_handle *th);
 
 /*
  * team_eventfd
@@ -94,7 +96,6 @@ uint8_t team_get_port_duplex(struct team_port *port);
 bool team_is_port_link_up(struct team_port *port);
 bool team_is_port_changed(struct team_port *port);
 bool team_is_port_removed(struct team_port *port);
-struct team_ifinfo;
 struct team_ifinfo *team_get_port_ifinfo(struct team_port *port);
 
 /*

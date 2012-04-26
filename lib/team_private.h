@@ -39,6 +39,7 @@ struct team_handle {
 	struct nl_sock *	nl_sock_event;
 	int			family;
 	uint32_t		ifindex;
+	struct team_ifinfo *	ifinfo;
 	struct list_item	port_list;
 	struct list_item	ifinfo_list;
 	struct list_item	option_list;

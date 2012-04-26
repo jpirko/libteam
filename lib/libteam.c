@@ -550,7 +550,7 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 		return err;
 	}
 
-	err = ifinfo_create(th, ifindex, NULL, NULL);
+	err = ifinfo_create(th, ifindex, NULL, &th->ifinfo);
 	if (err) {
 		err(th, "Failed create interface info.");
 		return err;
@@ -1101,4 +1101,18 @@ int team_hwaddr_len_get(struct team_handle *th, uint32_t ifindex)
 errout:
 	rtnl_link_put(link);
 	return err;
+}
+
+/**
+ * team_get_ifinfo:
+ * @th: libteam library context
+ *
+ * Get team device rtnetlink interface info.
+ *
+ * Returns: pointer to appropriate team_ifinfo structure.
+ **/
+TEAM_EXPORT
+struct team_ifinfo *team_get_ifinfo(struct team_handle *th)
+{
+	return th->ifinfo;
 }
