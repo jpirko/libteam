@@ -69,6 +69,7 @@ struct teamd_context {
 	struct list_item		port_priv_list;
 	uint32_t			ifindex;
 	struct team_ifinfo *		ifinfo;
+	char *				hwaddr;
 	uint32_t			hwaddr_len;
 	struct {
 		struct list_item		callback_list;

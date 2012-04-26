@@ -1120,13 +1120,8 @@ static int teamd_init(struct teamd_context *ctx)
 
 	team_set_user_priv(ctx->th, ctx);
 	ctx->ifinfo = team_get_ifinfo(ctx->th);
-
-	ctx->hwaddr_len = team_hwaddr_len_get(ctx->th, ctx->ifindex);
-	if (ctx->hwaddr_len < 0) {
-		teamd_log_err("Failed to get hardware address length.");
-		err = ctx->hwaddr_len;
-		goto team_destroy;
-	}
+	ctx->hwaddr = team_get_ifinfo_hwaddr(ctx->ifinfo);
+	ctx->hwaddr_len = team_get_ifinfo_hwaddr_len(ctx->ifinfo);
 
 	err = teamd_check_change_hwaddr(ctx);
 	if (err) {
