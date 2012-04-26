@@ -99,6 +99,7 @@ static int ppitem_create(struct teamd_context *ctx,
 		return -ENOMEM;
 	tdport = _port(ppitem);
 	list_add(&ctx->port_priv_list, &ppitem->list);
+	ctx->port_priv_list_count++;
 	if (tdport->link_watch && tdport->link_watch->port_added) {
 		err = tdport->link_watch->port_added(ctx, tdport);
 		if (err) {
@@ -122,6 +123,7 @@ lw_port_removed:
 		tdport->link_watch->port_removed(ctx, tdport);
 list_del:
 	list_del(&ppitem->list);
+	ctx->port_priv_list_count--;
 	ppitem_free(ppitem);
 	return err;
 }
@@ -132,6 +134,7 @@ static void ppitem_destroy(struct teamd_context *ctx,
 	struct teamd_port *tdport = _port(ppitem);
 
 	list_del(&ppitem->list);
+	ctx->port_priv_list_count--;
 	if (ctx->runner && ctx->runner->port_removed)
 		ctx->runner->port_removed(ctx, tdport);
 	if (tdport->link_watch && tdport->link_watch->port_removed)
