@@ -445,6 +445,11 @@ static int lacp_port_actor_update(struct lacp_port *lacp_port)
 	uint8_t state = 0;
 
 	memcpy(actor->system, lacp_port->ctx->hwaddr, ETH_ALEN);
+
+	err = lacp_update_selected(lacp_port->lacp);
+	if (err)
+		return err;
+
 	if (lacp_port->lacp->cfg.active)
 		state |= INFO_STATE_LACP_ACTIVITY;
 	if (lacp_port->lacp->cfg.fast_rate)
@@ -462,9 +467,6 @@ static int lacp_port_actor_update(struct lacp_port *lacp_port)
 	teamd_log_dbg("%s: lacp info state: 0x%02X.", lacp_port->tdport->ifname,
 						      state);
 	actor->state = state;
-	err = lacp_update_selected(lacp_port->lacp);
-	if (err)
-		return err;
 	return lacpdu_send(lacp_port);
 }
 
