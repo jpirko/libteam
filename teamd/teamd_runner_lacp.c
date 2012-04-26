@@ -554,7 +554,6 @@ static int lacpdu_send(struct lacp_port *lacp_port)
 	struct sockaddr_ll ll_my;
 	struct sockaddr_ll ll_slow;
 	int err;
-	int ret;
 
 	err = teamd_getsockname_hwaddr(lacp_port->sock, &ll_my, 0);
 	if (err)
@@ -566,13 +565,9 @@ static int lacpdu_send(struct lacp_port *lacp_port)
 	lacpdu.actor = lacp_port->actor;
 	lacpdu.partner = lacp_port->partner;
 
-	ret = sendto(lacp_port->sock, &lacpdu, sizeof(lacpdu), 0,
-		     (struct sockaddr *) &ll_slow, sizeof(ll_slow));
-	if (ret == -1) {
-		teamd_log_warn("sendto failed. %s", strerror(errno));
-		return 0;
-	}
-	return 0;
+	err = teamd_sendto(lacp_port->sock, &lacpdu, sizeof(lacpdu), 0,
+			   (struct sockaddr *) &ll_slow, sizeof(ll_slow));
+	return err;
 }
 
 static int lacpdu_recv(struct lacp_port *lacp_port)
@@ -581,14 +576,11 @@ static int lacpdu_recv(struct lacp_port *lacp_port)
 	socklen_t addr_len;
 	struct sockaddr_ll ll_from;
 	int err;
-	int ret;
 
-	ret = recvfrom(lacp_port->sock, &lacpdu, sizeof(lacpdu), 0,
-		       (struct sockaddr *) &ll_from, &addr_len);
-	if (ret == -1) {
-		teamd_log_warn("recvfrom failed. %s", strerror(errno));
-		return 0;
-	}
+	err = teamd_recvfrom(lacp_port->sock, &lacpdu, sizeof(lacpdu), 0,
+			     (struct sockaddr *) &ll_from, &addr_len);
+	if (err)
+		return err;
 
 	if (!lacpdu_check(&lacpdu)) {
 		teamd_log_warn("malformed LACP PDU came.");

@@ -88,3 +88,45 @@ int teamd_getsockname_hwaddr(int sock, struct sockaddr_ll *addr,
 	}
 	return 0;
 }
+
+int teamd_sendto(int sockfd, const void *buf, size_t len, int flags,
+		 const struct sockaddr *dest_addr, socklen_t addrlen)
+{
+	ssize_t ret;
+
+resend:
+	ret = sendto(sockfd, buf, len, flags, dest_addr, addrlen);
+	if (ret == -1) {
+		switch(errno) {
+		case EINTR:
+			goto resend;
+		case ENETDOWN:
+			return 0;
+		default:
+			teamd_log_err("sendto failed.");
+			return -errno;
+		}
+	}
+	return 0;
+}
+
+int teamd_recvfrom(int sockfd, void *buf, size_t len, int flags,
+		   struct sockaddr *src_addr, socklen_t *addrlen)
+{
+	size_t ret;
+
+rerecv:
+	ret = recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+	if (ret == -1) {
+		switch(errno) {
+		case EINTR:
+			goto rerecv;
+		case ENETDOWN:
+			return 0;
+		default:
+			teamd_log_err("recvfrom failed.");
+			return -errno;
+		}
+	}
+	return 0;
+}
