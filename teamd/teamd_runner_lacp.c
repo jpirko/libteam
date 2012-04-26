@@ -252,7 +252,7 @@ static int lacp_port_update_selected(struct lacp_port *lacp_port)
 		return 0;
 
 	teamd_log_dbg("%s: %s port.", tdport->ifname,
-		      lacp_port->selected ? "enabling": "disabling");
+		      lacp_port->selected ? "Enabling": "Disabling");
 	err = team_set_port_option_value_by_name_bool(lacp_port->ctx->th,
 						      "enabled",
 						      tdport->ifindex,
@@ -395,8 +395,8 @@ static int lacp_port_periodic_set(struct lacp_port *lacp_port)
 	int fast_on;
 
 	fast_on = lacp_port->partner.state & INFO_STATE_LACP_TIMEOUT;
-	teamd_log_dbg("Setting periodic timer to \"%s\".",
-		      fast_on ? "fast": "slow");
+	teamd_log_dbg("%s: Setting periodic timer to \"%s\".",
+		      lacp_port->tdport->ifname, fast_on ? "fast": "slow");
 	ms = fast_on ? LACP_PERIODIC_SHORT: LACP_PERIODIC_LONG;
 	ms_to_timespec(&ts, ms);
 	err = teamd_loop_callback_timer_set(lacp_port->ctx,
@@ -521,7 +521,7 @@ static int lacp_port_set_state(struct lacp_port *lacp_port,
 		break;
 	}
 
-	teamd_log_info("%s: changed port state: \"%s\" -> \"%s\"",
+	teamd_log_info("%s: Changed port state: \"%s\" -> \"%s\"",
 		       lacp_port->tdport->ifname,
 		       lacp_port_state_name[lacp_port->state],
 		       lacp_port_state_name[new_state]);
@@ -685,7 +685,7 @@ static int lacp_port_set_mac(struct teamd_context *ctx,
 	err = team_hwaddr_set(ctx->th, tdport->ifindex, tmp_hwaddr,
 			      ctx->hwaddr_len);
 	if (err) {
-		teamd_log_err("Failed to set port \"%s\" hardware address. ",
+		teamd_log_err("%s: Failed to set hardware address. ",
 			      tdport->ifname);
 		return err;
 	}
@@ -766,7 +766,7 @@ static int lacp_port_added(struct teamd_context *ctx,
 	err = team_set_port_option_value_by_name_bool(ctx->th, "enabled",
 						      tdport->ifindex, false);
 	if (err) {
-		teamd_log_err("Failed to disable port \"%s\".", tdport->ifname);
+		teamd_log_err("%s: Failed to disable port.", tdport->ifname);
 		goto timeout_callback_del;
 	}
 

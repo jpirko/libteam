@@ -274,10 +274,10 @@ static int teamd_flush_ports(struct teamd_context *ctx)
 	int err;
 
 	teamd_for_each_tdport(tdport, ctx) {
-		teamd_log_dbg("Removing port \"%s\".", tdport->ifname);
+		teamd_log_dbg("%s: Removing port.", tdport->ifname);
 		err = team_port_remove(ctx->th, tdport->ifindex);
 		if (err) {
-			teamd_log_err("Failed to remove port \"%s\".",
+			teamd_log_err("%s: Failed to remove port.",
 				      tdport->ifname);
 			return err;
 		}
@@ -838,13 +838,15 @@ int teamd_update_port_config(struct teamd_context *ctx, const char *port_name,
 	port_new_obj = json_loads(json_port_cfg_str, JSON_REJECT_DUPLICATES,
 				  &jerror);
 	if (!port_new_obj) {
-		teamd_log_err("Failed to parse port config string: %s on line %d, column %d",
+		teamd_log_err("%s: Failed to parse port config string: "
+			      "%s on line %d, column %d", port_name,
 			      jerror.text, jerror.line, jerror.column);
 		return -EIO;
 	}
 	err = get_port_obj(&port_obj, ctx, port_name);
 	if (err) {
-		teamd_log_err("Failed to obtain port config object");
+		teamd_log_err("%s: Failed to obtain port config object",
+			      port_name);
 		goto new_port_decref;
 	}
 
@@ -852,7 +854,8 @@ int teamd_update_port_config(struct teamd_context *ctx, const char *port_name,
 	json_object_clear(port_obj);
 	err = json_object_update(port_obj, port_new_obj);
 	if (err)
-		teamd_log_err("Failed to update existing config port object");
+		teamd_log_err("%s: Failed to update existing config "
+			      "port object", port_name);
 new_port_decref:
 	json_decref(port_new_obj);
 	return err;
@@ -875,11 +878,11 @@ static int teamd_add_ports(struct teamd_context *ctx)
 		uint32_t ifindex;
 
 		ifindex = team_ifname2ifindex(ctx->th, port_name);
-		teamd_log_dbg("Adding port \"%s\" (found ifindex \"%d\").",
+		teamd_log_dbg("%s: Adding port (found ifindex \"%d\").",
 			      port_name, ifindex);
 		err = team_port_add(ctx->th, ifindex);
 		if (err) {
-			teamd_log_err("Failed to add port \"%s\".", port_name);
+			teamd_log_err("%s: Failed to add port.", port_name);
 			return err;
 		}
 	}

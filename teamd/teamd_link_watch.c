@@ -98,7 +98,7 @@ int teamd_link_watch_set_user_link(struct teamd_context *ctx,
 						      "user_linkup",
 						      tdport->ifindex, linkup);
 	if (err) {
-		teamd_log_err("Failed to enable user linkup for port \"%s\".",
+		teamd_log_err("%s: Failed to enable user linkup for port.",
 			      tdport->ifname);
 		return err;
 	}
@@ -115,31 +115,34 @@ void teamd_link_watch_select(struct teamd_context *ctx,
 	err = json_unpack(ctx->config_json, "{s:{s:{s:o}}}", "ports",
 			  tdport->ifname, "link_watch", &link_watch_obj);
 	if (err) {
-		teamd_log_dbg("Failed to get link watch from port config.");
+		teamd_log_dbg("%s: Failed to get link watch from port config.",
+			      tdport->ifname);
 		err = json_unpack(ctx->config_json, "{s:o}", "link_watch",
 				  &link_watch_obj);
 		if (err) {
-			teamd_log_info("Failed to get link watch from config.");
+			teamd_log_info("%s: Failed to get link watch "
+				       "from config.", tdport->ifname);
 			goto nowatch;
 		}
 	}
 	err = json_unpack(link_watch_obj, "{s:s}", "name", &link_watch_name);
 	if (err) {
-		teamd_log_info("Failed to get link watch name.");
+		teamd_log_info("%s: Failed to get link watch name.",
+			       tdport->ifname);
 		goto nowatch;
 	}
-	teamd_log_dbg("Using link_watch \"%s\" for port \"%s\".",
-		      link_watch_name, tdport->ifname);
 	tdport->link_watch = teamd_find_link_watch(link_watch_name);
 	if (!tdport->link_watch) {
 		teamd_log_info("No link_watch named \"%s\" available.",
 			       link_watch_name);
 		goto nowatch;
 	}
+	teamd_log_info("%s: Using link_watch \"%s\".",
+		       tdport->ifname, link_watch_name);
 	tdport->link_watch_json = link_watch_obj;
 	return;
 nowatch:
-	teamd_log_info("Using no link watch for port \"%s\"!", tdport->ifname);
+	teamd_log_info("%s: Using no link watch!", tdport->ifname);
 }
 
 int teamd_link_watch_init(struct teamd_context *ctx)
@@ -287,6 +290,7 @@ static int lw_psr_callback_periodic(struct teamd_context *ctx, int events,
 				    void *func_priv)
 {
 	struct lw_psr_port_priv *port_priv = func_priv;
+	struct teamd_port *tdport = port_priv->tdport;
 	bool orig_link_up = port_priv->link_up;
 	const char *lw_name = port_priv->tdport->link_watch->name;
 	int err;
@@ -298,16 +302,15 @@ static int lw_psr_callback_periodic(struct teamd_context *ctx, int events,
 		port_priv->missed++;
 		if (port_priv->missed > port_priv->missed_max &&
 		    orig_link_up) {
-			teamd_log_dbg("Missed %u replies (max %u).",
-				       port_priv->missed,
-				       port_priv->missed_max);
+			teamd_log_dbg("%s: Missed %u replies (max %u).",
+				      tdport->ifname, port_priv->missed,
+				      port_priv->missed_max);
 			port_priv->link_up = false;
 		}
 	}
 	if (port_priv->link_up != orig_link_up) {
-		teamd_log_info("Port \"%s\" %s-link went %s.",
-				port_priv->tdport->ifname,
-				lw_name, port_priv->link_up ? "up" : "down");
+		teamd_log_info("%s: %s-link went %s.", tdport->ifname, lw_name,
+			       port_priv->link_up ? "up" : "down");
 		err = call_link_watch_handler(ctx);
 		if (err)
 			return err;
@@ -434,7 +437,7 @@ static int lw_psr_port_added(struct teamd_context *ctx,
 						      "user_linkup_enabled",
 						      tdport->ifindex, true);
 	if (err) {
-		teamd_log_err("Failed to enable user linkup for port \"%s\".",
+		teamd_log_err("%s: Failed to enable user linkup.",
 			      tdport->ifname);
 		goto periodic_callback_del;
 	}

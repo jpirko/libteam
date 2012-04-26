@@ -48,7 +48,7 @@ static int get_port_prio(struct teamd_context *ctx, const char *port_name)
 	err = json_unpack(ctx->config_json, "{s:{s:{s:i}}}", "ports", port_name,
 							     "prio", &prio);
 	if (err) {
-		teamd_log_dbg("Using default priority for \"%s\".", port_name);
+		teamd_log_dbg("%s: Using default port priority.", port_name);
 		return 0; /* return default priority */
 	}
 	return prio;
@@ -62,7 +62,7 @@ static bool is_port_sticky(struct teamd_context *ctx, const char *port_name)
 	err = json_unpack(ctx->config_json, "{s:{s:{s:b}}}", "ports", port_name,
 							     "sticky", &sticky);
 	if (err) {
-		teamd_log_dbg("Using default stickiness for \"%s\".", port_name);
+		teamd_log_dbg("%s: Using default port stickiness.", port_name);
 		return false; /* return default stickiness */
 	}
 	return sticky;
