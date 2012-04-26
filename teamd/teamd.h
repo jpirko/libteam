@@ -68,6 +68,7 @@ struct teamd_context {
 	teamd_link_watch_handler_t	link_watch_handler;
 	struct list_item		port_priv_list;
 	uint32_t			ifindex;
+	struct team_ifinfo *		ifinfo;
 	uint32_t			hwaddr_len;
 	struct {
 		struct list_item		callback_list;

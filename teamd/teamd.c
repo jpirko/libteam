@@ -1119,6 +1119,7 @@ static int teamd_init(struct teamd_context *ctx)
 	}
 
 	team_set_user_priv(ctx->th, ctx);
+	ctx->ifinfo = team_get_ifinfo(ctx->th);
 
 	ctx->hwaddr_len = team_hwaddr_len_get(ctx->th, ctx->ifindex);
 	if (ctx->hwaddr_len < 0) {
