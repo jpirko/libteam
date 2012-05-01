@@ -148,6 +148,12 @@ struct lacp_port {
 		uint8_t	duplex;
 		bool up;
 	} __link_last;
+	struct {
+		uint16_t prio;
+#define		LACP_PORT_CFG_DFLT_PRIO 0xff
+		uint16_t key;
+#define		LACP_PORT_CFG_DFLT_KEY 0
+	} cfg;
 };
 
 static int lacp_load_config(struct teamd_context *ctx, struct lacp *lacp)
@@ -459,8 +465,9 @@ static void lacp_port_actor_init(struct lacp_port *lacp_port)
 	struct lacpdu_info *actor = &lacp_port->actor;
 
 	actor->system_priority = htons(lacp_port->lacp->cfg.sys_prio);
-        actor->key = htons(0x00);
-        actor->port_priority = htons(0xff);
+	memcpy(actor->system, lacp_port->ctx->hwaddr, ETH_ALEN);
+        actor->key = htons(lacp_port->cfg.key);
+        actor->port_priority = htons(lacp_port->cfg.prio);
 	actor->port = htons(lacp_port->tdport->ifindex);
 }
 
@@ -468,11 +475,8 @@ static int lacpdu_send(struct lacp_port *lacp_port);
 
 static int lacp_port_actor_update(struct lacp_port *lacp_port)
 {
-	struct lacpdu_info *actor = &lacp_port->actor;
 	int err;
 	uint8_t state = 0;
-
-	memcpy(actor->system, lacp_port->ctx->hwaddr, ETH_ALEN);
 
 	err = lacp_update_selected(lacp_port->lacp);
 	if (err)
@@ -493,7 +497,7 @@ static int lacp_port_actor_update(struct lacp_port *lacp_port)
 		state |= INFO_STATE_AGGREGATION;
 	teamd_log_dbg("%s: lacp info state: 0x%02X.", lacp_port->tdport->ifname,
 						      state);
-	actor->state = state;
+	lacp_port->actor.state = state;
 	return lacpdu_send(lacp_port);
 }
 
@@ -696,6 +700,43 @@ static int lacp_port_set_mac(struct teamd_context *ctx,
 	return 0;
 }
 
+static int lacp_port_load_config(struct teamd_context *ctx,
+				 struct lacp_port *lacp_port)
+{
+	const char *port_name = lacp_port->tdport->ifname;
+	int err;
+	int tmp;
+
+	err = json_unpack(ctx->config_json, "{s:{s:{s:i}}}", "ports", port_name,
+							     "lacp_prio", &tmp);
+	if (err) {
+		lacp_port->cfg.prio = LACP_PORT_CFG_DFLT_PRIO;
+	} else if (tmp < 0 || tmp > USHRT_MAX) {
+		teamd_log_err("%s: \"lacp_prio\" value is out of its limits.",
+			      port_name);
+		return -EINVAL;
+	} else {
+		lacp_port->cfg.prio = tmp;
+	}
+	teamd_log_dbg("%s: Using lacp_prio \"%d\".", port_name,
+		      lacp_port->cfg.prio);
+
+	err = json_unpack(ctx->config_json, "{s:{s:{s:i}}}", "ports", port_name,
+							     "lacp_key", &tmp);
+	if (err) {
+		lacp_port->cfg.key = LACP_PORT_CFG_DFLT_KEY;
+	} else if (tmp < 0 || tmp > USHRT_MAX) {
+		teamd_log_err("%s: \"lacp_key\" value is out of its limits.",
+			      port_name);
+		return -EINVAL;
+	} else {
+		lacp_port->cfg.key = tmp;
+	}
+	teamd_log_dbg("%s: Using lacp_key \"%d\".", port_name,
+		      lacp_port->cfg.key);
+	return 0;
+}
+
 static int lacp_port_added(struct teamd_context *ctx,
 			   struct teamd_port *tdport)
 {
@@ -706,6 +747,12 @@ static int lacp_port_added(struct teamd_context *ctx,
 	lacp_port->ctx = ctx;
 	lacp_port->tdport = tdport;
 	lacp_port->lacp = lacp;
+
+	err = lacp_port_load_config(ctx, lacp_port);
+	if (err) {
+		teamd_log_err("Failed to load port config.");
+		return err;
+	}
 
 	err = teamd_packet_sock_open(&lacp_port->sock,
 				     tdport->ifindex,
