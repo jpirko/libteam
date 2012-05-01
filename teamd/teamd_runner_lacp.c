@@ -304,7 +304,8 @@ static int lacp_port_update_enabled(struct lacp_port *lacp_port)
 static bool lacp_ports_aggregable(struct lacp_port *lacp_port1,
 				  struct lacp_port *lacp_port2)
 {
-	if (lacp_port1->partner.key != lacp_port2->partner.key)
+	if (lacp_port1->partner.key != lacp_port2->partner.key ||
+	    lacp_port1->actor.key != lacp_port2->actor.key)
 		return false;
 	if (memcmp(lacp_port1->partner.system,
 		   lacp_port2->partner.system, ETH_ALEN))
