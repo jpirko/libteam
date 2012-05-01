@@ -341,16 +341,18 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 	err = json_unpack(tdport->link_watch_json, "{s:i}",
 			  "interval", &tmp);
 	if (err) {
-		teamd_log_err("Failed to get \"interval\" link-watch option.");
+		teamd_log_err("%s: Failed to get \"interval\" link-watch "
+			      "option.", tdport->ifname);
 		return -ENOENT;
 	}
-	teamd_log_dbg("Using interval \"%d\".", tmp);
+	teamd_log_dbg("%s: Using interval \"%d\".", tdport->ifname, tmp);
 	ms_to_timespec(&port_priv->interval, tmp);
 
 	err = json_unpack(tdport->link_watch_json, "{s:i}",
 			  "init_wait", &tmp);
 	if (!err) {
-		teamd_log_dbg("Using init_wait \"%d\".", tmp);
+		teamd_log_dbg("%s: Using init_wait \"%d\".",
+			      tdport->ifname, tmp);
 		ms_to_timespec(&port_priv->init_wait, tmp);
 	} else {
 		port_priv->init_wait = port_priv->ops->default_init_wait;
@@ -359,14 +361,16 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 	err = json_unpack(tdport->link_watch_json, "{s:i}",
 			  "missed_max", &tmp);
 	if (err) {
-		teamd_log_err("Failed to get \"missed_max\" link-watch option.");
+		teamd_log_err("%s: Failed to get \"missed_max\" link-watch "
+			      "option.", tdport->ifname);
 		return -ENOENT;
 	}
 	if (tmp < 0) {
-		teamd_log_err("\"missed_max\" must not be negative number.");
+		teamd_log_err("%s: \"missed_max\" must not be negative "
+			      "number.", tdport->ifname);
 		return -EINVAL;
 	}
-	teamd_log_dbg("Using missed_max \"%d\".", tmp);
+	teamd_log_dbg("%s: Using missed_max \"%d\".", tdport->ifname, tmp);
 	port_priv->missed_max = tmp;
 	return 0;
 }
