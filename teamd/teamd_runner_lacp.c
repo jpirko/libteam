@@ -242,6 +242,12 @@ static bool lacp_port_selectable(struct lacp_port *lacp_port)
 {
 	if (lacp_port->selected)
 		return false;
+	if (!memcmp(lacp_port->actor.system,
+		    lacp_port->partner.system, ETH_ALEN)) {
+		teamd_log_warn("%s: Port seems to be loopbacked to the same "
+			       "team device.", lacp_port->tdport->ifname);
+		return false;
+	}
 	if (lacp_port->state == PORT_STATE_CURRENT ||
 	    lacp_port->state == PORT_STATE_EXPIRED)
 		return true;
