@@ -106,6 +106,7 @@ static bool lacpdu_check(struct lacpdu *lacpdu)
 
 struct lacp {
 	struct teamd_context *ctx;
+	uint32_t selected_aggregator_id;
 	struct {
 		bool active;
 #define		LACP_CFG_DFLT_ACTIVE true
@@ -142,6 +143,7 @@ struct lacp_port {
 	struct lacpdu_info partner;
 	struct lacpdu_info __partner_last; /* last state before update */
 	bool selected;
+	uint32_t aggregator_id;
 	enum lacp_port_state state;
 	struct {
 		uint32_t speed;
@@ -256,15 +258,21 @@ static bool lacp_port_selectable(struct lacp_port *lacp_port)
 
 static int lacp_port_should_be_enabled(struct lacp_port *lacp_port)
 {
+	struct lacp *lacp = lacp_port->lacp;
+
 	if (lacp_port->selected &&
-	    lacp_port->partner.state & INFO_STATE_SYNCHRONIZATION)
+	    lacp_port->partner.state & INFO_STATE_SYNCHRONIZATION &&
+	    lacp_port->aggregator_id == lacp->selected_aggregator_id)
 		return true;
 	return false;
 }
 
 static int lacp_port_should_be_disabled(struct lacp_port *lacp_port)
 {
-	if (!lacp_port->selected)
+	struct lacp *lacp = lacp_port->lacp;
+
+	if (!lacp_port->selected ||
+	    lacp_port->aggregator_id != lacp->selected_aggregator_id)
 		return true;
 	return false;
 }
@@ -293,8 +301,9 @@ static int lacp_port_update_enabled(struct lacp_port *lacp_port)
 	else
 		return 0;
 
-	teamd_log_dbg("%s: %s port.", tdport->ifname,
-		      new_enabled_state ? "Enabling": "Disabling");
+	teamd_log_dbg("%s: %s port, aggregator id %d", tdport->ifname,
+		      new_enabled_state ? "Enabling": "Disabling",
+		      lacp_port->aggregator_id);
 	err = team_set_port_option_value_by_name_bool(lacp_port->ctx->th,
 						      "enabled",
 						      tdport->ifindex,
@@ -342,6 +351,7 @@ static int lacp_update_selected(struct lacp *lacp)
 	struct lacp_port *best_lacp_port;
 	struct teamd_port *tdport;
 	struct lacp_port *lacp_port;
+	uint32_t aggregator_id;
 	int err;
 
 	/*
@@ -351,16 +361,31 @@ static int lacp_update_selected(struct lacp *lacp)
 	teamd_for_each_tdport(tdport, lacp->ctx) {
 		lacp_port = teamd_get_runner_port_priv(tdport);
 		lacp_port->selected = false;
+		lacp_port->aggregator_id = 0;
+	}
+	lacp->selected_aggregator_id = 0;
+
+	while ((best_lacp_port = lacp_get_best_port(lacp))) {
+		/* Use best port ifindex as aggregator id */
+		aggregator_id = best_lacp_port->tdport->ifindex;
+		if (!lacp->selected_aggregator_id)
+			lacp->selected_aggregator_id = aggregator_id;
+		teamd_for_each_tdport(tdport, lacp->ctx) {
+			lacp_port = teamd_get_runner_port_priv(tdport);
+			if (lacp_port_selectable(lacp_port) &&
+			    best_lacp_port &&
+			    lacp_ports_aggregable(lacp_port, best_lacp_port)) {
+				lacp_port->selected = true;
+				lacp_port->aggregator_id = aggregator_id;
+			}
+		}
 	}
 
-	best_lacp_port = lacp_get_best_port(lacp);
+	/*
+	 * At last, do port enabling/disabling.
+	 */
 	teamd_for_each_tdport(tdport, lacp->ctx) {
 		lacp_port = teamd_get_runner_port_priv(tdport);
-		if (lacp_port_selectable(lacp_port) &&
-		    best_lacp_port &&
-		    lacp_ports_aggregable(lacp_port, best_lacp_port)) {
-			lacp_port->selected = true;
-		}
 		err = lacp_port_update_enabled(lacp_port);
 		if (err)
 			return err;
