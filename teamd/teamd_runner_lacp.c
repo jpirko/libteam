@@ -328,22 +328,55 @@ static bool lacp_ports_aggregable(struct lacp_port *lacp_port1,
 	return true;
 }
 
+static void get_lacp_port_prio_info(struct lacp_port *lacp_port,
+				    struct lacpdu_info *prio_info)
+{
+	int prio_diff;
+	int system_diff;
+
+	prio_diff = ntohs(lacp_port->actor.system_priority) -
+		    ntohs(lacp_port->partner.system_priority);
+	system_diff = memcmp(lacp_port->actor.system,
+			     lacp_port->partner.system, ETH_ALEN);
+	if (prio_diff < 0 || (prio_diff == 0 && system_diff < 0))
+		*prio_info = lacp_port->actor;
+	if (prio_diff > 0 || (prio_diff == 0 && system_diff > 0))
+		*prio_info = lacp_port->partner;
+
+	/* adjust values for further memcmp comparison */
+	prio_info->system_priority = ntohs(prio_info->system_priority);
+	prio_info->key = 0;
+	prio_info->port_priority = ntohs(prio_info->port_priority);
+	prio_info->port = ntohs(prio_info->port);
+	prio_info->state = 0;
+}
+
+static bool has_better_prio(struct lacp_port *lacp_port1,
+			    struct lacp_port *lacp_port2)
+{
+	struct lacpdu_info prio_info1;
+	struct lacpdu_info prio_info2;
+
+	get_lacp_port_prio_info(lacp_port1, &prio_info1);
+	get_lacp_port_prio_info(lacp_port2, &prio_info2);
+	return memcmp(&prio_info1, &prio_info2, sizeof(prio_info1)) < 0;
+}
+
 static struct lacp_port *lacp_get_best_port(struct lacp *lacp)
 {
 	struct teamd_port *tdport;
 	struct lacp_port *lacp_port;
+	struct lacp_port *best_lacp_port = NULL;
 
 	teamd_for_each_tdport(tdport, lacp->ctx) {
 		lacp_port = teamd_get_runner_port_priv(tdport);
 		if (!lacp_port_selectable(lacp_port))
 			continue;
-		/*
-		 * Take the first which has partner for now. This needs
-		 * to be improved!!!
-		 */
-		return lacp_port;
+		if (!best_lacp_port ||
+		    has_better_prio(lacp_port, best_lacp_port))
+			best_lacp_port = lacp_port;
 	}
-	return NULL;
+	return best_lacp_port;
 }
 
 static int lacp_update_selected(struct lacp *lacp)
