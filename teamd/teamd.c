@@ -1014,7 +1014,7 @@ static void debug_log_ifinfo_list(struct teamd_context *ctx)
 		hwaddr_str(str, team_get_ifinfo_hwaddr(ifinfo), hwaddr_len);
 		teamd_log_dbg("%d: hwaddr: %s%s", ifindex, str,
 			      team_is_ifinfo_hwaddr_changed(ifinfo) ? " changed" : "");
-		teamd_log_dbg("%d: hwaddr_len: %lu%s", ifindex, hwaddr_len,
+		teamd_log_dbg("%d: hwaddr_len: %Zu%s", ifindex, hwaddr_len,
 			      team_is_ifinfo_hwaddr_len_changed(ifinfo) ? " changed" : "");
 		teamd_log_dbg("%d: ifname: %s%s", ifindex,
 			      team_get_ifinfo_ifname(ifinfo),
