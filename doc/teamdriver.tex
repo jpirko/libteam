@@ -14,7 +14,7 @@
 \newpage
 
 \section{Prologue}
-The primary purpose of this document is to give reader an introduction into Team driver project code understanding. Target audience should have a knowledge about Linux kernel development in general with focus on Linux kernel network core and drivers.
+The primary purpose of this document is to give an introduction to the codebase of the Team driver project. Target audience should have a knowledge about Linux kernel development in general with focus on Linux kernel network core and drivers.
 
 Purpose of the Team driver is to provide a mechanism to team multiple NICs (ports) into one logical one (teamdev). This is already implemented in Linux kernel by bonding driver. Main thing to realize is that Team driver project does not try to replicate or mimic bonding driver. What it does is it resolves the same problem using a different perspective. Therefore for example the way Team is configured differs dramatically from the way bonding is.
 
@@ -64,7 +64,7 @@ There are following kinds of communition taking place on Team Generic Netlink:
 
 \subsection{Team modes}
 
-Modes are implemented as sole modules. Modes (defined by \verb+struct team_mode+) implement handlers (\verb+struct team_mode_ops+) which are called from Team core. These handlers defines the behaviour. Currently there are three modes defined:
+Modes are implemented as separate modules. Modes (defined by \verb+struct team_mode+) implement handlers (\verb+struct team_mode_ops+) which are called from Team core. These handlers defines the behaviour. Currently there are three modes defined:
 
 \begin{enumerate}
 \item \verb+roundrobin+ - very basic mode with RX port selector based on looping around the port list.
@@ -118,7 +118,7 @@ All the runtime work is done in main loop (\verb+teamd_run_loop_run+). So whatev
 
 \subsubsection{Runners}
 
-Runners determines the behaviour orthe device. They operate using a kernel Team mode they want. Runners watch for port state changes and react to that. Also they may implement other functionality. Following runners are implemented:
+Runners determines the behaviour of the device. They operate using a kernel Team mode they want. Runners watch for port state changes and react to that. Also they may implement other functionality. Following runners are implemented:
 
 \begin{itemize}
 \item \verb+dummy+ 
