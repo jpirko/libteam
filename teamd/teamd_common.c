@@ -128,5 +128,5 @@ rerecv:
 			return -errno;
 		}
 	}
-	return 0;
+	return ret;
 }

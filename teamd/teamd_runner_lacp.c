@@ -677,7 +677,7 @@ static int lacpdu_recv(struct lacp_port *lacp_port)
 
 	err = teamd_recvfrom(lacp_port->sock, &lacpdu, sizeof(lacpdu), 0,
 			     (struct sockaddr *) &ll_from, &addr_len);
-	if (err)
+	if (err <= 0)
 		return err;
 
 	if (!lacpdu_check(&lacpdu)) {

@@ -631,7 +631,7 @@ static int lw_ap_receive(struct lw_psr_port_priv *port_priv)
 
 	err = teamd_recvfrom(port_priv->sock, buf, sizeof(buf), 0,
 			     (struct sockaddr *) &ll_from, &addr_len);
-	if (err)
+	if (err <= 0)
 		return err;
 
 	if (ll_from.sll_pkttype != PACKET_HOST)
@@ -873,7 +873,7 @@ static int lw_nsnap_receive(struct lw_psr_port_priv *port_priv)
 
 	err = teamd_recvfrom(port_priv->sock, &nap, sizeof(nap), 0,
 			     (struct sockaddr *) &ll_from, &addr_len);
-	if (err)
+	if (err <= 0)
 		return err;
 
 	/* check IPV6 header */
