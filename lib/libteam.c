@@ -802,7 +802,13 @@ int team_check_events(struct team_handle *th)
 TEAM_EXPORT
 int team_get_mode_name(struct team_handle *th, char **mode_name)
 {
-	return team_get_option_value_by_name_string(th, "mode", mode_name);
+	struct team_option *option;
+
+	option = team_get_option(th, "n", "mode");
+	if (!option)
+		return -ENOENT;
+	*mode_name = team_get_option_value_string(option);
+	return 0;
 }
 
 /**
@@ -817,7 +823,12 @@ int team_get_mode_name(struct team_handle *th, char **mode_name)
 TEAM_EXPORT
 int team_set_mode_name(struct team_handle *th, const char *mode_name)
 {
-	return team_set_option_value_by_name_string(th, "mode", mode_name);
+	struct team_option *option;
+
+	option = team_get_option(th, "n!", "mode");
+	if (!option)
+		return -ENOENT;
+	return team_set_option_value_string(th, option, mode_name);
 }
 
 /**
@@ -833,7 +844,13 @@ int team_set_mode_name(struct team_handle *th, const char *mode_name)
 TEAM_EXPORT
 int team_get_active_port(struct team_handle *th, uint32_t *ifindex)
 {
-	return team_get_option_value_by_name_u32(th, "activeport", ifindex);
+	struct team_option *option;
+
+	option = team_get_option(th, "n", "activeport");
+	if (!option)
+		return -ENOENT;
+	*ifindex = team_get_option_value_u32(option);
+	return 0;
 }
 
 /**
@@ -849,7 +866,12 @@ int team_get_active_port(struct team_handle *th, uint32_t *ifindex)
 TEAM_EXPORT
 int team_set_active_port(struct team_handle *th, uint32_t ifindex)
 {
-	return team_set_option_value_by_name_u32(th, "activeport", ifindex);
+	struct team_option *option;
+
+	option = team_get_option(th, "n!", "activeport");
+	if (!option)
+		return -ENOENT;
+	return team_set_option_value_u32(th, option, ifindex);
 }
 
 /**
@@ -868,7 +890,7 @@ int team_get_bpf_hash_func(struct team_handle *th, struct sock_fprog *fp)
 	struct team_option *option;
 	unsigned int data_len;
 
-	option = team_get_option_by_name(th, "bpf_hash_func");
+	option = team_get_option(th, "n", "bpf_hash_func");
 	if (!option)
 		return -ENOENT;
 
@@ -896,13 +918,85 @@ int team_set_bpf_hash_func(struct team_handle *th, const struct sock_fprog *fp)
 {
 	void *data = NULL;
 	unsigned int data_len = 0;
+	struct team_option *option;
+
+	option = team_get_option(th, "n!", "bpf_hash_func");
+	if (!option)
+		return -ENOENT;
 
 	if (fp) {
 		data = fp->filter;
 		data_len = fp->len * sizeof(struct sock_filter);
 	}
-	return team_set_option_value_by_name_binary(th, "bpf_hash_func",
-						    data, data_len);
+	return team_set_option_value_binary(th, option, data, data_len);
+}
+
+/**
+ * team_set_port_enabled:
+ * @th: libteam library context
+ * @port_ifindex: port interface index
+ * @val: boolean value
+ *
+ * Enables or disable port identified by @port_ifindex
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_set_port_enabled(struct team_handle *th,
+			  uint32_t port_ifindex, bool val)
+{
+	struct team_option *option;
+
+	option = team_get_option(th, "np!", "enabled", port_ifindex);
+	if (!option)
+		return -ENOENT;
+	return team_set_option_value_bool(th, option, val);
+}
+
+/**
+ * team_set_port_user_linkup_enabled:
+ * @th: libteam library context
+ * @port_ifindex: port interface index
+ * @val: boolean value
+ *
+ * Enables or disable user linkup for port identified by @port_ifindex
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_set_port_user_linkup_enabled(struct team_handle *th,
+				      uint32_t port_ifindex, bool val)
+{
+	struct team_option *option;
+
+	option = team_get_option(th, "np!", "user_linkup_enabled",
+				 port_ifindex);
+	if (!option)
+		return -ENOENT;
+	return team_set_option_value_bool(th, option, val);
+}
+
+/**
+ * team_set_port_user_linkup:
+ * @th: libteam library context
+ * @port_ifindex: port interface index
+ * @linkup: desired link state
+ *
+ * Sets user linkup for port identified by @port_ifindex
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_set_port_user_linkup(struct team_handle *th,
+			      uint32_t port_ifindex, bool linkup)
+{
+	struct team_option *option;
+
+	option = team_get_option(th, "np!", "user_linkup", port_ifindex);
+	if (!option)
+		return -ENOENT;
+
+	return team_set_option_value_bool(th, option, linkup);
 }
 
 /**

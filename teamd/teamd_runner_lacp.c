@@ -283,16 +283,17 @@ static int lacp_port_update_enabled(struct lacp_port *lacp_port)
 	int err;
 	bool new_enabled_state;
 	bool curr_enabled_state;
+	struct team_option *option;
 
-	err = team_get_port_option_value_by_name_bool(lacp_port->ctx->th,
-						      "enabled",
-						      tdport->ifindex,
-						      &curr_enabled_state);
-	if (err) {
-		teamd_log_err("%s: Failed to get \"enabled\" option.",
+	option = team_get_option(lacp_port->ctx->th, "np",
+				 "user_linkup_enabled", tdport->ifindex);
+	if (!option) {
+		teamd_log_err("%s: Failed to found \"enabled\" option.",
 			      tdport->ifname);
-		return err;;
+		return -ENOENT;
 	}
+
+	curr_enabled_state = team_get_option_value_bool(option);
 
 	if (!curr_enabled_state && lacp_port_should_be_enabled(lacp_port))
 		new_enabled_state = true;
@@ -304,10 +305,8 @@ static int lacp_port_update_enabled(struct lacp_port *lacp_port)
 	teamd_log_dbg("%s: %s port, aggregator id %d", tdport->ifname,
 		      new_enabled_state ? "Enabling": "Disabling",
 		      lacp_port->aggregator_id);
-	err = team_set_port_option_value_by_name_bool(lacp_port->ctx->th,
-						      "enabled",
-						      tdport->ifindex,
-						      new_enabled_state);
+	err = team_set_option_value_bool(lacp_port->ctx->th, option,
+					 new_enabled_state);
 	if (err) {
 		teamd_log_err("%s: Failed to %s port.", tdport->ifname,
 			      new_enabled_state ? "enable": "disable");
@@ -878,9 +877,8 @@ static int lacp_port_added(struct teamd_context *ctx,
 		goto free_timeout_cb_name;
 	}
 
-	/* Newly added ports are disabled */
-	err = team_set_port_option_value_by_name_bool(ctx->th, "enabled",
-						      tdport->ifindex, false);
+	/* Newly added ports are enabled */
+	err = team_set_port_enabled(ctx->th, tdport->ifindex, false);
 	if (err) {
 		teamd_log_err("%s: Failed to disable port.", tdport->ifname);
 		goto timeout_callback_del;

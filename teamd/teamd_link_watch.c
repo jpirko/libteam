@@ -89,22 +89,6 @@ bool teamd_link_watch_port_up(struct teamd_context *ctx,
 	return true;
 }
 
-int teamd_link_watch_set_user_link(struct teamd_context *ctx,
-				   struct teamd_port *tdport, bool linkup)
-{
-	int err;
-
-	err = team_set_port_option_value_by_name_bool(ctx->th,
-						      "user_linkup",
-						      tdport->ifindex, linkup);
-	if (err) {
-		teamd_log_err("%s: Failed to enable user linkup for port.",
-			      tdport->ifname);
-		return err;
-	}
-	return 0;
-}
-
 void teamd_link_watch_select(struct teamd_context *ctx,
 			     struct teamd_port *tdport)
 {
@@ -314,8 +298,9 @@ static int lw_psr_callback_periodic(struct teamd_context *ctx, int events,
 		err = call_link_watch_handler(ctx);
 		if (err)
 			return err;
-		err = teamd_link_watch_set_user_link(ctx, port_priv->tdport,
-						     port_priv->link_up);
+		err = team_set_port_user_linkup(ctx->th,
+						port_priv->tdport->ifindex,
+						port_priv->link_up);
 		if (err)
 			return err;
 	}
@@ -437,9 +422,7 @@ static int lw_psr_port_added(struct teamd_context *ctx,
 		goto free_periodic_cb_name;
 	}
 
-	err = team_set_port_option_value_by_name_bool(ctx->th,
-						      "user_linkup_enabled",
-						      tdport->ifindex, true);
+	err = team_set_port_user_linkup_enabled(ctx->th, tdport->ifindex, true);
 	if (err) {
 		teamd_log_err("%s: Failed to enable user linkup.",
 			      tdport->ifname);
