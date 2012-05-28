@@ -154,6 +154,8 @@ bool team_is_option_initialized(struct team_option *option);
 char *team_get_option_name(struct team_option *option);
 uint32_t team_get_option_port_ifindex(struct team_option *option);
 bool team_is_option_per_port(struct team_option *option);
+uint32_t team_get_option_array_index(struct team_option *option);
+bool team_is_option_array(struct team_option *option);
 enum team_option_type team_get_option_type(struct team_option *option);
 bool team_is_option_changed(struct team_option *option);
 unsigned int team_get_option_value_len(struct team_option *option);

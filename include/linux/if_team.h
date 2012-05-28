@@ -69,6 +69,7 @@ enum {
 	TEAM_ATTR_OPTION_DATA,		/* dynamic */
 	TEAM_ATTR_OPTION_REMOVED,	/* flag */
 	TEAM_ATTR_OPTION_PORT_IFINDEX,	/* u32 */ /* for per-port options */
+	TEAM_ATTR_OPTION_ARRAY_INDEX,	/* u32 */ /* for array options */
 
 	__TEAM_ATTR_OPTION_MAX,
 	TEAM_ATTR_OPTION_MAX = __TEAM_ATTR_OPTION_MAX - 1,

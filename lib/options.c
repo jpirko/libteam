@@ -37,6 +37,8 @@ struct team_option_id {
 	char *			name;
 	uint32_t		port_ifindex;
 	bool			port_ifindex_used;
+	uint32_t		array_index;
+	bool			array_index_used;
 };
 
 struct team_option {
@@ -88,6 +90,11 @@ static struct team_option *do_find_option(struct team_handle *th,
 		if (option->id.port_ifindex_used &&
 		    option->id.port_ifindex != opt_id->port_ifindex)
 			continue;
+		if (option->id.array_index_used != opt_id->array_index_used)
+			continue;
+		if (option->id.array_index_used &&
+		    option->id.array_index != opt_id->array_index)
+			continue;
 		return option;
 	}
 	return NULL;
@@ -127,6 +134,8 @@ static int create_option(struct team_option **poption,
 	}
 	option->id.port_ifindex = opt_id->port_ifindex;
 	option->id.port_ifindex_used = opt_id->port_ifindex_used;
+	option->id.array_index = opt_id->array_index;
+	option->id.array_index_used = opt_id->array_index_used;
 
 	*poption = option;
 	return 0;
@@ -261,6 +270,13 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 			opt_id.port_ifindex_used = false;
 		}
 
+		if (option_attrs[TEAM_ATTR_OPTION_ARRAY_INDEX]) {
+			opt_id.array_index = nla_get_u32(option_attrs[TEAM_ATTR_OPTION_ARRAY_INDEX]);
+			opt_id.array_index_used = true;
+		} else {
+			opt_id.array_index_used = false;
+		}
+
 		switch (nla_type) {
 		case NLA_U32:
 			{
@@ -386,7 +402,7 @@ static struct team_option *find_option(struct team_handle *th,
  *
  * Get option structure referred by format sttring.
  *
- * Returns: pointer to option structure or NULL in case option is not found.
+ * Returns: pointer to option structure or NULL in case of an error.
  **/
 TEAM_EXPORT
 struct team_option *team_get_option(struct team_handle *th,
@@ -406,8 +422,13 @@ struct team_option *team_get_option(struct team_handle *th,
 			opt_id.port_ifindex = va_arg(ap, uint32_t);
 			opt_id.port_ifindex_used = true;
 			break;
+		case 'a': /* array index */
+			opt_id.array_index = va_arg(ap, uint32_t);
+			opt_id.array_index_used = true;
+			break;
 		case '!': /* option does not have to exist */
 			must_exist = false;
+			break;
 		}
 	}
 	va_end(ap);
@@ -491,6 +512,35 @@ TEAM_EXPORT
 bool team_is_option_per_port(struct team_option *option)
 {
 	return option->id.port_ifindex_used;
+}
+
+/**
+ * team_get_option_array_index:
+ * @option: option structure
+ *
+ * Get option array index.
+ *
+ * Returns: array index.
+ * to any port.
+ **/
+TEAM_EXPORT
+uint32_t team_get_option_array_index(struct team_option *option)
+{
+	return option->id.array_index;
+}
+
+/**
+ * team_is_option_array:
+ * @option: option structure
+ *
+ * See if option is array.
+ *
+ * Returns: true if option is array.
+ **/
+TEAM_EXPORT
+bool team_is_option_array(struct team_option *option)
+{
+	return option->id.array_index_used;
 }
 
 /**
@@ -649,6 +699,9 @@ static int set_option_value(struct team_handle *th, struct team_option *option,
 	if (option->id.port_ifindex_used)
 		NLA_PUT_U32(msg, TEAM_ATTR_OPTION_PORT_IFINDEX,
 			    option->id.port_ifindex);
+	if (option->id.array_index_used)
+		NLA_PUT_U32(msg, TEAM_ATTR_OPTION_ARRAY_INDEX,
+			    option->id.array_index);
 	NLA_PUT_U32(msg, TEAM_ATTR_OPTION_TYPE, nla_type);
 	switch (nla_type) {
 		case NLA_U32:
