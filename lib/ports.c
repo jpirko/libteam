@@ -121,7 +121,10 @@ int get_port_list_handler(struct nl_msg *msg, void *arg)
 	if (!attrs[TEAM_ATTR_LIST_PORT])
 		return NL_SKIP;
 
-	port_list_cleanup_last_state(th);
+	if (!th->msg_recv_started) {
+		port_list_cleanup_last_state(th);
+		th->msg_recv_started = true;
+	}
 	nla_for_each_nested(nl_port, attrs[TEAM_ATTR_LIST_PORT], i) {
 		struct team_port *port;
 		uint32_t ifindex;

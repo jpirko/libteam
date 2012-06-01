@@ -228,7 +228,10 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 	if (!attrs[TEAM_ATTR_LIST_OPTION])
 		return NL_SKIP;
 
-	option_list_cleanup_last_state(th);
+	if (!th->msg_recv_started) {
+		option_list_cleanup_last_state(th);
+		th->msg_recv_started = true;
+	}
 	nla_for_each_nested(nl_option, attrs[TEAM_ATTR_LIST_OPTION], i) {
 		struct team_option *option;
 		struct team_option_id opt_id;

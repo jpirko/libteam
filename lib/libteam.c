@@ -148,9 +148,10 @@ static int ack_handler(struct nl_msg *msg, void *arg)
 
 static int finish_handler(struct nl_msg *msg, void *arg)
 {
-	int *err = arg;
+	struct team_handle *th = arg;
 
-	*err = 0;
+	th->msg_recv_started = false;
+	th->nl_sock_err = 0;
 	return NL_SKIP;
 }
 
@@ -522,11 +523,13 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 	nl_socket_modify_err_cb(th->nl_sock,NL_CB_CUSTOM,
 				error_handler, &th->nl_sock_err);
 	nl_socket_modify_cb(th->nl_sock, NL_CB_FINISH, NL_CB_CUSTOM,
-			    finish_handler, &th->nl_sock_err);
+			    finish_handler, th);
 	nl_socket_modify_cb(th->nl_sock, NL_CB_ACK, NL_CB_CUSTOM,
 			    ack_handler, &th->nl_sock_err);
 	nl_socket_modify_cb(th->nl_sock_event, NL_CB_VALID, NL_CB_CUSTOM,
 			    event_handler, th);
+	nl_socket_modify_cb(th->nl_sock_event, NL_CB_FINISH, NL_CB_CUSTOM,
+			    finish_handler, th);
 
 	nl_socket_disable_seq_check(th->nl_cli.sock_event);
 	nl_socket_modify_cb(th->nl_cli.sock_event, NL_CB_VALID,

@@ -37,6 +37,7 @@ struct team_handle {
 	struct nl_sock *	nl_sock;
 	int			nl_sock_err;
 	struct nl_sock *	nl_sock_event;
+	bool			msg_recv_started;
 	int			family;
 	uint32_t		ifindex;
 	struct team_ifinfo *	ifinfo;
