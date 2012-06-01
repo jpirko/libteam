@@ -963,40 +963,89 @@ static void debug_log_port_list(struct teamd_context *ctx)
 	teamd_log_dbg("</port_list>");
 }
 
+static void __print_port_str(char *buf, size_t bufsiz,
+			     struct team_option *option)
+{
+	if (team_is_option_per_port(option)) {
+		snprintf(buf, bufsiz, "@if%u",
+			 team_get_option_port_ifindex(option));
+	} else {
+		*buf = '\0';
+	}
+}
+
+static void __print_array_str(char *buf, size_t bufsiz,
+			      struct team_option *option)
+{
+	if (team_is_option_array(option)) {
+		snprintf(buf, bufsiz, "[%u]",
+			 team_get_option_array_index(option));
+	} else {
+		*buf = '\0';
+	}
+}
+
+static bool __print_value_str(char *buf, size_t bufsiz,
+			      struct team_option *option)
+{
+	int n;
+
+	switch (team_get_option_type(option)) {
+	case TEAM_OPTION_TYPE_U32:
+		n = snprintf(buf, bufsiz, "%u",
+			     team_get_option_value_u32(option));
+		break;
+	case TEAM_OPTION_TYPE_STRING:
+		n = snprintf(buf, bufsiz, "\"%s\"",
+			     team_get_option_value_string(option));
+		break;
+	case TEAM_OPTION_TYPE_BINARY:
+		{
+			unsigned int len = team_get_option_value_len(option);
+			char *data = team_get_option_value_binary(option);
+			int i;
+
+			for (i = 0; i < len; i++) {
+				if ((long) bufsiz - 1 - (i + 1) * 3 < 0)
+					break;
+				sprintf(buf, "\\%02x", data[i]);
+				buf += 3;
+			}
+			*buf = '\0';
+			n = 3 * len;
+		}
+		break;
+	case TEAM_OPTION_TYPE_BOOL:
+		n = snprintf(buf, bufsiz, "%s",
+			     team_get_option_value_bool(option) ? "true" : "false");
+		break;
+	default:
+		n = snprintf(buf, bufsiz, "<unknown>");
+		break;
+	}
+	return n > bufsiz ? true : false;
+}
+
 static void debug_log_option_list(struct teamd_context *ctx)
 {
 	struct team_option *option;
+	char value_str[80];
+	char port_str[16];
+	char array_str[16];
 
 	teamd_log_dbg("<option_list>");
 	team_for_each_option(option, ctx->th) {
 		char *name = team_get_option_name(option);
 		bool changed = team_is_option_changed(option);
-		uint32_t ifindex = team_get_option_port_ifindex(option);
+		bool val_trunc;
 
-		switch (team_get_option_type(option)) {
-		case TEAM_OPTION_TYPE_U32:
-			teamd_log_dbg("%d: %s: \"%d\" <int>%s", ifindex, name,
-				      team_get_option_value_u32(option),
-				      changed ? " changed" : "");
-			break;
-		case TEAM_OPTION_TYPE_STRING:
-			teamd_log_dbg("%d: %s: \"%s\"<str>%s", ifindex, name,
-				      team_get_option_value_string(option),
-				      changed ? " changed" : "");
-			break;
-		case TEAM_OPTION_TYPE_BINARY:
-			teamd_log_dbg("%d: %s: <bin>%s", ifindex, name,
-				      changed ? " changed" : "");
-			break;
-		case TEAM_OPTION_TYPE_BOOL:
-			teamd_log_dbg("%d: %s: \"%s\" <bool>%s", ifindex, name,
-				      team_get_option_value_bool(option) ? "true" : "false",
-				      changed ? " changed" : "");
-			break;
-		default:
-			teamd_log_dbg("%d: %s: <unknown>%s", ifindex, name,
-				      changed ? " changed" : "");
-		}
+		val_trunc = __print_value_str(value_str, sizeof(value_str),
+					      option);
+		__print_port_str(port_str, sizeof(port_str), option);
+		__print_array_str(array_str, sizeof(array_str), option);
+		teamd_log_dbg("%s%s%s #%s%s#%s", name, array_str, port_str,
+			      value_str, val_trunc ? "<trunc>" : "",
+			      changed ? " changed" : "");
 	}
 	teamd_log_dbg("</option_list>");
 }
