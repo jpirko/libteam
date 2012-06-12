@@ -195,6 +195,14 @@ void *teamd_get_link_watch_port_priv(struct teamd_port *tdport);
 int teamd_dbus_init(struct teamd_context *ctx);
 void teamd_dbus_fini(struct teamd_context *ctx);
 
+struct teamd_balancer;
+int teamd_balancer_init(struct teamd_context *ctx, struct teamd_balancer **ptb);
+void teamd_balancer_fini(struct teamd_balancer *tb);
+int teamd_balancer_port_added(struct teamd_balancer *tb,
+			      struct teamd_port *tdport);
+void teamd_balancer_port_removed(struct teamd_balancer *tb,
+				 struct teamd_port *tdport);
+
 int teamd_hash_func_set(struct teamd_context *ctx);
 
 int teamd_packet_sock_open(int *sock_p, const uint32_t ifindex,

@@ -23,12 +23,32 @@
 
 #include "teamd.h"
 
-static int lb_init(struct teamd_context *ctx)
+struct lb_priv {
+	struct teamd_balancer *tb;
+};
+
+static struct lb_priv *lb_priv(struct teamd_context *ctx)
 {
-	return teamd_hash_func_set(ctx);
+	return (struct lb_priv *) ctx->runner_priv;
 }
 
-static int lb_port_added(struct teamd_context *ctx, struct teamd_port *tdport)
+static int lb_init(struct teamd_context *ctx)
+{
+	int err;
+
+	err = teamd_hash_func_set(ctx);
+	if (err)
+		return err;
+	return teamd_balancer_init(ctx, &lb_priv(ctx)->tb);
+}
+
+static void lb_fini(struct teamd_context *ctx)
+{
+	teamd_balancer_fini(lb_priv(ctx)->tb);
+}
+
+static int lb_port_added(struct teamd_context *ctx,
+			 struct teamd_port *tdport)
 {
 	int err;
 
@@ -39,12 +59,21 @@ static int lb_port_added(struct teamd_context *ctx, struct teamd_port *tdport)
 			      tdport->ifname);
 		return err;
 	}
-	return 0;
+	return teamd_balancer_port_added(lb_priv(ctx)->tb, tdport);
+}
+
+static void lb_port_removed(struct teamd_context *ctx,
+			    struct teamd_port *tdport)
+{
+	teamd_balancer_port_removed(lb_priv(ctx)->tb, tdport);
 }
 
 const struct teamd_runner teamd_runner_loadbalance = {
 	.name		= "loadbalance",
 	.team_mode_name	= "loadbalance",
 	.init		= lb_init,
+	.fini		= lb_fini,
 	.port_added	= lb_port_added,
+	.port_removed	= lb_port_removed,
+	.priv_size	= sizeof(struct lb_priv),
 };
