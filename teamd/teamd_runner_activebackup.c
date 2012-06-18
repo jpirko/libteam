@@ -67,9 +67,9 @@ static bool is_port_sticky(struct teamd_context *ctx, const char *port_name)
 	return sticky;
 }
 
-static void change_active_port(struct teamd_context *ctx,
-			       struct teamd_port *old_tdport,
-			       struct teamd_port *new_tdport)
+static int change_active_port(struct teamd_context *ctx,
+			      struct teamd_port *old_tdport,
+			      struct teamd_port *new_tdport)
 {
 	uint32_t new_active_ifindex = new_tdport->ifindex;
 	uint32_t old_active_ifindex = 0;
@@ -80,14 +80,17 @@ static void change_active_port(struct teamd_context *ctx,
 		err = team_hwaddr_set(ctx->th, old_active_ifindex,
 				      abl_priv(ctx)->old_active_hwaddr,
 				      ctx->hwaddr_len);
-		if (err)
-			teamd_log_err("Failed to set old active original hardware address: %s",
-				      strerror(-err));
+		if (err) {
+			teamd_log_err("Failed to set old active original hardware address.");
+			return err;
+		}
 	}
 
 	err = team_set_active_port(ctx->th, new_active_ifindex);
-	if (err)
-		teamd_log_err("Failed to set active port: %s", strerror(-err));
+	if (err) {
+		teamd_log_err("Failed to set active port.");
+		return err;
+	}
 
 	memcpy(abl_priv(ctx)->old_active_hwaddr,
 	       team_get_ifinfo_hwaddr(new_tdport->team_ifinfo),
@@ -95,9 +98,11 @@ static void change_active_port(struct teamd_context *ctx,
 
 	err = team_hwaddr_set(ctx->th, new_active_ifindex, ctx->hwaddr,
 			      ctx->hwaddr_len);
-	if (err)
-		teamd_log_err("Failed to set new active hardware address: %s",
-			      strerror(-err));
+	if (err) {
+		teamd_log_err("Failed to set new active hardware address.");
+		return err;
+	}
+	return 0;
 }
 
 static int link_watch_handler(struct teamd_context *ctx)
@@ -152,7 +157,9 @@ static int link_watch_handler(struct teamd_context *ctx)
 	    !is_port_sticky(ctx, active_tdport->ifname)) {
 		teamd_log_info("Changing active port to \"%s\".",
 			       best_tdport->ifname);
-		change_active_port(ctx, active_tdport, best_tdport);
+		err = change_active_port(ctx, active_tdport, best_tdport);
+		if (err)
+			return err;
 	}
 	return 0;
 }
