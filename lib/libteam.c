@@ -518,6 +518,12 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 		return -errno;
 	}
 
+	err = nl_socket_set_buffer_size(th->nl_sock_event, 98304, 0);
+	if (err) {
+		err(th, "Failed to set buffer size of netlink event sock.");
+		return -nl2syserr(err);
+	}
+
 	th->family = genl_ctrl_resolve(th->nl_sock, TEAM_GENL_NAME);
 	if (th->family < 0) {
 		err(th, "Failed to resolve netlink family.");
