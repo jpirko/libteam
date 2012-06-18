@@ -466,6 +466,14 @@ int team_destroy(struct team_handle *th)
 	return -nl2syserr(err);
 }
 
+#ifndef SOL_NETLINK
+#define SOL_NETLINK 270
+#endif
+
+#ifndef NETLINK_BROADCAST_SEND_ERROR
+#define NETLINK_BROADCAST_SEND_ERROR    0x4
+#endif
+
 /**
  * team_init:
  * @th: libteam library context
@@ -480,6 +488,7 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 {
 	int err;
 	int grp_id;
+	int val;
 
 	if (!ifindex) {
 		err(th, "Passed interface index %d is not valid.", ifindex);
@@ -499,6 +508,14 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 	if (err) {
 		err(th, "Failed to connect to netlink event sock.");
 		return -nl2syserr(err);
+	}
+
+	val = NETLINK_BROADCAST_SEND_ERROR;
+	err = setsockopt(nl_socket_get_fd(th->nl_sock_event), SOL_NETLINK,
+			 NETLINK_BROADCAST_ERROR, &val, sizeof(val));
+	if (err) {
+		err(th, "Failed set NETLINK_BROADCAST_ERROR on netlink event sock.");
+		return -errno;
 	}
 
 	th->family = genl_ctrl_resolve(th->nl_sock, TEAM_GENL_NAME);
