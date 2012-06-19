@@ -1033,7 +1033,7 @@ static void debug_log_option_list(struct teamd_context *ctx)
 	char port_str[16];
 	char array_str[16];
 
-	teamd_log_dbg("<changed_option_list>");
+	teamd_log_dbgx(ctx, 2, "<changed_option_list>");
 	team_for_each_option(option, ctx->th) {
 		char *name = team_get_option_name(option);
 		bool changed = team_is_option_changed(option);
@@ -1046,10 +1046,10 @@ static void debug_log_option_list(struct teamd_context *ctx)
 					      option);
 		__print_port_str(port_str, sizeof(port_str), option);
 		__print_array_str(array_str, sizeof(array_str), option);
-		teamd_log_dbg("%s%s%s #%s%s#", name, array_str, port_str,
-			      value_str, val_trunc ? "<trunc>" : "");
+		teamd_log_dbgx(ctx, 2, "%s%s%s #%s%s#", name, array_str,
+			       port_str, value_str, val_trunc ? "<trunc>" : "");
 	}
-	teamd_log_dbg("</changed_option_list>");
+	teamd_log_dbgx(ctx, 2, "</changed_option_list>");
 }
 
 static void debug_log_ifinfo_list(struct teamd_context *ctx)
