@@ -1037,9 +1037,10 @@ static void debug_log_option_list(struct teamd_context *ctx)
 	team_for_each_option(option, ctx->th) {
 		char *name = team_get_option_name(option);
 		bool changed = team_is_option_changed(option);
+		bool changed_locally = team_is_option_changed_locally(option);
 		bool val_trunc;
 
-		if (!changed)
+		if (!changed || changed_locally)
 			continue;
 		val_trunc = __print_value_str(value_str, sizeof(value_str),
 					      option);
