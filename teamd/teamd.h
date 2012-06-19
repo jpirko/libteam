@@ -38,6 +38,10 @@
 #define teamd_log_info(args...) daemon_log(LOG_INFO, ##args)
 #define teamd_log_dbg(args...) daemon_log(LOG_DEBUG, ##args)
 
+#define teamd_log_dbgx(ctx, val, args...)	\
+	if (val <= ctx->debug)			\
+		daemon_log(LOG_DEBUG, ##args)
+
 enum teamd_command {
 	DAEMON_CMD_RUN,
 	DAEMON_CMD_KILL,
@@ -55,7 +59,7 @@ typedef int (*teamd_link_watch_handler_t)(struct teamd_context *ctx);
 struct teamd_context {
 	enum teamd_command		cmd;
 	bool				daemonize;
-	bool				debug;
+	unsigned int			debug;
 	bool				force_recreate;
 	char *				config_file;
 	char *				config_text;

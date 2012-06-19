@@ -157,7 +157,7 @@ static int parse_command_line(struct teamd_context *ctx,
 			ctx->pid_file = strdup(optarg);
 			break;
 		case 'g':
-			ctx->debug = true;
+			ctx->debug++;
 			break;
 		case 'r':
 			ctx->force_recreate = true;
