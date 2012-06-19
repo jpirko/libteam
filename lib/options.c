@@ -575,6 +575,20 @@ bool team_is_option_changed(struct team_option *option)
 }
 
 /**
+ * team_is_option_changed_locally:
+ * @option: option structure
+ *
+ * See if option values got changed locally.
+ *
+ * Returns: true if option got changed locally.
+ **/
+TEAM_EXPORT
+bool team_is_option_changed_locally(struct team_option *option)
+{
+	return option->changed_locally;
+}
+
+/**
  * team_get_option_value_len:
  * @option: option structure
  *

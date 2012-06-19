@@ -158,6 +158,7 @@ uint32_t team_get_option_array_index(struct team_option *option);
 bool team_is_option_array(struct team_option *option);
 enum team_option_type team_get_option_type(struct team_option *option);
 bool team_is_option_changed(struct team_option *option);
+bool team_is_option_changed_locally(struct team_option *option);
 unsigned int team_get_option_value_len(struct team_option *option);
 uint32_t team_get_option_value_u32(struct team_option *option);
 char *team_get_option_value_string(struct team_option *option);
