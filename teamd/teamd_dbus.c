@@ -56,8 +56,8 @@ static DBusMessage *port_config_update(DBusMessage *message,
 					       "message arguments.");
 		goto out;
 	}
-	teamd_log_dbg("port_devname \"%s\", port_config \"%s\"\n",
-		      port_devname, port_config);
+	teamd_log_dbgx(ctx, 2, "port_devname \"%s\", port_config \"%s\"",
+		       port_devname, port_config);
 
 	ifindex = team_ifname2ifindex(ctx->th, port_devname);
 	if (!ifindex) {
@@ -102,7 +102,7 @@ static DBusMessage *port_add(DBusMessage *message, struct teamd_context *ctx)
 					       "message arguments.");
 		goto out;
 	}
-	teamd_log_dbg("port_devname \"%s\"\n", port_devname);
+	teamd_log_dbgx(ctx, 2, "port_devname \"%s\"", port_devname);
 
 	ifindex = team_ifname2ifindex(ctx->th, port_devname);
 	if (!ifindex) {
@@ -146,7 +146,7 @@ static DBusMessage *port_remove(DBusMessage *message, struct teamd_context *ctx)
 					       "message arguments.");
 		goto out;
 	}
-	teamd_log_dbg("port_devname \"%s\"\n", port_devname);
+	teamd_log_dbgx(ctx, 2, "port_devname \"%s\"", port_devname);
 
 	ifindex = team_ifname2ifindex(ctx->th, port_devname);
 	if (!ifindex) {
