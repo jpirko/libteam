@@ -260,7 +260,8 @@ static DBusHandlerResult message_handler(DBusConnection *con,
 		if (!reply)
 			reply = dbus_message_new_method_return(message);
 		if (reply) {
-			dbus_connection_send(con, reply, NULL);
+			if (!dbus_connection_send(con, reply, NULL))
+				teamd_log_err("dbus: Failed to send reply.");
 			dbus_message_unref(reply);
 		}
 	}
