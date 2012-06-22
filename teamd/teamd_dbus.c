@@ -28,10 +28,7 @@
 #include <team.h>
 
 #include "teamd.h"
-
-#define TEAMD_DBUS_SERVICE	"org.libteam.teamd"
-#define TEAMD_DBUS_IFACE	"org.libteam.teamd"
-#define TEAMD_DBUS_PATH		"/org/libteam/teamd"
+#include "teamd_dbus.h"
 
 static DBusMessage *port_config_update(DBusMessage *message,
 				       struct teamd_context *ctx)
