@@ -285,10 +285,10 @@ static int lacp_port_update_enabled(struct lacp_port *lacp_port)
 	bool curr_enabled_state;
 	struct team_option *option;
 
-	option = team_get_option(lacp_port->ctx->th, "np",
-				 "user_linkup_enabled", tdport->ifindex);
+	option = team_get_option(lacp_port->ctx->th, "np", "enabled",
+				 tdport->ifindex);
 	if (!option) {
-		teamd_log_err("%s: Failed to found \"enabled\" option.",
+		teamd_log_err("%s: Failed to find \"enabled\" option.",
 			      tdport->ifname);
 		return -ENOENT;
 	}
