@@ -20,4 +20,4 @@ teamdctl_SOURCES=teamdctl.c
 
 EXTRA_DIST = example_configs
 
-noinst_HEADERS = teamd.h teamd_bpf_chef.h
+noinst_HEADERS = teamd.h teamd_bpf_chef.h teamd_dbus.h
