@@ -18,6 +18,6 @@ teamd_SOURCES=teamd.c teamd_common.c teamd_per_port.c teamd_dbus.c \
 	      teamd_balancer.c
 teamdctl_SOURCES=teamdctl.c
 
-EXTRA_DIST = example_configs
+EXTRA_DIST = example_configs dbus
 
 noinst_HEADERS = teamd.h teamd_bpf_chef.h teamd_dbus.h
