@@ -1,0 +1,40 @@
+.TH teamdctl 8 "28 June 2012" "libteam"
+.SH NAME
+teamd \(em team network device control daemon control tool
+.SH SYNOPSIS
+.B teamdctl
+.B \-h
+.TP
+.B teamdctl TEAMDEV METHOD [METHOD_ARGS..]
+.TP
+.SH DESCRIPTION
+.PP
+teamdctl is a tool which provides D-Bus wrapper over teamd D-Bus API.
+It allows user to interfere with running teamd instance.
+
+.SH OPTIONS
+.TP
+.B "\-h, \-\-help"
+Print help text to console and exit.
+
+.SH METHOD
+.TP
+.B ConfigDump
+Dumps teamd JSON config.
+.TP
+.B "PortAdd PORTDEV"
+Takes port device name as argument. Adds port device into team.
+.TP
+.B "PortRemove PORTDEV"
+Takes port device name as argument. Removes port device from team.
+.TP
+.B "PortConfigUpdate PORTDEV PORTCONFIG"
+Takes port device name as the first argument and new port JSON config as the
+second argument. Updates port device config.
+
+.SH AUTHOR
+.PP
+Jiri Pirko is the original author and current maintainer of libteam.
+.SH VERSION
+.PP
+This manual page applies to libteam @PACKAGE_VERSION@.
