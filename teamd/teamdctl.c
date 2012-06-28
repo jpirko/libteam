@@ -34,8 +34,9 @@ static void print_help(const char *argv0) {
             argv0);
 }
 
-typedef int (*msg_prepare_t)(DBusMessage *msg, int argc, char **argv);
-typedef int (*msg_process_t)(DBusMessage *msg);
+typedef int (*msg_prepare_t)(char *method_name, DBusMessage *msg,
+			     int argc, char **argv);
+typedef int (*msg_process_t)(char *method_name, DBusMessage *msg);
 
 struct method_type {
 	char *name;
@@ -43,7 +44,33 @@ struct method_type {
 	msg_process_t msg_process;
 };
 
-static int noreply_msg_process(DBusMessage *msg)
+static int noreply_msg_process(char *method_name, DBusMessage *msg)
+{
+	DBusMessageIter args;
+	dbus_bool_t dbres;
+	char *param = NULL;
+
+	dbres = dbus_message_iter_init(msg, &args);
+	if (dbres == FALSE)
+		return 0; /* Success */
+
+	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
+		fprintf(stderr, "%s: Received argument is not string as expected.\n",
+			method_name);
+		return -EINVAL;
+	}
+	dbus_message_iter_get_basic(&args, &param);
+	fprintf(stderr, "%s: Failed: \"%s\"\n", method_name, param);
+	return -EINVAL;
+}
+
+static int configdump_msg_prepare(char *method_name, DBusMessage *msg,
+				  int argc, char **argv)
+{
+	return 0;
+}
+
+static int configdump_msg_process(char *method_name, DBusMessage *msg)
 {
 	DBusMessageIter args;
 	dbus_bool_t dbres;
@@ -51,85 +78,71 @@ static int noreply_msg_process(DBusMessage *msg)
 
 	dbres = dbus_message_iter_init(msg, &args);
 	if (dbres == FALSE) {
-		fprintf(stderr, "Success.\n");
-		return 0;
-	}
-
-	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
-		fprintf(stderr, "Received argument is not string as expected.\n");
-		return -EINVAL;
-	}
-	dbus_message_iter_get_basic(&args, &param);
-	fprintf(stderr, "Failed: \"%s\"\n", param);
-	return 0;
-}
-
-static int configdump_msg_prepare(DBusMessage *msg, int argc, char **argv)
-{
-	return 0;
-}
-
-static int configdump_msg_process(DBusMessage *msg)
-{
-	DBusMessageIter args;
-	dbus_bool_t dbres;
-	char *param = NULL;
-
-	dbres = dbus_message_iter_init(msg, &args);
-	if (dbres == FALSE) {
-		fprintf(stderr, "Failed, no data received.\n");
+		fprintf(stderr, "%s: Failed, no data received.\n", method_name);
 		return -EINVAL;
 	}
 
 	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
-		fprintf(stderr, "Received argument is not string as expected.\n");
+		fprintf(stderr, "%s: Received argument is not string as expected.\n",
+			method_name);
 		return -EINVAL;
 	}
 	dbus_message_iter_get_basic(&args, &param);
-	fprintf(stderr, "Success. Config dump:\n%s\n", param);
+	fprintf(stderr, "%s\n", param);
 	return 0;
 }
 
-static int portaddrm_msg_prepare(DBusMessage *msg, int argc, char **argv)
+static int portaddrm_msg_prepare(char *method_name, DBusMessage *msg,
+				 int argc, char **argv)
 {
 	DBusMessageIter args;
 	dbus_bool_t dbres;
 
 	if (argc < 1) {
-		fprintf(stderr, "Port name as a command line parameter expected.\n");
+		fprintf(stderr, "%s: Port name as a command line parameter expected.\n",
+			method_name);
 		return -EINVAL;
 	}
 	dbus_message_iter_init_append(msg, &args);
-	dbres = dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &argv[0]);
+	dbres = dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING,
+					       &argv[0]);
 	if (dbres == FALSE) {
-		fprintf(stderr, "Failed to construct message.\n");
+		fprintf(stderr, "%s: Failed to construct message.\n",
+			method_name);
 		return -ENOMEM;
 	}
 	return 0;
 }
 
-static int portconfigupdate_msg_prepare(DBusMessage *msg, int argc, char **argv)
+static int portconfigupdate_msg_prepare(char *method_name, DBusMessage *msg,
+					int argc, char **argv)
 {
 	DBusMessageIter args;
 	dbus_bool_t dbres;
 
 	if (argc < 1) {
-		fprintf(stderr, "Port name as a command line parameter expected.\n");
+		fprintf(stderr, "%s: Port name as a command line parameter expected.\n",
+			method_name);
 		return -EINVAL;
 	}
 	if (argc < 2) {
-		fprintf(stderr, "Port config as a command line parameter expected.\n");
+		fprintf(stderr, "%s: Port config as a command line parameter expected.\n",
+			method_name);
 		return -EINVAL;
 	}
 	dbus_message_iter_init_append(msg, &args);
-	dbres = dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &argv[0]);
+	dbres = dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING,
+					       &argv[0]);
 	if (dbres == FALSE) {
-		fprintf(stderr, "Failed to construct message.\n");
+		fprintf(stderr, "%s: Failed to construct message.\n",
+			method_name);
 		return -ENOMEM;
 	}
-	dbres = dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &argv[1]);
+	dbres = dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING,
+					       &argv[1]);
 	if (dbres == FALSE) {
-		fprintf(stderr, "Failed to construct message.\n");
+		fprintf(stderr, "%s: Failed to construct message.\n",
+			method_name);
 		return -ENOMEM;
 	}
 	return 0;
@@ -192,7 +205,7 @@ static int call_method(char *team_devname, char *method_name,
 		goto bus_put;
 	}
 
-	err = msg_prepare(msg, argc, argv);
+	err = msg_prepare(method_name, msg, argc, argv);
 	if (err) {
 		goto free_message;
 	}
@@ -220,7 +233,7 @@ static int call_method(char *team_devname, char *method_name,
 	if (!msg)
 		goto bus_put;
 
-	err = msg_process(msg);
+	err = msg_process(method_name, msg);
 	if (err) {
 		goto free_message;
 	}
@@ -283,7 +296,6 @@ int main(int argc, char **argv)
 				  method_types[i].msg_prepare,
 				  method_types[i].msg_process);
 		if (err) {
-			fprintf(stderr, "Failed to call D-Bus method.\n");
 			return EXIT_FAILURE;
 		}
 		break;
