@@ -1,0 +1,7 @@
+DEVICE="team_test0"
+DEVICETYPE="Team"
+ONBOOT="yes"
+BOOTPROTO=none
+NETMASK=255.255.255.0
+IPADDR=192.168.23.11
+TEAM_CONFIG='{"runner": {"name": "lacp", "active": 1, "fast_rate": 1, "tx_hash": ["eth", "ipv4", "ipv6"]},"link_watch":	{"name": "ethtool"}}'

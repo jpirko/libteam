@@ -1,0 +1,4 @@
+DEVICE="eth1"
+DEVICETYPE="TeamPort"
+ONBOOT="no"
+TEAM_MASTER="team_test0"

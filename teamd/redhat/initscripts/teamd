@@ -1,0 +1,3 @@
+# teamd defaults file
+#TEAMD_CMDLINE="-g"
+TEAMD_CMDLINE=""

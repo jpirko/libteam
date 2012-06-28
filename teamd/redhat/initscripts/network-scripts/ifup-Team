@@ -1,0 +1,48 @@
+#!/bin/sh
+
+# Copyright (C) 2012 Jiri Pirko <jpirko@redhat.com>
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2.1 of the License, or (at your option) any later version.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+
+. /etc/init.d/functions
+
+cd /etc/sysconfig/network-scripts
+. ./network-functions
+
+[ -f ../network ] && . ../network
+
+CONFIG=${1}
+
+need_config "${CONFIG}"
+
+source_config
+
+. /etc/sysconfig/teamd
+
+# If the device is a team, create it with teamd, if available.
+if [ "${DEVICETYPE}" = "Team" ]; then
+	if [ ! -x /usr/bin/teamd ]; then
+		net_log $"Team support not available: teamd not found"
+		exit 1
+		fi
+	/usr/bin/teamd ${TEAMD_CMDLINE} -d -D -t ${DEVICE} -c "${TEAM_CONFIG}" -p /var/run/teamd-${DEVICE}.pid || exit 1
+	# Bring up all existing port devices now
+	for device in $(LANG=C egrep -l "^[[:space:]]*TEAM_MASTER=\"?${DEVICE}\"?" /etc/sysconfig/network-scripts/ifcfg-*) ; do
+		is_ignored_file "$device" && continue
+		/sbin/ifup ${device##*/}
+	done
+fi
+
+exec /etc/sysconfig/network-scripts/ifup-eth ${CONFIG} $2

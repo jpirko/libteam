@@ -1,0 +1,7 @@
+DEVICE="team_test0"
+DEVICETYPE="Team"
+ONBOOT="no"
+BOOTPROTO=none
+NETMASK=255.255.255.0
+IPADDR=192.168.23.11
+TEAM_CONFIG='{"runner": {"name": "roundrobin"}}'

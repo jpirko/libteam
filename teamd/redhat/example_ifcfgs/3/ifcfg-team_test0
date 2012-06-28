@@ -1,0 +1,7 @@
+DEVICE="team_test0"
+DEVICETYPE="Team"
+ONBOOT="yes"
+BOOTPROTO=none
+NETMASK=255.255.255.0
+IPADDR=192.168.23.11
+TEAM_CONFIG='{"runner": {"name": "activebackup"}, "link_watch":	{"name": "arp_ping", "interval": 100, "missed_max": 30, "source_host": "192.168.23.2", "target_host": "192.168.23.1"}}'
