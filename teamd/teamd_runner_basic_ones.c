@@ -23,6 +23,11 @@ const struct teamd_runner teamd_runner_dummy = {
 	.name = "dummy",
 };
 
+const struct teamd_runner teamd_runner_broadcast = {
+	.name		= "broadcast",
+	.team_mode_name	= "broadcast",
+};
+
 const struct teamd_runner teamd_runner_roundrobin = {
 	.name		= "roundrobin",
 	.team_mode_name	= "roundrobin",
