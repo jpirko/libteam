@@ -315,13 +315,15 @@ static int tb_option_change_handler_func(struct team_handle *th, void *arg,
 static bool tb_get_enable_tx_balancing(struct teamd_context *ctx)
 {
 	int err;
-	int enable_tx_balancing;
+	char *tx_balancer_name;
 
-	err = json_unpack(ctx->config_json, "{s:{s:b}}", "runner",
-			  "enable_tx_balancing", &enable_tx_balancing);
+	err = json_unpack(ctx->config_json, "{s:{s:{s:s}}}", "runner",
+			  "tx_balancer", "name", &tx_balancer_name);
 	if (err)
 		return false; /* disabled by default */
-	return enable_tx_balancing;
+	if (!strcmp(tx_balancer_name, "basic"))
+		return true;
+	return false;
 }
 
 static uint32_t tb_get_balancing_interval(struct teamd_context *ctx)
