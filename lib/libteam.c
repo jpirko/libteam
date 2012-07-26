@@ -1026,6 +1026,29 @@ int team_set_port_user_linkup(struct team_handle *th,
 }
 
 /**
+ * team_set_port_queue_id:
+ * @th: libteam library context
+ * @port_ifindex: port interface index
+ * @queue_id: desired queue id
+ *
+ * Sets queue id for port identified by @port_ifindex
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_set_port_queue_id(struct team_handle *th,
+			   uint32_t port_ifindex, uint32_t queue_id)
+{
+	struct team_option *option;
+
+	option = team_get_option(th, "np!", "queue_id", port_ifindex);
+	if (!option)
+		return -ENOENT;
+
+	return team_set_option_value_u32(th, option, queue_id);
+}
+
+/**
  * SECTION: RTNL helpers
  * @short_description: Route netlink helper function
  */
