@@ -195,6 +195,9 @@ static inline unsigned int teamd_port_count(struct teamd_context *ctx)
 	return ctx->port_priv_list_count;
 }
 
+int teamd_port_add(struct teamd_context *ctx, const char *port_name);
+int teamd_port_remove(struct teamd_context *ctx, const char *port_name);
+
 void *teamd_get_runner_port_priv(struct teamd_port *tdport);
 void *teamd_get_link_watch_port_priv(struct teamd_port *tdport);
 int teamd_dbus_init(struct teamd_context *ctx);

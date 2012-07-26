@@ -275,13 +275,9 @@ static int teamd_flush_ports(struct teamd_context *ctx)
 	int err;
 
 	teamd_for_each_tdport(tdport, ctx) {
-		teamd_log_dbg("%s: Removing port.", tdport->ifname);
-		err = team_port_remove(ctx->th, tdport->ifindex);
-		if (err) {
-			teamd_log_err("%s: Failed to remove port.",
-				      tdport->ifname);
+		err = teamd_port_remove(ctx, tdport->ifname);
+		if (err)
 			return err;
-		}
 	}
 	return 0;
 }
@@ -862,6 +858,34 @@ new_port_decref:
 	return err;
 }
 
+int teamd_port_add(struct teamd_context *ctx, const char *port_name)
+{
+	int err;
+	uint32_t ifindex;
+
+	ifindex = team_ifname2ifindex(ctx->th, port_name);
+	teamd_log_dbg("%s: Adding port (found ifindex \"%d\").",
+		      port_name, ifindex);
+	err = team_port_add(ctx->th, ifindex);
+	if (err)
+		teamd_log_err("%s: Failed to add port.", port_name);
+	return err;
+}
+
+int teamd_port_remove(struct teamd_context *ctx, const char *port_name)
+{
+	int err;
+	uint32_t ifindex;
+
+	ifindex = team_ifname2ifindex(ctx->th, port_name);
+	teamd_log_dbg("%s: Removing port (found ifindex \"%d\").",
+		      port_name, ifindex);
+	err = team_port_remove(ctx->th, ifindex);
+	if (err)
+		teamd_log_err("%s: Failed to remove port.", port_name);
+	return err;
+}
+
 static int teamd_add_ports(struct teamd_context *ctx)
 {
 	int err;
@@ -876,16 +900,10 @@ static int teamd_add_ports(struct teamd_context *ctx)
 	for (iter = json_object_iter(ports_obj); iter;
 	     iter = json_object_iter_next(ports_obj, iter)) {
 		const char *port_name = json_object_iter_key(iter);
-		uint32_t ifindex;
 
-		ifindex = team_ifname2ifindex(ctx->th, port_name);
-		teamd_log_dbg("%s: Adding port (found ifindex \"%d\").",
-			      port_name, ifindex);
-		err = team_port_add(ctx->th, ifindex);
-		if (err) {
-			teamd_log_err("%s: Failed to add port.", port_name);
+		err = teamd_port_add(ctx, port_name);
+		if (err)
 			return err;
-		}
 	}
 	return 0;
 }

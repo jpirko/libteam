@@ -84,7 +84,6 @@ static DBusMessage *port_add(DBusMessage *message, struct teamd_context *ctx)
 	DBusMessage *reply;
 	DBusError error;
 	const char *port_devname;
-	uint32_t ifindex;
 	int err;
 
 	dbus_error_init(&error);
@@ -101,17 +100,16 @@ static DBusMessage *port_add(DBusMessage *message, struct teamd_context *ctx)
 	}
 	teamd_log_dbgx(ctx, 2, "port_devname \"%s\"", port_devname);
 
-	ifindex = team_ifname2ifindex(ctx->th, port_devname);
-	if (!ifindex) {
-		teamd_log_err("Device \"%s\" does not exist.", port_devname);
+	err = teamd_port_add(ctx, port_devname);
+	switch (err) {
+	case -ENODEV:
 		reply = dbus_message_new_error(message,
 					       TEAMD_DBUS_IFACE ".NoSuchDev",
 					       "No such device.");
 		goto out;
-	}
-	err = team_port_add(ctx->th, ifindex);
-	if (err) {
-		teamd_log_err("Failed to add port \"%s\".", port_devname);
+	case 0:
+		break;
+	default:
 		reply = dbus_message_new_error(message,
 					       TEAMD_DBUS_IFACE ".PortAddFail",
 					       "Failed to add port.");
@@ -128,7 +126,6 @@ static DBusMessage *port_remove(DBusMessage *message, struct teamd_context *ctx)
 	DBusMessage *reply;
 	DBusError error;
 	const char *port_devname;
-	uint32_t ifindex;
 	int err;
 
 	dbus_error_init(&error);
@@ -145,17 +142,16 @@ static DBusMessage *port_remove(DBusMessage *message, struct teamd_context *ctx)
 	}
 	teamd_log_dbgx(ctx, 2, "port_devname \"%s\"", port_devname);
 
-	ifindex = team_ifname2ifindex(ctx->th, port_devname);
-	if (!ifindex) {
-		teamd_log_err("Device \"%s\" does not exist.", port_devname);
+	err = teamd_port_remove(ctx, port_devname);
+	switch (err) {
+	case -ENODEV:
 		reply = dbus_message_new_error(message,
 					       TEAMD_DBUS_IFACE ".NoSuchDev",
 					       "No such device.");
 		goto out;
-	}
-	err = team_port_remove(ctx->th, ifindex);
-	if (err) {
-		teamd_log_err("Failed to remove port \"%s\".", port_devname);
+	case 0:
+		break;
+	default:
 		reply = dbus_message_new_error(message,
 					       TEAMD_DBUS_IFACE ".PortRemoveFail",
 					       "Failed to del port.");
