@@ -862,14 +862,41 @@ int teamd_port_add(struct teamd_context *ctx, const char *port_name)
 {
 	int err;
 	uint32_t ifindex;
+	json_t *port_obj;
+	int tmp;
 
 	ifindex = team_ifname2ifindex(ctx->th, port_name);
 	teamd_log_dbg("%s: Adding port (found ifindex \"%d\").",
 		      port_name, ifindex);
 	err = team_port_add(ctx->th, ifindex);
-	if (err)
+	if (err) {
 		teamd_log_err("%s: Failed to add port.", port_name);
-	return err;
+		return err;
+	}
+
+	err = json_unpack(ctx->config_json, "{s:{s:o}}",
+			  "ports", port_name, &port_obj);
+	if (err)
+		return 0; /* no config found */
+
+	err = json_unpack(port_obj, "{s:i}", "queue_id", &tmp);
+	if (!err) {
+		uint32_t queue_id;
+
+		if (tmp < 0) {
+			teamd_log_err("%s: \"queue_id\" must not be negative number.",
+				      port_name);
+			return -EINVAL;
+		}
+		queue_id = tmp;
+		err = team_set_port_queue_id(ctx->th, ifindex, queue_id);
+		if (err) {
+			teamd_log_err("%s: Failed to set \"queue_id\".",
+				      port_name);
+			return err;
+		}
+	}
+	return 0;
 }
 
 int teamd_port_remove(struct teamd_context *ctx, const char *port_name)
