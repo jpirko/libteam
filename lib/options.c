@@ -113,6 +113,8 @@ static int get_option_data_size_by_type(int opt_type, const void *data,
 		return data_len;
 	case TEAM_OPTION_TYPE_BOOL:
 		return sizeof(bool);
+	case TEAM_OPTION_TYPE_S32:
+		return sizeof(__s32);
 	default:
 		return -EINVAL;
 	}
@@ -305,6 +307,13 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 				data = &arg;
 			}
 			opt_type = TEAM_OPTION_TYPE_BOOL;
+			break;
+		case NLA_S32:
+			{
+				__s32 arg = nla_get_s32(data_attr);
+				data = &arg;
+			}
+			opt_type = TEAM_OPTION_TYPE_S32;
 			break;
 		default:
 			err(th, "Unknown nla_type received.");
@@ -655,6 +664,20 @@ bool team_get_option_value_bool(struct team_option *option)
 	return *((bool *) option->data);
 }
 
+/**
+ * team_get_option_value_s32:
+ * @option: option structure
+ *
+ * Get option value as signed 32-bit number.
+ *
+ * Returns: number.
+ **/
+TEAM_EXPORT
+int32_t team_get_option_value_s32(struct team_option *option)
+{
+	return *((__s32 *) option->data);
+}
+
 static int local_set_option_value(struct team_handle *th,
 				  struct team_option_id *opt_id, int opt_type,
 				  const void *data, int data_len)
@@ -694,6 +717,9 @@ static int set_option_value(struct team_handle *th, struct team_option *option,
 	case TEAM_OPTION_TYPE_BOOL:
 		nla_type = NLA_FLAG;
 		break;
+	case TEAM_OPTION_TYPE_S32:
+		nla_type = NLA_S32;
+		break;
 	default:
 		return -ENOENT;
 	}
@@ -732,6 +758,9 @@ static int set_option_value(struct team_handle *th, struct team_option *option,
 		case NLA_FLAG:
 			if (*((bool *) data))
 				NLA_PUT_FLAG(msg, TEAM_ATTR_OPTION_DATA);
+		case NLA_S32:
+			NLA_PUT_S32(msg, TEAM_ATTR_OPTION_DATA, *((__u32 *) data));
+			break;
 			break;
 		default:
 			goto nla_put_failure;
@@ -823,4 +852,22 @@ int team_set_option_value_bool(struct team_handle *th,
 			       struct team_option *option, bool val)
 {
 	return set_option_value(th, option, &val, 0, TEAM_OPTION_TYPE_BOOL);
+}
+
+/**
+ * team_set_option_value_s32:
+ * @th: libteam library context
+ * @option: option structure
+ * @val: value to be set
+ *
+ * Set 32-bit signed number type option.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_set_option_value_s32(struct team_handle *th,
+			      struct team_option *option, int32_t val)
+{
+	return set_option_value(th, option, &val, 0,
+				TEAM_OPTION_TYPE_S32);
 }

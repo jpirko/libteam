@@ -139,6 +139,7 @@ enum team_option_type {
 	TEAM_OPTION_TYPE_STRING,
 	TEAM_OPTION_TYPE_BINARY,
 	TEAM_OPTION_TYPE_BOOL,
+	TEAM_OPTION_TYPE_S32,
 };
 
 struct team_option;
@@ -166,6 +167,7 @@ uint32_t team_get_option_value_u32(struct team_option *option);
 char *team_get_option_value_string(struct team_option *option);
 void *team_get_option_value_binary(struct team_option *option);
 bool team_get_option_value_bool(struct team_option *option);
+int32_t team_get_option_value_s32(struct team_option *option);
 
 /* option setters */
 int team_set_option_value_u32(struct team_handle *th,
@@ -177,6 +179,8 @@ int team_set_option_value_binary(struct team_handle *th,
 				 const void *data, unsigned int data_len);
 int team_set_option_value_bool(struct team_handle *th,
 			       struct team_option *option, bool val);
+int team_set_option_value_s32(struct team_handle *th,
+			      struct team_option *option, int32_t val);
 
 /*
  * team_change_handler
