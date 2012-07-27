@@ -1238,10 +1238,16 @@ static int teamd_init(struct teamd_context *ctx)
 		goto run_loop_fini;
 	}
 
+	err = teamd_option_watch_init(ctx);
+	if (err) {
+		teamd_log_err("Failed to init option watches.");
+		goto team_unreg_debug_handlers;
+	}
+
 	err = teamd_per_port_init(ctx);
 	if (err) {
 		teamd_log_err("Failed to init per-port.");
-		goto team_unreg_debug_handlers;
+		goto option_watch_fini;
 	}
 
 	err = teamd_link_watch_init(ctx);
@@ -1278,6 +1284,8 @@ link_watch_fini:
 	teamd_link_watch_fini(ctx);
 per_port_fini:
 	teamd_per_port_fini(ctx);
+option_watch_fini:
+	teamd_option_watch_fini(ctx);
 team_unreg_debug_handlers:
 	teamd_unregister_default_handlers(ctx);
 run_loop_fini:
@@ -1297,6 +1305,7 @@ static void teamd_fini(struct teamd_context *ctx)
 	teamd_runner_fini(ctx);
 	teamd_link_watch_fini(ctx);
 	teamd_per_port_fini(ctx);
+	teamd_option_watch_fini(ctx);
 	teamd_unregister_default_handlers(ctx);
 	teamd_run_loop_fini(ctx);
 	team_destroy(ctx->th);

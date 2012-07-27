@@ -73,6 +73,7 @@ struct teamd_context {
 	teamd_link_watch_handler_t	link_watch_handler;
 	struct list_item		port_priv_list;
 	unsigned int			port_priv_list_count;
+	struct list_item		option_watch_list;
 	uint32_t			ifindex;
 	struct team_ifinfo *		ifinfo;
 	char *				hwaddr;
@@ -200,6 +201,24 @@ int teamd_port_remove(struct teamd_context *ctx, const char *port_name);
 
 void *teamd_get_runner_port_priv(struct teamd_port *tdport);
 void *teamd_get_link_watch_port_priv(struct teamd_port *tdport);
+
+typedef int (*teamd_option_watch_handler_t)(struct teamd_context *ctx,
+					    struct team_option *option,
+					    void *option_watch_priv);
+struct teamd_option_watch {
+	teamd_option_watch_handler_t handler;
+	const char *option_name;
+};
+
+int teamd_option_watch_init(struct teamd_context *ctx);
+void teamd_option_watch_fini(struct teamd_context *ctx);
+int teamd_option_watch_register(struct teamd_context *ctx,
+				const struct teamd_option_watch *option_watch,
+				void *option_watch_priv);
+void teamd_option_watch_unregister(struct teamd_context *ctx,
+				   const struct teamd_option_watch *option_watch,
+				   void *option_watch_priv);
+
 int teamd_dbus_init(struct teamd_context *ctx);
 void teamd_dbus_fini(struct teamd_context *ctx);
 
