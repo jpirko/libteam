@@ -1049,6 +1049,52 @@ int team_set_port_queue_id(struct team_handle *th,
 }
 
 /**
+ * team_get_port_priority:
+ * @th: libteam library context
+ * @port_ifindex: port interface index
+ * @priority: where the port priority will be stored
+ *
+ * Gets priority for port identified by @port_ifindex
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_get_port_priority(struct team_handle *th,
+			   uint32_t port_ifindex, int32_t *priority)
+{
+	struct team_option *option;
+
+	option = team_get_option(th, "np", "priority", port_ifindex);
+	if (!option)
+		return -ENOENT;
+	*priority = team_get_option_value_s32(option);
+	return 0;
+}
+
+/**
+ * team_set_port_priority:
+ * @th: libteam library context
+ * @port_ifindex: port interface index
+ * @priority: desired priority
+ *
+ * Sets priority for port identified by @port_ifindex
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_set_port_priority(struct team_handle *th,
+			   uint32_t port_ifindex, int32_t priority)
+{
+	struct team_option *option;
+
+	option = team_get_option(th, "np!", "priority", port_ifindex);
+	if (!option)
+		return -ENOENT;
+
+	return team_set_option_value_s32(th, option, priority);
+}
+
+/**
  * SECTION: RTNL helpers
  * @short_description: Route netlink helper function
  */

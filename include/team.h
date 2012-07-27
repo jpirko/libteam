@@ -65,6 +65,10 @@ int team_set_port_user_linkup(struct team_handle *th,
 			      uint32_t port_ifindex, bool linkup);
 int team_set_port_queue_id(struct team_handle *th,
 			   uint32_t port_ifindex, uint32_t queue_id);
+int team_get_port_priority(struct team_handle *th,
+			   uint32_t port_ifindex, int32_t *priority);
+int team_set_port_priority(struct team_handle *th,
+			   uint32_t port_ifindex, int32_t priority);
 struct team_ifinfo;
 struct team_ifinfo *team_get_ifinfo(struct team_handle *th);
 
