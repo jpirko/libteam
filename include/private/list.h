@@ -38,15 +38,24 @@ static inline bool list_empty(struct list_item *head)
 	return head->next == head;
 }
 
-static inline void list_add(struct list_item *head, struct list_item *new_node)
+static inline void __list_add(struct list_item *new_node,
+			      struct list_item *prev_node,
+			      struct list_item *next_node)
 {
-	struct list_item *head_orig_prev = head->prev;
+	new_node->prev = prev_node;
+	new_node->next = next_node;
+	prev_node->next = new_node;
+	next_node->prev = new_node;
+}
 
-	new_node->prev = head_orig_prev;
-	new_node->next = head;
+static inline void list_add(struct list_item *head, struct list_item *node)
+{
+	__list_add(node, head, head->next);
+}
 
-	head->prev = new_node;
-	head_orig_prev->next = new_node;
+static inline void list_add_tail(struct list_item *head, struct list_item *node)
+{
+	__list_add(node, head->prev, head);
 }
 
 static inline void list_del(struct list_item *node)
