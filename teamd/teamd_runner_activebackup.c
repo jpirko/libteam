@@ -39,15 +39,15 @@ static struct abl_priv *abl_priv(struct teamd_context *ctx)
 	return (struct abl_priv *) ctx->runner_priv;
 }
 
-static int get_port_prio(struct teamd_context *ctx, const char *port_name)
+static int get_port_prio(struct teamd_context *ctx, struct teamd_port *tdport)
 {
 	int prio;
 	int err;
 
-	err = json_unpack(ctx->config_json, "{s:{s:{s:i}}}", "ports", port_name,
-							     "prio", &prio);
+	err = team_get_port_priority(ctx->th, tdport->ifindex, &prio);
 	if (err) {
-		teamd_log_dbg("%s: Using default port priority.", port_name);
+		teamd_log_warn("%s: Can't get port priority. Using default.",
+			       tdport->ifname);
 		return 0; /* return default priority */
 	}
 	return prio;
@@ -125,7 +125,7 @@ static int link_watch_handler(struct teamd_context *ctx)
 	if (active_tdport)
 		teamd_log_dbg("Current active port: \"%s\" (ifindex \"%d\", prio \"%d\").",
 			      active_tdport->ifname, active_tdport->ifindex,
-			      get_port_prio(ctx, active_tdport->ifname));
+			      get_port_prio(ctx, active_tdport));
 
 	teamd_for_each_tdport(tdport, ctx) {
 		struct team_port *port = tdport->team_port;
@@ -133,7 +133,7 @@ static int link_watch_handler(struct teamd_context *ctx)
 		if (teamd_link_watch_port_up(ctx, tdport)) {
 			uint32_t speed = team_get_port_speed(port);
 			uint8_t duplex = team_get_port_duplex(port);
-			int prio = get_port_prio(ctx, tdport->ifname);
+			int prio = get_port_prio(ctx, tdport);
 
 			if (!best_tdport ||
 			    (prio > best_prio) ||
