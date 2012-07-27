@@ -896,6 +896,15 @@ int teamd_port_add(struct teamd_context *ctx, const char *port_name)
 			return err;
 		}
 	}
+	err = json_unpack(port_obj, "{s:i}", "prio", &tmp);
+	if (!err) {
+		err = team_set_port_priority(ctx->th, ifindex, tmp);
+		if (err) {
+			teamd_log_err("%s: Failed to set \"priority\".",
+				      port_name);
+			return err;
+		}
+	}
 	return 0;
 }
 
