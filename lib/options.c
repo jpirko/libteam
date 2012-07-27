@@ -32,6 +32,7 @@
 #include <private/list.h>
 #include <private/misc.h>
 #include "team_private.h"
+#include "nl_updates.h"
 
 struct team_option_id {
 	char *			name;
@@ -206,8 +207,6 @@ static int update_option(struct team_handle *th, struct team_option **poption,
 	return 0;
 }
 
-#define __NLA_BINARY 11 /* Not in libnl atm */
-
 int get_options_handler(struct nl_msg *msg, void *arg)
 {
 	struct nlmsghdr *nlh = nlmsg_hdr(msg);
@@ -295,7 +294,7 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 			}
 			opt_type = TEAM_OPTION_TYPE_STRING;
 			break;
-		case __NLA_BINARY:
+		case NLA_BINARY:
 			data = nla_data(data_attr);
 			data_len = nla_len(data_attr);
 			opt_type = TEAM_OPTION_TYPE_BINARY;
@@ -690,7 +689,7 @@ static int set_option_value(struct team_handle *th, struct team_option *option,
 		nla_type = NLA_STRING;
 		break;
 	case TEAM_OPTION_TYPE_BINARY:
-		nla_type = __NLA_BINARY;
+		nla_type = NLA_BINARY;
 		break;
 	case TEAM_OPTION_TYPE_BOOL:
 		nla_type = NLA_FLAG;
@@ -727,7 +726,7 @@ static int set_option_value(struct team_handle *th, struct team_option *option,
 		case NLA_STRING:
 			NLA_PUT_STRING(msg, TEAM_ATTR_OPTION_DATA, (char *) data);
 			break;
-		case __NLA_BINARY:
+		case NLA_BINARY:
 			NLA_PUT(msg, TEAM_ATTR_OPTION_DATA, data_len, (char *) data);
 			break;
 		case NLA_FLAG:
