@@ -1074,6 +1074,10 @@ static bool __print_value_str(char *buf, size_t bufsiz,
 		n = snprintf(buf, bufsiz, "%s",
 			     team_get_option_value_bool(option) ? "true" : "false");
 		break;
+	case TEAM_OPTION_TYPE_S32:
+		n = snprintf(buf, bufsiz, "%d",
+			     team_get_option_value_s32(option));
+		break;
 	default:
 		n = snprintf(buf, bufsiz, "<unknown>");
 		break;
