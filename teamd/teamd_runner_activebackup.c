@@ -31,7 +31,8 @@
 #include "teamd.h"
 
 struct abl_priv {
-	char		old_active_hwaddr[MAX_ADDR_LEN];
+	char old_active_hwaddr[MAX_ADDR_LEN];
+	struct teamd_option_watch *prio_watch;
 };
 
 static struct abl_priv *abl_priv(struct teamd_context *ctx)
@@ -164,23 +165,23 @@ static int link_watch_handler(struct teamd_context *ctx)
 	return 0;
 }
 
-static int abl_prio_option_watch_handler(struct teamd_context *ctx,
-					 struct team_option *option,
-					 void *priv)
+static int abl_prio_option_changed(struct teamd_context *ctx,
+				   struct team_option *option, void *priv)
 {
 	return link_watch_handler(ctx);
 }
 
-static const struct teamd_option_watch abl_prio_option_watch = {
+static const struct teamd_option_watch_ops abl_prio_option_watch_ops = {
 	.option_name = "priority",
-	.handler = abl_prio_option_watch_handler,
+	.option_changed = abl_prio_option_changed,
 };
 
 static int abl_init(struct teamd_context *ctx)
 {
 	int err;
 
-	err = teamd_option_watch_register(ctx, &abl_prio_option_watch, NULL);
+	err = teamd_option_watch_register(&abl_priv(ctx)->prio_watch, ctx,
+					  &abl_prio_option_watch_ops, NULL);
 	if (!err)
 		return err;
 	teamd_link_watch_set_handler(ctx, link_watch_handler);
@@ -190,7 +191,7 @@ static int abl_init(struct teamd_context *ctx)
 static void abl_fini(struct teamd_context *ctx)
 {
 	teamd_link_watch_set_handler(ctx, NULL);
-	teamd_option_watch_unregister(ctx, &abl_prio_option_watch, NULL);
+	teamd_option_watch_unregister(abl_priv(ctx)->prio_watch);
 }
 
 const struct teamd_runner teamd_runner_activebackup = {
