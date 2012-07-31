@@ -73,7 +73,8 @@ struct teamd_context {
 	teamd_link_watch_handler_t	link_watch_handler;
 	struct list_item		port_priv_list;
 	unsigned int			port_priv_list_count;
-	struct list_item		option_watch_list;
+	struct list_item                option_watch_list;
+	struct list_item		event_watch_list;
 	uint32_t			ifindex;
 	struct team_ifinfo *		ifinfo;
 	char *				hwaddr;
@@ -109,6 +110,31 @@ struct teamd_runner {
 	void (*port_removed)(struct teamd_context *ctx, struct teamd_port *tdport);
 	size_t port_priv_size;
 };
+
+struct teamd_event_watch;
+
+struct teamd_event_watch_ops {
+	int (*port_added)(struct teamd_context *ctx,
+			  struct teamd_port *tdport, void *priv);
+	void (*port_removed)(struct teamd_context *ctx,
+			     struct teamd_port *tdport, void *priv);
+	int (*option_changed)(struct teamd_context *ctx,
+			      struct team_option *option, void *priv);
+};
+
+int teamd_event_port_added(struct teamd_context *ctx,
+			   struct teamd_port *tdport);
+void teamd_event_port_removed(struct teamd_context *ctx,
+			      struct teamd_port *tdport);
+int teamd_event_option_changed(struct teamd_context *ctx,
+			       struct team_option *option);
+int teamd_events_init(struct teamd_context *ctx);
+void teamd_events_fini(struct teamd_context *ctx);
+int teamd_event_watch_register(struct teamd_event_watch **pwatch,
+			       struct teamd_context *ctx,
+			       const struct teamd_event_watch_ops *ops,
+			       void *priv);
+void teamd_event_watch_unregister(struct teamd_event_watch *watch);
 
 struct teamd_link_watch {
 	const char *name;

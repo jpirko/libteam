@@ -100,12 +100,15 @@ static int ppitem_create(struct teamd_context *ctx,
 	tdport = _port(ppitem);
 	list_add(&ctx->port_priv_list, &ppitem->list);
 	ctx->port_priv_list_count++;
+	err = teamd_event_port_added(ctx, tdport);
+	if (err)
+		goto list_del;
 	if (tdport->link_watch && tdport->link_watch->port_added) {
 		err = tdport->link_watch->port_added(ctx, tdport);
 		if (err) {
 			teamd_log_err("Link watch port_added failed: %s.",
 				      strerror(-err));
-			goto list_del;
+			goto teamd_event_port_removed;
 		}
 	}
 	if (ctx->runner && ctx->runner->port_added) {
@@ -121,6 +124,8 @@ static int ppitem_create(struct teamd_context *ctx,
 lw_port_removed:
 	if (tdport->link_watch && tdport->link_watch->port_removed)
 		tdport->link_watch->port_removed(ctx, tdport);
+teamd_event_port_removed:
+	teamd_event_port_removed(ctx, tdport);
 list_del:
 	list_del(&ppitem->list);
 	ctx->port_priv_list_count--;
@@ -133,6 +138,7 @@ static void ppitem_destroy(struct teamd_context *ctx,
 {
 	struct teamd_port *tdport = _port(ppitem);
 
+	teamd_event_port_removed(ctx, tdport);
 	list_del(&ppitem->list);
 	ctx->port_priv_list_count--;
 	if (ctx->runner && ctx->runner->port_removed)

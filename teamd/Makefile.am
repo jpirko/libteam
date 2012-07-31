@@ -11,7 +11,8 @@ teamd_LDADD = $(top_builddir)/lib/libteam.la $(LIBDAEMON_LIBS) $(JANSSON_LIBS) $
 teamdctl_LDADD = $(top_builddir)/lib/libteam.la $(DBUS_LIBS)
 
 bin_PROGRAMS=teamd teamdctl
-teamd_SOURCES=teamd.c teamd_common.c teamd_per_port.c teamd_option_watch.c \
+teamd_SOURCES=teamd.c teamd_common.c teamd_events.c \
+	      teamd_per_port.c teamd_option_watch.c \
 	      teamd_dbus.c teamd_link_watch.c teamd_bpf_chef.c \
 	      teamd_hash_func.c teamd_balancer.c \
 	      teamd_runner_basic_ones.c teamd_runner_activebackup.c \
