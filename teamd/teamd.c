@@ -1293,6 +1293,16 @@ static int teamd_init(struct teamd_context *ctx)
 		goto dbus_fini;
 	}
 
+	/*
+	 * Expose name as the last thing so watchers like systemd
+	 * knows we are here and all ready.
+	 */
+	err = teamd_dbus_expose_name(ctx);
+	if (err) {
+		teamd_log_err("Failed to expose dbus name.");
+		goto dbus_fini;
+	}
+
 	return 0;
 
 dbus_fini:

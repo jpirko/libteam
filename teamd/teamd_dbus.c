@@ -268,44 +268,13 @@ static DBusObjectPathVTable vtable = {
 
 static int teamd_dbus_iface_init(struct teamd_context *ctx)
 {
-	DBusError error;
-	int err;
-	char *service_name;
-
-	err = asprintf(&service_name, TEAMD_DBUS_SERVICE ".%s",
-		       ctx->team_devname);
-	if (err == -1)
-		return -errno;
-
 	if (dbus_connection_register_object_path(ctx->dbus.con,
 						 TEAMD_DBUS_PATH, &vtable,
 						 ctx) == FALSE) {
 		teamd_log_err("dbus: Could not set up message handler");
-		err = -EINVAL;
-		goto out;
+		return -EINVAL;
 	}
-	dbus_error_init(&error);
-	err = dbus_bus_request_name(ctx->dbus.con, service_name, 0,
-				    &error);
-	if (err == DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
-		teamd_log_dbg("dbus: have name %s", service_name);
-		err = 0;
-	} else if (dbus_error_is_set(&error)) {
-		teamd_log_err("dbus: Failed to acquire %s: %s: %s",
-			      service_name, error.name, error.message);
-		err = -EINVAL;
-	} else {
-		teamd_log_err("dbus: name %s already taken.", service_name);
-		err = -EBUSY;
-	}
-	dbus_error_free(&error);
-	if (err)
-		dbus_connection_unregister_object_path(ctx->dbus.con,
-						       TEAMD_DBUS_PATH);
-out:
-	dbus_error_free(&error);
-	free(service_name);
-	return err;
+	return 0;
 }
 
 static void teamd_dbus_iface_fini(struct teamd_context *ctx)
@@ -624,4 +593,37 @@ void teamd_dbus_fini(struct teamd_context *ctx)
 		return;
 	teamd_dbus_iface_fini(ctx);
 	teamd_dbus_con_fini(ctx);
+}
+
+int teamd_dbus_expose_name(struct teamd_context *ctx)
+{
+	DBusError error;
+	int err;
+	char *service_name;
+
+	if (!ctx->dbus.enabled)
+		return 0;
+
+	err = asprintf(&service_name, TEAMD_DBUS_SERVICE ".%s",
+		       ctx->team_devname);
+	if (err == -1)
+		return -errno;
+
+	dbus_error_init(&error);
+	err = dbus_bus_request_name(ctx->dbus.con, service_name, 0,
+				    &error);
+	if (err == DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
+		teamd_log_dbg("dbus: have name %s", service_name);
+		err = 0;
+	} else if (dbus_error_is_set(&error)) {
+		teamd_log_err("dbus: Failed to acquire %s: %s: %s",
+			      service_name, error.name, error.message);
+		err = -EINVAL;
+	} else {
+		teamd_log_err("dbus: name %s already taken.", service_name);
+		err = -EBUSY;
+	}
+	dbus_error_free(&error);
+	free(service_name);
+	return err;
 }

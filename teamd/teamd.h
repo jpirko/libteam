@@ -250,6 +250,7 @@ void teamd_option_watch_unregister(struct teamd_option_watch *watch);
 
 int teamd_dbus_init(struct teamd_context *ctx);
 void teamd_dbus_fini(struct teamd_context *ctx);
+int teamd_dbus_expose_name(struct teamd_context *ctx);
 
 struct teamd_balancer;
 int teamd_balancer_init(struct teamd_context *ctx, struct teamd_balancer **ptb);
