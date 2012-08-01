@@ -5,6 +5,7 @@ AC_INIT([libteam], [0.1], [jpirko@redhat.com])
 AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([-Wall foreign subdir-objects])
 #m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES(yes)], [])
+AM_PROG_AR
 
 AC_SUBST(LIBTEAM_CURRENT, 0)
 AC_SUBST(LIBTEAM_REVISION, 0)
