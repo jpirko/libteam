@@ -1,0 +1,6 @@
+[Unit]
+Description=Team Daemon for device %I
+
+[Service]
+BusName=org.libteam.teamd.%i
+ExecStart=/usr/bin/teamd -D -t %i -f /run/teamd/%i.conf
