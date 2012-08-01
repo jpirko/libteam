@@ -266,7 +266,7 @@ static DBusObjectPathVTable vtable = {
 	.message_function = message_handler,
 };
 
-int teamd_dbus_iface_init(struct teamd_context *ctx)
+static int teamd_dbus_iface_init(struct teamd_context *ctx)
 {
 	DBusError error;
 	int err;
@@ -308,13 +308,13 @@ out:
 	return err;
 }
 
-void teamd_dbus_iface_fini(struct teamd_context *ctx)
+static void teamd_dbus_iface_fini(struct teamd_context *ctx)
 {
 	dbus_connection_unregister_object_path(ctx->dbus.con,
 					       TEAMD_DBUS_PATH);
 }
 
-int teamd_dbus_con_init(struct teamd_context *ctx)
+static int teamd_dbus_con_init(struct teamd_context *ctx)
 {
 	DBusError error;
 	int err = 0;
@@ -333,7 +333,7 @@ free_err:
 	return err;
 }
 
-void teamd_dbus_con_fini(struct teamd_context *ctx)
+static void teamd_dbus_con_fini(struct teamd_context *ctx)
 {
 	dbus_connection_unref(ctx->dbus.con);
 }
@@ -557,7 +557,7 @@ static void dispatch_exit(void *priv)
 	free(dp);
 }
 
-int teamd_dbus_mainloop_init(struct teamd_context *ctx)
+static int teamd_dbus_mainloop_init(struct teamd_context *ctx)
 {
 	struct dispatch_priv *dp = dp;
 	int err;
