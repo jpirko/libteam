@@ -107,6 +107,13 @@ static inline struct list_item *list_get_next_node(struct list_item *head,
 	     entry = list_get_node_entry(entry->struct_member.next,		\
 					 typeof(*entry), struct_member))
 
+#define list_for_each_node_entry_continue_reverse(entry, head, struct_member)	\
+	for (entry = list_get_node_entry(entry->struct_member.prev,		\
+					 typeof(*entry), struct_member);	\
+	     &entry->struct_member != (head);					\
+	     entry = list_get_node_entry(entry->struct_member.prev,		\
+					 typeof(*entry), struct_member))
+
 #define list_for_each_node_entry_safe(entry, tmp, head, struct_member)		\
 	for (entry = list_get_node_entry((head)->next,				\
 					 typeof(*entry), struct_member),	\
