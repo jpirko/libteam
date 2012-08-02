@@ -204,6 +204,30 @@ static inline void teamd_link_watch_set_handler(struct teamd_context *ctx,
 	ctx->link_watch_handler = handler;
 }
 
+struct teamd_port_priv {
+	int (*init)(struct teamd_context *ctx, struct teamd_port *tdport,
+		    void *this_priv, void *creator_priv);
+	void (*fini)(struct teamd_context *ctx, struct teamd_port *tdport,
+		     void *this_priv, void *creator_priv);
+	size_t priv_size;
+};
+
+int teamd_port_priv_create_and_get(void **ppriv, struct teamd_port *tdport,
+				   const struct teamd_port_priv *pp,
+				   void *creator_priv);
+int teamd_port_priv_create(struct teamd_port *tdport,
+			   const struct teamd_port_priv *pp, void *creator_priv);
+void *teamd_get_next_port_priv_by_creator(struct teamd_port *tdport,
+					  void *creator_priv, void *priv);
+void *teamd_get_first_port_priv_by_creator(struct teamd_port *tdport,
+					   void *creator_priv);
+#define teamd_for_each_port_priv_by_creator(priv, tdport, creator_priv)		\
+	for (priv = teamd_get_next_port_priv_by_creator(tdport, creator_priv,	\
+							NULL);			\
+	     priv;								\
+	     priv = teamd_get_next_port_priv_by_creator(tdport,	creator_priv,	\
+							priv))
+
 int teamd_per_port_init(struct teamd_context *ctx);
 void teamd_per_port_fini(struct teamd_context *ctx);
 struct teamd_port *teamd_get_port(struct teamd_context *ctx, uint32_t ifindex);
