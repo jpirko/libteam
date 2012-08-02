@@ -106,6 +106,7 @@ static bool lacpdu_check(struct lacpdu *lacpdu)
 
 struct lacp {
 	struct teamd_context *ctx;
+	struct teamd_event_watch *event_watch;
 	uint32_t selected_aggregator_id;
 	struct {
 		bool active;
@@ -158,6 +159,17 @@ struct lacp_port {
 	} cfg;
 };
 
+static struct lacp_port *lacp_port_get(struct lacp *lacp,
+				       struct teamd_port *tdport)
+{
+	/*
+	 * When calling this after teamd_event_watch_register() which is in
+	 * lacp_init() it is ensured that this will always return valid priv
+	 * pointer for an existing port.
+	 */
+	return teamd_get_first_port_priv_by_creator(tdport, lacp);
+}
+
 static int lacp_load_config(struct teamd_context *ctx, struct lacp *lacp)
 {
 	int err;
@@ -185,59 +197,6 @@ static int lacp_load_config(struct teamd_context *ctx, struct lacp *lacp)
 	lacp->cfg.fast_rate = err ? LACP_CFG_DFLT_FAST_RATE : !!tmp;
 	teamd_log_dbg("Using fast_rate \"%d\".", lacp->cfg.fast_rate);
 	return 0;
-}
-
-static int lacp_port_link_update(struct lacp_port *lacp_port);
-
-static int lacp_port_change_handler_func(struct team_handle *th, void *arg,
-					 team_change_type_mask_t type_mask)
-{
-	struct teamd_context *ctx = team_get_user_priv(th);
-	struct teamd_port *tdport;
-	struct lacp_port *lacp_port;
-	int err;
-
-	teamd_for_each_tdport(tdport, ctx) {
-		if (team_is_port_changed(tdport->team_port)) {
-			lacp_port = teamd_get_runner_port_priv(tdport);
-			err = lacp_port_link_update(lacp_port);
-			if (err)
-				return err;
-		}
-	}
-	return 0;
-}
-
-static struct team_change_handler lacp_port_change_handler = {
-	.func = lacp_port_change_handler_func,
-	.type_mask = TEAM_PORT_CHANGE,
-};
-
-static int lacp_init(struct teamd_context *ctx)
-{
-	struct lacp *lacp = ctx->runner_priv;
-	int err;
-
-	lacp->ctx = ctx;
-	err = teamd_hash_func_set(ctx);
-	if (err)
-		return err;
-	err = lacp_load_config(ctx, lacp);
-	if (err) {
-		teamd_log_err("Failed to load config values.");
-		return err;
-	}
-	err = team_change_handler_register(ctx->th, &lacp_port_change_handler);
-	if (err) {
-		teamd_log_err("Failed to register change handler.");
-		return err;
-	}
-	return 0;
-}
-
-static void lacp_fini(struct teamd_context *ctx)
-{
-	team_change_handler_unregister(ctx->th, &lacp_port_change_handler);
 }
 
 static bool lacp_port_selectable(struct lacp_port *lacp_port)
@@ -368,7 +327,7 @@ static struct lacp_port *lacp_get_best_port(struct lacp *lacp)
 	struct lacp_port *best_lacp_port = NULL;
 
 	teamd_for_each_tdport(tdport, lacp->ctx) {
-		lacp_port = teamd_get_runner_port_priv(tdport);
+		lacp_port = lacp_port_get(lacp, tdport);
 		if (!lacp_port_selectable(lacp_port))
 			continue;
 		if (!best_lacp_port ||
@@ -391,7 +350,7 @@ static int lacp_update_selected(struct lacp *lacp)
 	 * each other.
 	 */
 	teamd_for_each_tdport(tdport, lacp->ctx) {
-		lacp_port = teamd_get_runner_port_priv(tdport);
+		lacp_port = lacp_port_get(lacp, tdport);
 		lacp_port->selected = false;
 		lacp_port->aggregator_id = 0;
 	}
@@ -403,7 +362,7 @@ static int lacp_update_selected(struct lacp *lacp)
 		if (!lacp->selected_aggregator_id)
 			lacp->selected_aggregator_id = aggregator_id;
 		teamd_for_each_tdport(tdport, lacp->ctx) {
-			lacp_port = teamd_get_runner_port_priv(tdport);
+			lacp_port = lacp_port_get(lacp, tdport);
 			if (lacp_port_selectable(lacp_port) &&
 			    best_lacp_port &&
 			    lacp_ports_aggregable(lacp_port, best_lacp_port)) {
@@ -417,7 +376,7 @@ static int lacp_update_selected(struct lacp *lacp)
 	 * At last, do port enabling/disabling.
 	 */
 	teamd_for_each_tdport(tdport, lacp->ctx) {
-		lacp_port = teamd_get_runner_port_priv(tdport);
+		lacp_port = lacp_port_get(lacp, tdport);
 		err = lacp_port_update_enabled(lacp_port);
 		if (err)
 			return err;
@@ -802,9 +761,10 @@ static int lacp_port_load_config(struct teamd_context *ctx,
 }
 
 static int lacp_port_added(struct teamd_context *ctx,
-			   struct teamd_port *tdport)
+			   struct teamd_port *tdport,
+			   void *priv, void *creator_priv)
 {
-	struct lacp_port *lacp_port = teamd_get_runner_port_priv(tdport);
+	struct lacp_port *lacp_port = priv;
 	struct lacp *lacp = ctx->runner_priv;
 	int err;
 
@@ -914,9 +874,10 @@ close_sock:
 }
 
 static void lacp_port_removed(struct teamd_context *ctx,
-			      struct teamd_port *tdport)
+			      struct teamd_port *tdport,
+			      void *priv, void *creator_priv)
 {
-	struct lacp_port *lacp_port = teamd_get_runner_port_priv(tdport);
+	struct lacp_port *lacp_port = priv;
 
 	lacp_port_set_state(lacp_port, PORT_STATE_DISABLED);
 	teamd_loop_callback_del(ctx, lacp_port->cb_name_periodic);
@@ -927,13 +888,90 @@ static void lacp_port_removed(struct teamd_context *ctx,
 	close(lacp_port->sock);
 }
 
+static int lacp_port_change_handler_func(struct team_handle *th, void *arg,
+					 team_change_type_mask_t type_mask)
+{
+	struct teamd_context *ctx = team_get_user_priv(th);
+	struct lacp *lacp = ctx->runner_priv;
+	struct teamd_port *tdport;
+	struct lacp_port *lacp_port;
+	int err;
+
+	teamd_for_each_tdport(tdport, ctx) {
+		if (team_is_port_changed(tdport->team_port)) {
+			lacp_port = lacp_port_get(lacp, tdport);
+			err = lacp_port_link_update(lacp_port);
+			if (err)
+				return err;
+		}
+	}
+	return 0;
+}
+
+static struct team_change_handler lacp_port_change_handler = {
+	.func = lacp_port_change_handler_func,
+	.type_mask = TEAM_PORT_CHANGE,
+};
+
+static const struct teamd_port_priv lacp_port_priv = {
+	.init = lacp_port_added,
+	.fini = lacp_port_removed,
+	.priv_size = sizeof(struct lacp_port),
+};
+
+static int lacp_event_watch_port_added(struct teamd_context *ctx,
+				       struct teamd_port *tdport, void *priv)
+{
+	return teamd_port_priv_create(tdport, &lacp_port_priv, priv);
+}
+
+static const struct teamd_event_watch_ops lacp_port_watch_ops = {
+	.port_added = lacp_event_watch_port_added,
+};
+
+static int lacp_init(struct teamd_context *ctx)
+{
+	struct lacp *lacp = ctx->runner_priv;
+	int err;
+
+	lacp->ctx = ctx;
+	err = teamd_hash_func_set(ctx);
+	if (err)
+		return err;
+	err = lacp_load_config(ctx, lacp);
+	if (err) {
+		teamd_log_err("Failed to load config values.");
+		return err;
+	}
+	err = team_change_handler_register(ctx->th, &lacp_port_change_handler);
+	if (err) {
+		teamd_log_err("Failed to register change handler.");
+		return err;
+	}
+	err = teamd_event_watch_register(&lacp->event_watch, ctx,
+					 &lacp_port_watch_ops, lacp);
+	if (err) {
+		teamd_log_err("Failed to register event watch.");
+		goto change_handler_unregister;
+	}
+	return 0;
+change_handler_unregister:
+	team_change_handler_unregister(ctx->th, &lacp_port_change_handler);
+	return err;
+}
+
+static void lacp_fini(struct teamd_context *ctx)
+{
+	struct lacp *lacp = ctx->runner_priv;
+
+	team_change_handler_unregister(ctx->th, &lacp_port_change_handler);
+	teamd_event_watch_unregister(lacp->event_watch);
+}
+
 const struct teamd_runner teamd_runner_lacp = {
 	.name		= "lacp",
 	.team_mode_name	= "loadbalance",
 	.init		= lacp_init,
 	.fini		= lacp_fini,
 	.priv_size	= sizeof(struct lacp),
-	.port_added	= lacp_port_added,
-	.port_removed	= lacp_port_removed,
-	.port_priv_size = sizeof(struct lacp_port),
 };

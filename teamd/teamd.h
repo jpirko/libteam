@@ -106,9 +106,6 @@ struct teamd_runner {
 	size_t priv_size;
 	int (*init)(struct teamd_context *ctx);
 	void (*fini)(struct teamd_context *ctx);
-	int (*port_added)(struct teamd_context *ctx, struct teamd_port *tdport);
-	void (*port_removed)(struct teamd_context *ctx, struct teamd_port *tdport);
-	size_t port_priv_size;
 };
 
 struct teamd_event_watch;
@@ -249,7 +246,6 @@ static inline unsigned int teamd_port_count(struct teamd_context *ctx)
 int teamd_port_add(struct teamd_context *ctx, const char *port_name);
 int teamd_port_remove(struct teamd_context *ctx, const char *port_name);
 
-void *teamd_get_runner_port_priv(struct teamd_port *tdport);
 void *teamd_get_link_watch_port_priv(struct teamd_port *tdport);
 
 typedef int (*teamd_option_watch_handler_t)(struct teamd_context *ctx,
