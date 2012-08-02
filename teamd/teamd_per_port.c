@@ -28,7 +28,7 @@
 
 #include "teamd.h"
 
-struct port_priv_item {
+struct port_obj {
 	struct teamd_port port; /* must be first */
 	struct list_item list;
 	bool to_be_freed;
@@ -36,70 +36,70 @@ struct port_priv_item {
 	void *link_watch_priv;
 };
 
-#define _port(ppitem) (&(ppitem)->port)
+#define _port(port_obj) (&(port_obj)->port)
 
-static struct port_priv_item *ppitem_alloc(struct teamd_context *ctx,
-					   uint32_t ifindex,
-					   struct team_port *team_port)
+static struct port_obj *port_obj_alloc(struct teamd_context *ctx,
+				       uint32_t ifindex,
+				       struct team_port *team_port)
 {
-	struct port_priv_item *ppitem;
+	struct port_obj *port_obj;
 	struct teamd_port *tdport;
 	struct team_ifinfo *team_ifinfo;
 
-	ppitem = myzalloc(sizeof(*ppitem));
-	if (!ppitem)
+	port_obj = myzalloc(sizeof(*port_obj));
+	if (!port_obj)
 		goto err_out;
-	tdport = _port(ppitem);
+	tdport = _port(port_obj);
 	tdport->ifindex = ifindex;
 	team_ifinfo = team_get_port_ifinfo(team_port);
 	tdport->ifname = team_get_ifinfo_ifname(team_ifinfo);
 	tdport->team_port = team_port;
 	tdport->team_ifinfo = team_ifinfo;
 	if (ctx->runner->port_priv_size) {
-		ppitem->runner_priv = myzalloc(ctx->runner->port_priv_size);
-		if (!ppitem->runner_priv)
-			goto free_ppitem;
+		port_obj->runner_priv = myzalloc(ctx->runner->port_priv_size);
+		if (!port_obj->runner_priv)
+			goto free_port_obj;
 	}
 	teamd_link_watch_select(ctx, tdport);
 	if (tdport->link_watch && tdport->link_watch->port_priv_size) {
-		ppitem->link_watch_priv =
+		port_obj->link_watch_priv =
 				myzalloc(tdport->link_watch->port_priv_size);
-		if (!ppitem->link_watch_priv)
+		if (!port_obj->link_watch_priv)
 			goto free_runner_priv;
 	}
-	return ppitem;
+	return port_obj;
 
 free_runner_priv:
-	free(ppitem->runner_priv);
-free_ppitem:
-	free(ppitem);
+	free(port_obj->runner_priv);
+free_port_obj:
+	free(port_obj);
 err_out:
-	teamd_log_err("Failed to alloc port priv.");
+	teamd_log_err("Failed to alloc port object.");
 	return NULL;
 }
 
-static void ppitem_free(struct port_priv_item *ppitem)
+static void port_obj_free(struct port_obj *port_obj)
 {
-	free(ppitem->link_watch_priv);
-	free(ppitem->runner_priv);
-	free(ppitem);
+	free(port_obj->link_watch_priv);
+	free(port_obj->runner_priv);
+	free(port_obj);
 }
 
-static int ppitem_create(struct teamd_context *ctx,
-			 struct port_priv_item **p_ppitem,
-			 uint32_t ifindex,
-			 struct team_port *team_port)
+static int port_obj_create(struct teamd_context *ctx,
+			   struct port_obj **p_port_obj,
+			   uint32_t ifindex,
+			   struct team_port *team_port)
 {
-	struct port_priv_item *ppitem;
+	struct port_obj *port_obj;
 	struct teamd_port *tdport;
 	int err;
 
-	ppitem = ppitem_alloc(ctx, ifindex, team_port);
-	if (!ppitem)
+	port_obj = port_obj_alloc(ctx, ifindex, team_port);
+	if (!port_obj)
 		return -ENOMEM;
-	tdport = _port(ppitem);
-	list_add(&ctx->port_priv_list, &ppitem->list);
-	ctx->port_priv_list_count++;
+	tdport = _port(port_obj);
+	list_add(&ctx->port_obj_list, &port_obj->list);
+	ctx->port_obj_list_count++;
 	err = teamd_event_port_added(ctx, tdport);
 	if (err)
 		goto list_del;
@@ -119,7 +119,7 @@ static int ppitem_create(struct teamd_context *ctx,
 			goto lw_port_removed;
 		}
 	}
-	*p_ppitem = ppitem;
+	*p_port_obj = port_obj;
 	return 0;
 lw_port_removed:
 	if (tdport->link_watch && tdport->link_watch->port_removed)
@@ -127,85 +127,85 @@ lw_port_removed:
 teamd_event_port_removed:
 	teamd_event_port_removed(ctx, tdport);
 list_del:
-	list_del(&ppitem->list);
-	ctx->port_priv_list_count--;
-	ppitem_free(ppitem);
+	list_del(&port_obj->list);
+	ctx->port_obj_list_count--;
+	port_obj_free(port_obj);
 	return err;
 }
 
-static void ppitem_destroy(struct teamd_context *ctx,
-			   struct port_priv_item *ppitem)
+static void port_obj_destroy(struct teamd_context *ctx,
+			     struct port_obj *port_obj)
 {
-	struct teamd_port *tdport = _port(ppitem);
+	struct teamd_port *tdport = _port(port_obj);
 
 	teamd_event_port_removed(ctx, tdport);
-	list_del(&ppitem->list);
-	ctx->port_priv_list_count--;
+	list_del(&port_obj->list);
+	ctx->port_obj_list_count--;
 	if (ctx->runner && ctx->runner->port_removed)
 		ctx->runner->port_removed(ctx, tdport);
 	if (tdport->link_watch && tdport->link_watch->port_removed)
 		tdport->link_watch->port_removed(ctx, tdport);
 }
 
-static struct port_priv_item *get_ppitem(struct teamd_context *ctx,
-					 uint32_t ifindex)
+static struct port_obj *get_port_obj(struct teamd_context *ctx,
+				     uint32_t ifindex)
 {
-	struct port_priv_item *ppitem;
+	struct port_obj *port_obj;
 
-	list_for_each_node_entry(ppitem, &ctx->port_priv_list, list) {
-		if (_port(ppitem)->ifindex == ifindex)
-			return ppitem;
+	list_for_each_node_entry(port_obj, &ctx->port_obj_list, list) {
+		if (_port(port_obj)->ifindex == ifindex)
+			return port_obj;
 	}
 	return NULL;
 }
 
 void *teamd_get_runner_port_priv(struct teamd_port *tdport)
 {
-	struct port_priv_item *ppitem = (struct port_priv_item *) tdport;
+	struct port_obj *port_obj = (struct port_obj *) tdport;
 
-	return ppitem->runner_priv;
+	return port_obj->runner_priv;
 }
 
 void *teamd_get_link_watch_port_priv(struct teamd_port *tdport)
 {
-	struct port_priv_item *ppitem = (struct port_priv_item *) tdport;
+	struct port_obj *port_obj = (struct port_obj *) tdport;
 
-	return ppitem->link_watch_priv;
+	return port_obj->link_watch_priv;
 }
 
-static void check_ppitems_to_be_freed(struct teamd_context *ctx)
+static void check_port_objs_to_be_freed(struct teamd_context *ctx)
 {
-	struct port_priv_item *ppitem, *tmp;
+	struct port_obj *port_obj, *tmp;
 
-	list_for_each_node_entry_safe(ppitem, tmp,
-				      &ctx->port_priv_list, list) {
-		if (ppitem->to_be_freed)
-			ppitem_free(ppitem);
+	list_for_each_node_entry_safe(port_obj, tmp,
+				      &ctx->port_obj_list, list) {
+		if (port_obj->to_be_freed)
+			port_obj_free(port_obj);
 	}
 }
 
 static int port_priv_change_handler_func(struct team_handle *th, void *arg,
-					  team_change_type_mask_t type_mask)
+					 team_change_type_mask_t type_mask)
 {
 	struct teamd_context *ctx = team_get_user_priv(th);
 	struct team_port *port;
-	struct port_priv_item *ppitem;
+	struct port_obj *port_obj;
 	int err;
 
-	check_ppitems_to_be_freed(ctx);
+	check_port_objs_to_be_freed(ctx);
 
 	team_for_each_port(port, th) {
 		uint32_t ifindex = team_get_port_ifindex(port);
 
-		ppitem = get_ppitem(ctx, ifindex);
-		if (!ppitem) {
-			err = ppitem_create(ctx, &ppitem, ifindex, port);
+		port_obj = get_port_obj(ctx, ifindex);
+		if (!port_obj) {
+			err = port_obj_create(ctx, &port_obj, ifindex, port);
 			if (err)
 				return err;
 		}
 		if (team_is_port_removed(port)) {
-			ppitem_destroy(ctx, ppitem);
-			ppitem->to_be_freed = true;
+			port_obj_destroy(ctx, port_obj);
+			port_obj->to_be_freed = true;
 		}
 	}
 	return 0;
@@ -220,7 +220,7 @@ int teamd_per_port_init(struct teamd_context *ctx)
 {
 	int err;
 
-	list_init(&ctx->port_priv_list);
+	list_init(&ctx->port_obj_list);
 	err = team_change_handler_register(ctx->th, &port_priv_change_handler);
 	return err;
 }
@@ -228,28 +228,28 @@ int teamd_per_port_init(struct teamd_context *ctx)
 void teamd_per_port_fini(struct teamd_context *ctx)
 {
 	team_change_handler_unregister(ctx->th, &port_priv_change_handler);
-	check_ppitems_to_be_freed(ctx);
+	check_port_objs_to_be_freed(ctx);
 }
 
 struct teamd_port *teamd_get_port(struct teamd_context *ctx, uint32_t ifindex)
 {
-	struct port_priv_item *ppitem;
+	struct port_obj *port_obj;
 
-	ppitem = get_ppitem(ctx, ifindex);
-	if (!ppitem)
+	port_obj = get_port_obj(ctx, ifindex);
+	if (!port_obj)
 		return NULL;
-	return _port(ppitem);
+	return _port(port_obj);
 }
 
 struct teamd_port *teamd_get_next_tdport(struct teamd_context *ctx,
 					 struct teamd_port *tdport)
 {
-	struct port_priv_item *ppitem = NULL;
+	struct port_obj *port_obj = NULL;
 
 	if (tdport)
-		ppitem = get_container(tdport, struct port_priv_item, port);
-	ppitem = list_get_next_node_entry(&ctx->port_priv_list, ppitem, list);
-	if (!ppitem)
+		port_obj = get_container(tdport, struct port_obj, port);
+	port_obj = list_get_next_node_entry(&ctx->port_obj_list, port_obj, list);
+	if (!port_obj)
 		return NULL;
-	return _port(ppitem);
+	return _port(port_obj);
 }

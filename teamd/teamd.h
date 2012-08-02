@@ -71,8 +71,8 @@ struct teamd_context {
 	const struct teamd_runner *	runner;
 	void *				runner_priv;
 	teamd_link_watch_handler_t	link_watch_handler;
-	struct list_item		port_priv_list;
-	unsigned int			port_priv_list_count;
+	struct list_item		port_obj_list;
+	unsigned int			port_obj_list_count;
 	struct list_item                option_watch_list;
 	struct list_item		event_watch_list;
 	uint32_t			ifindex;
@@ -214,12 +214,12 @@ struct teamd_port *teamd_get_next_tdport(struct teamd_context *ctx,
 	     tdport = teamd_get_next_tdport(ctx, tdport))
 static inline bool teamd_has_ports(struct teamd_context *ctx)
 {
-	return !list_empty(&ctx->port_priv_list);
+	return !list_empty(&ctx->port_obj_list);
 }
 
 static inline unsigned int teamd_port_count(struct teamd_context *ctx)
 {
-	return ctx->port_priv_list_count;
+	return ctx->port_obj_list_count;
 }
 
 int teamd_port_add(struct teamd_context *ctx, const char *port_name);
