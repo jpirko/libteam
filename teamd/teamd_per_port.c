@@ -39,7 +39,6 @@ struct port_obj {
 	struct teamd_port port; /* must be first */
 	struct list_item list;
 	bool to_be_freed;
-	void *link_watch_priv;
 	struct list_item priv_list;
 };
 
@@ -146,8 +145,10 @@ static struct port_obj *port_obj_alloc(struct teamd_context *ctx,
 	struct team_ifinfo *team_ifinfo;
 
 	port_obj = myzalloc(sizeof(*port_obj));
-	if (!port_obj)
-		goto err_out;
+	if (!port_obj) {
+		teamd_log_err("Failed to alloc port object.");
+		return NULL;
+	}
 	list_init(&port_obj->priv_list);
 	tdport = _port(port_obj);
 	tdport->ifindex = ifindex;
@@ -155,25 +156,11 @@ static struct port_obj *port_obj_alloc(struct teamd_context *ctx,
 	tdport->ifname = team_get_ifinfo_ifname(team_ifinfo);
 	tdport->team_port = team_port;
 	tdport->team_ifinfo = team_ifinfo;
-	teamd_link_watch_select(ctx, tdport);
-	if (tdport->link_watch && tdport->link_watch->port_priv_size) {
-		port_obj->link_watch_priv =
-				myzalloc(tdport->link_watch->port_priv_size);
-		if (!port_obj->link_watch_priv)
-			goto free_port_obj;
-	}
 	return port_obj;
-
-free_port_obj:
-	free(port_obj);
-err_out:
-	teamd_log_err("Failed to alloc port object.");
-	return NULL;
 }
 
 static void port_obj_free(struct port_obj *port_obj)
 {
-	free(port_obj->link_watch_priv);
 	free(port_obj);
 }
 
@@ -195,22 +182,12 @@ static int port_obj_create(struct teamd_context *ctx,
 	err = teamd_event_port_added(ctx, tdport);
 	if (err)
 		goto list_del;
-	if (tdport->link_watch && tdport->link_watch->port_added) {
-		err = tdport->link_watch->port_added(ctx, tdport);
-		if (err) {
-			teamd_log_err("Link watch port_added failed: %s.",
-				      strerror(-err));
-			goto teamd_event_port_removed;
-		}
-	}
 	err = port_priv_init_all(ctx, port_obj);
 	if (err)
-		goto lw_port_removed;
+		goto teamd_event_port_removed;
 	*p_port_obj = port_obj;
 	return 0;
-lw_port_removed:
-	if (tdport->link_watch && tdport->link_watch->port_removed)
-		tdport->link_watch->port_removed(ctx, tdport);
+
 teamd_event_port_removed:
 	teamd_event_port_removed(ctx, tdport);
 list_del:
@@ -230,8 +207,6 @@ static void port_obj_destroy(struct teamd_context *ctx,
 	ctx->port_obj_list_count--;
 	port_priv_fini_all(ctx, port_obj);
 	port_priv_free_all(ctx, port_obj);
-	if (tdport->link_watch && tdport->link_watch->port_removed)
-		tdport->link_watch->port_removed(ctx, tdport);
 }
 
 static struct port_obj *get_port_obj(struct teamd_context *ctx,
@@ -244,13 +219,6 @@ static struct port_obj *get_port_obj(struct teamd_context *ctx,
 			return port_obj;
 	}
 	return NULL;
-}
-
-void *teamd_get_link_watch_port_priv(struct teamd_port *tdport)
-{
-	struct port_obj *port_obj = (struct port_obj *) tdport;
-
-	return port_obj->link_watch_priv;
 }
 
 static void check_port_objs_to_be_freed(struct teamd_context *ctx)

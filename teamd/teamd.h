@@ -51,7 +51,6 @@ enum teamd_command {
 };
 
 struct teamd_runner;
-struct teamd_link_watch;
 struct teamd_context;
 
 typedef int (*teamd_link_watch_handler_t)(struct teamd_context *ctx);
@@ -96,8 +95,6 @@ struct teamd_port {
 	char *				ifname;
 	struct team_port *		team_port;
 	struct team_ifinfo *		team_ifinfo;
-	const struct teamd_link_watch *	link_watch;
-	json_t *			link_watch_json;
 };
 
 struct teamd_runner {
@@ -131,14 +128,6 @@ int teamd_event_watch_register(struct teamd_context *ctx,
 void teamd_event_watch_unregister(struct teamd_context *ctx,
 				  const struct teamd_event_watch_ops *ops,
 				  void *priv);
-
-struct teamd_link_watch {
-	const char *name;
-	int (*port_added)(struct teamd_context *ctx, struct teamd_port *tdport);
-	void (*port_removed)(struct teamd_context *ctx, struct teamd_port *tdport);
-	bool (*is_port_up)(struct teamd_context *ctx, struct teamd_port *tdport);
-	size_t port_priv_size;
-};
 
 int teamd_update_port_config(struct teamd_context *ctx, const char *port_name,
 			     const char *json_port_cfg_str);
@@ -187,19 +176,6 @@ const struct teamd_runner teamd_runner_activebackup;
 const struct teamd_runner teamd_runner_loadbalance;
 const struct teamd_runner teamd_runner_lacp;
 
-bool teamd_link_watch_port_up(struct teamd_context *ctx,
-			      struct teamd_port *tdport);
-void teamd_link_watch_select(struct teamd_context *ctx,
-			     struct teamd_port *tdport);
-int teamd_link_watch_init(struct teamd_context *ctx);
-void teamd_link_watch_fini(struct teamd_context *ctx);
-
-static inline void teamd_link_watch_set_handler(struct teamd_context *ctx,
-						teamd_link_watch_handler_t handler)
-{
-	ctx->link_watch_handler = handler;
-}
-
 struct teamd_port_priv {
 	int (*init)(struct teamd_context *ctx, struct teamd_port *tdport,
 		    void *this_priv, void *creator_priv);
@@ -245,7 +221,16 @@ static inline unsigned int teamd_port_count(struct teamd_context *ctx)
 int teamd_port_add(struct teamd_context *ctx, const char *port_name);
 int teamd_port_remove(struct teamd_context *ctx, const char *port_name);
 
-void *teamd_get_link_watch_port_priv(struct teamd_port *tdport);
+bool teamd_link_watch_port_up(struct teamd_context *ctx,
+			      struct teamd_port *tdport);
+int teamd_link_watch_init(struct teamd_context *ctx);
+void teamd_link_watch_fini(struct teamd_context *ctx);
+
+static inline void teamd_link_watch_set_handler(struct teamd_context *ctx,
+						teamd_link_watch_handler_t handler)
+{
+	ctx->link_watch_handler = handler;
+}
 
 typedef int (*teamd_option_watch_handler_t)(struct teamd_context *ctx,
 					    struct team_option *option,

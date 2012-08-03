@@ -38,106 +38,17 @@
 
 #include "teamd.h"
 
-const struct teamd_link_watch teamd_link_watch_ethtool;
-const struct teamd_link_watch teamd_link_watch_arp_ping;
-const struct teamd_link_watch teamd_link_watch_nsnap;
-
-static const struct teamd_link_watch *teamd_link_watch_list[] = {
-	&teamd_link_watch_ethtool,
-	&teamd_link_watch_arp_ping,
-	&teamd_link_watch_nsnap,
+struct lw_common_port_priv {
+	const struct teamd_link_watch *link_watch;
+	json_t *link_watch_json;
 };
 
-#define TEAMD_LINK_WATCH_LIST_SIZE ARRAY_SIZE(teamd_link_watch_list)
-
-static const struct teamd_link_watch *teamd_find_link_watch(const char *link_watch_name)
-{
-	int i;
-
-	for (i = 0; i < TEAMD_LINK_WATCH_LIST_SIZE; i++) {
-		if (strcmp(teamd_link_watch_list[i]->name, link_watch_name) == 0)
-			return teamd_link_watch_list[i];
-	}
-	return NULL;
-}
-
-static int call_link_watch_handler(struct teamd_context *ctx)
-{
-	if (ctx->link_watch_handler)
-		return ctx->link_watch_handler(ctx);
-	return 0;
-}
-
-static int port_change_handler_func(struct team_handle *th, void *arg,
-				    team_change_type_mask_t type_mask)
-{
-	struct teamd_context *ctx = team_get_user_priv(th);
-
-	return call_link_watch_handler(ctx);
-}
-
-static struct team_change_handler port_change_handler = {
-	.func = port_change_handler_func,
-	.type_mask = TEAM_PORT_CHANGE,
+struct teamd_link_watch {
+	const char *name;
+	bool (*is_port_up)(struct teamd_context *ctx, struct teamd_port *tdport,
+			   struct lw_common_port_priv *common_ppriv);
+	struct teamd_port_priv port_priv;
 };
-
-bool teamd_link_watch_port_up(struct teamd_context *ctx,
-			      struct teamd_port *tdport)
-{
-	if (tdport && tdport->link_watch && tdport->link_watch->is_port_up)
-		return tdport->link_watch->is_port_up(ctx, tdport);
-	return true;
-}
-
-void teamd_link_watch_select(struct teamd_context *ctx,
-			     struct teamd_port *tdport)
-{
-	int err;
-	const char *link_watch_name;
-	json_t *link_watch_obj;
-
-	err = json_unpack(ctx->config_json, "{s:{s:{s:o}}}", "ports",
-			  tdport->ifname, "link_watch", &link_watch_obj);
-	if (err) {
-		teamd_log_dbg("%s: Failed to get link watch from port config.",
-			      tdport->ifname);
-		err = json_unpack(ctx->config_json, "{s:o}", "link_watch",
-				  &link_watch_obj);
-		if (err) {
-			teamd_log_info("%s: Failed to get link watch "
-				       "from config.", tdport->ifname);
-			goto nowatch;
-		}
-	}
-	err = json_unpack(link_watch_obj, "{s:s}", "name", &link_watch_name);
-	if (err) {
-		teamd_log_info("%s: Failed to get link watch name.",
-			       tdport->ifname);
-		goto nowatch;
-	}
-	tdport->link_watch = teamd_find_link_watch(link_watch_name);
-	if (!tdport->link_watch) {
-		teamd_log_info("No link_watch named \"%s\" available.",
-			       link_watch_name);
-		goto nowatch;
-	}
-	teamd_log_info("%s: Using link_watch \"%s\".",
-		       tdport->ifname, link_watch_name);
-	tdport->link_watch_json = link_watch_obj;
-	return;
-nowatch:
-	teamd_log_info("%s: Using no link watch!", tdport->ifname);
-}
-
-int teamd_link_watch_init(struct teamd_context *ctx)
-{
-	return team_change_handler_register(ctx->th, &port_change_handler);
-}
-
-void teamd_link_watch_fini(struct teamd_context *ctx)
-{
-	team_change_handler_unregister(ctx->th, &port_change_handler);
-}
 
 static int __set_sockaddr(struct sockaddr *sa, socklen_t sa_len,
 			  sa_family_t family, const char *hostname)
@@ -223,7 +134,8 @@ static char *str_sockaddr_in6(struct sockaddr_in6 *sin6)
  */
 
 static bool lw_ethtool_is_port_up(struct teamd_context *ctx,
-				  struct teamd_port *tdport)
+				  struct teamd_port *tdport,
+				  struct lw_common_port_priv *common_ppriv)
 {
 	struct team_port *port;
 
@@ -233,9 +145,16 @@ static bool lw_ethtool_is_port_up(struct teamd_context *ctx,
 	return false;
 }
 
+struct lw_ethtool_port_priv {
+	struct lw_common_port_priv common; /* must be first */
+};
+
 const struct teamd_link_watch teamd_link_watch_ethtool = {
-	.name		= "ethtool",
-	.is_port_up	= lw_ethtool_is_port_up,
+	.name			= "ethtool",
+	.is_port_up		= lw_ethtool_is_port_up,
+	.port_priv = {
+		.priv_size	= sizeof(struct lw_ethtool_port_priv),
+	},
 };
 
 
@@ -246,17 +165,18 @@ const struct teamd_link_watch teamd_link_watch_ethtool = {
 struct lw_psr_port_priv;
 
 struct lw_psr_ops {
-	int (*sock_open)(struct lw_psr_port_priv *port_priv);
-	void (*sock_close)(struct lw_psr_port_priv *port_priv);
+	int (*sock_open)(struct lw_psr_port_priv *psr_ppriv);
+	void (*sock_close)(struct lw_psr_port_priv *psr_ppriv);
 	int (*load_options)(struct teamd_context *ctx,
 			    struct teamd_port *tdport,
-			    struct lw_psr_port_priv *port_priv);
-	int (*send)(struct lw_psr_port_priv *port_priv);
-	int (*receive)(struct lw_psr_port_priv *port_priv);
+			    struct lw_psr_port_priv *psr_ppriv);
+	int (*send)(struct lw_psr_port_priv *psr_ppriv);
+	int (*receive)(struct lw_psr_port_priv *psr_ppriv);
 	struct timespec default_init_wait;
 };
 
 struct lw_psr_port_priv {
+	struct lw_common_port_priv common; /* must be first */
 	struct teamd_port *tdport;
 	const struct lw_psr_ops *ops;
 	struct timespec interval;
@@ -270,81 +190,87 @@ struct lw_psr_port_priv {
 	bool link_up;
 };
 
+static struct lw_psr_port_priv *
+lw_psr_ppriv_get(struct lw_common_port_priv *common_ppriv)
+{
+	return (struct lw_psr_port_priv *) common_ppriv;
+}
+
+static int call_link_watch_handler(struct teamd_context *ctx);
+
 static int lw_psr_callback_periodic(struct teamd_context *ctx, int events,
 				    void *func_priv)
 {
-	struct lw_psr_port_priv *port_priv = func_priv;
-	struct teamd_port *tdport = port_priv->tdport;
-	bool orig_link_up = port_priv->link_up;
-	const char *lw_name = port_priv->tdport->link_watch->name;
+	struct lw_psr_port_priv *psr_ppriv = func_priv;
+	struct teamd_port *tdport = psr_ppriv->tdport;
+	bool orig_link_up = psr_ppriv->link_up;
+	const char *lw_name = psr_ppriv->common.link_watch->name;
 	int err;
 
-	if (port_priv->reply_received) {
-		port_priv->link_up = true;
-		port_priv->missed = 0;
+	if (psr_ppriv->reply_received) {
+		psr_ppriv->link_up = true;
+		psr_ppriv->missed = 0;
 	} else {
-		port_priv->missed++;
-		if (port_priv->missed > port_priv->missed_max &&
+		psr_ppriv->missed++;
+		if (psr_ppriv->missed > psr_ppriv->missed_max &&
 		    orig_link_up) {
 			teamd_log_dbg("%s: Missed %u replies (max %u).",
-				      tdport->ifname, port_priv->missed,
-				      port_priv->missed_max);
-			port_priv->link_up = false;
+				      tdport->ifname, psr_ppriv->missed,
+				      psr_ppriv->missed_max);
+			psr_ppriv->link_up = false;
 		}
 	}
-	if (port_priv->link_up != orig_link_up) {
+	if (psr_ppriv->link_up != orig_link_up) {
 		teamd_log_info("%s: %s-link went %s.", tdport->ifname, lw_name,
-			       port_priv->link_up ? "up" : "down");
+			       psr_ppriv->link_up ? "up" : "down");
 		err = call_link_watch_handler(ctx);
 		if (err)
 			return err;
 		err = team_set_port_user_linkup(ctx->th,
-						port_priv->tdport->ifindex,
-						port_priv->link_up);
+						psr_ppriv->tdport->ifindex,
+						psr_ppriv->link_up);
 		if (err)
 			return err;
 	}
-	port_priv->reply_received = false;
-	return port_priv->ops->send(port_priv);
+	psr_ppriv->reply_received = false;
+	return psr_ppriv->ops->send(psr_ppriv);
 }
 
 static int lw_psr_callback_socket(struct teamd_context *ctx, int events,
 				  void *func_priv)
 {
-	struct lw_psr_port_priv *port_priv = func_priv;
+	struct lw_psr_port_priv *psr_ppriv = func_priv;
 
-	return port_priv->ops->receive(port_priv);
+	return psr_ppriv->ops->receive(psr_ppriv);
 }
 
 static int lw_psr_load_options(struct teamd_context *ctx,
 			       struct teamd_port *tdport,
-			       struct lw_psr_port_priv *port_priv)
+			       struct lw_psr_port_priv *psr_ppriv)
 {
+	json_t *link_watch_json = psr_ppriv->common.link_watch_json;
 	int err;
 	int tmp;
 
-	err = json_unpack(tdport->link_watch_json, "{s:i}",
-			  "interval", &tmp);
+	err = json_unpack(link_watch_json, "{s:i}", "interval", &tmp);
 	if (err) {
 		teamd_log_err("%s: Failed to get \"interval\" link-watch "
 			      "option.", tdport->ifname);
 		return -ENOENT;
 	}
 	teamd_log_dbg("%s: Using interval \"%d\".", tdport->ifname, tmp);
-	ms_to_timespec(&port_priv->interval, tmp);
+	ms_to_timespec(&psr_ppriv->interval, tmp);
 
-	err = json_unpack(tdport->link_watch_json, "{s:i}",
-			  "init_wait", &tmp);
+	err = json_unpack(link_watch_json, "{s:i}", "init_wait", &tmp);
 	if (!err) {
 		teamd_log_dbg("%s: Using init_wait \"%d\".",
 			      tdport->ifname, tmp);
-		ms_to_timespec(&port_priv->init_wait, tmp);
+		ms_to_timespec(&psr_ppriv->init_wait, tmp);
 	} else {
-		port_priv->init_wait = port_priv->ops->default_init_wait;
+		psr_ppriv->init_wait = psr_ppriv->ops->default_init_wait;
 	}
 
-	err = json_unpack(tdport->link_watch_json, "{s:i}",
-			  "missed_max", &tmp);
+	err = json_unpack(link_watch_json, "{s:i}", "missed_max", &tmp);
 	if (err) {
 		teamd_log_err("%s: Failed to get \"missed_max\" link-watch "
 			      "option.", tdport->ifname);
@@ -356,37 +282,38 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 		return -EINVAL;
 	}
 	teamd_log_dbg("%s: Using missed_max \"%d\".", tdport->ifname, tmp);
-	port_priv->missed_max = tmp;
+	psr_ppriv->missed_max = tmp;
 	return 0;
 }
 
 static int lw_psr_port_added(struct teamd_context *ctx,
-			     struct teamd_port *tdport)
+			     struct teamd_port *tdport,
+			     void *priv, void *creator_priv)
 {
-	struct lw_psr_port_priv *port_priv = teamd_get_link_watch_port_priv(tdport);
-	const char *lw_name = tdport->link_watch->name;
+	struct lw_psr_port_priv *psr_ppriv = priv;
+	const char *lw_name = psr_ppriv->common.link_watch->name;
 	int err;
 
-	port_priv->tdport = tdport;
-	err = port_priv->ops->sock_open(port_priv);
+	psr_ppriv->tdport = tdport;
+	err = psr_ppriv->ops->sock_open(psr_ppriv);
 	if (err) {
 		teamd_log_err("Failed to create socket.");
 		return err;
 	}
 
-	err = lw_psr_load_options(ctx, tdport, port_priv);
+	err = lw_psr_load_options(ctx, tdport, psr_ppriv);
 	if (err) {
 		teamd_log_err("Failed to load options.");
 		goto close_sock;
 	}
 
-	err = port_priv->ops->load_options(ctx, tdport, port_priv);
+	err = psr_ppriv->ops->load_options(ctx, tdport, psr_ppriv);
 	if (err) {
 		teamd_log_err("Failed to load options.");
 		goto close_sock;
 	}
 
-	err = asprintf(&port_priv->cb_name_socket, "%s_socket_if%d", lw_name,
+	err = asprintf(&psr_ppriv->cb_name_socket, "%s_socket_if%d", lw_name,
 		       tdport->ifindex);
 	if (err == -1) {
 		teamd_log_err("Failed generate callback name.");
@@ -394,16 +321,16 @@ static int lw_psr_port_added(struct teamd_context *ctx,
 		goto close_sock;
 	}
 
-	err = teamd_loop_callback_fd_add(ctx, port_priv->cb_name_socket,
-					 port_priv->sock,
+	err = teamd_loop_callback_fd_add(ctx, psr_ppriv->cb_name_socket,
+					 psr_ppriv->sock,
 					 TEAMD_LOOP_FD_EVENT_READ,
-					 lw_psr_callback_socket, port_priv);
+					 lw_psr_callback_socket, psr_ppriv);
 	if (err) {
 		teamd_log_err("Failed add socket callback.");
 		goto free_cb_name_socket;
 	}
 
-	err = asprintf(&port_priv->cb_name_periodic, "%s_periodic_if%d", lw_name,
+	err = asprintf(&psr_ppriv->cb_name_periodic, "%s_periodic_if%d", lw_name,
 		       tdport->ifindex);
 	if (err == -1) {
 		teamd_log_err("Failed generate callback name.");
@@ -412,11 +339,11 @@ static int lw_psr_port_added(struct teamd_context *ctx,
 	}
 
 	err = teamd_loop_callback_timer_add_set(ctx,
-						port_priv->cb_name_periodic,
-						&port_priv->interval,
-						&port_priv->init_wait,
+						psr_ppriv->cb_name_periodic,
+						&psr_ppriv->interval,
+						&psr_ppriv->init_wait,
 						lw_psr_callback_periodic,
-						port_priv);
+						psr_ppriv);
 	if (err) {
 		teamd_log_err("Failed add callback timer");
 		goto free_periodic_cb_name;
@@ -429,41 +356,43 @@ static int lw_psr_port_added(struct teamd_context *ctx,
 		goto periodic_callback_del;
 	}
 
-	teamd_loop_callback_enable(ctx, port_priv->cb_name_socket);
-	teamd_loop_callback_enable(ctx, port_priv->cb_name_periodic);
+	teamd_loop_callback_enable(ctx, psr_ppriv->cb_name_socket);
+	teamd_loop_callback_enable(ctx, psr_ppriv->cb_name_periodic);
 	return 0;
 
 periodic_callback_del:
-	teamd_loop_callback_del(ctx, port_priv->cb_name_periodic);
+	teamd_loop_callback_del(ctx, psr_ppriv->cb_name_periodic);
 free_periodic_cb_name:
-	free(port_priv->cb_name_periodic);
+	free(psr_ppriv->cb_name_periodic);
 socket_callback_del:
-	teamd_loop_callback_del(ctx, port_priv->cb_name_socket);
+	teamd_loop_callback_del(ctx, psr_ppriv->cb_name_socket);
 free_cb_name_socket:
-	free(port_priv->cb_name_socket);
+	free(psr_ppriv->cb_name_socket);
 close_sock:
-	port_priv->ops->sock_close(port_priv);
+	psr_ppriv->ops->sock_close(psr_ppriv);
 	return err;
 }
 
 static void lw_psr_port_removed(struct teamd_context *ctx,
-				struct teamd_port *tdport)
+				struct teamd_port *tdport,
+				void *priv, void *creator_priv)
 {
-	struct lw_psr_port_priv *port_priv = teamd_get_link_watch_port_priv(tdport);
+	struct lw_psr_port_priv *psr_ppriv = priv;
 
-	teamd_loop_callback_del(ctx, port_priv->cb_name_periodic);
-	free(port_priv->cb_name_periodic);
-	teamd_loop_callback_del(ctx, port_priv->cb_name_socket);
-	free(port_priv->cb_name_socket);
-	port_priv->ops->sock_close(port_priv);
+	teamd_loop_callback_del(ctx, psr_ppriv->cb_name_periodic);
+	free(psr_ppriv->cb_name_periodic);
+	teamd_loop_callback_del(ctx, psr_ppriv->cb_name_socket);
+	free(psr_ppriv->cb_name_socket);
+	psr_ppriv->ops->sock_close(psr_ppriv);
 }
 
 static bool lw_psr_is_port_up(struct teamd_context *ctx,
-			      struct teamd_port *tdport)
+			      struct teamd_port *tdport,
+			      struct lw_common_port_priv *common_ppriv)
 {
-	struct lw_psr_port_priv *port_priv = teamd_get_link_watch_port_priv(tdport);
+	struct lw_psr_port_priv *psr_ppriv = lw_psr_ppriv_get(common_ppriv);
 
-	return port_priv->link_up;
+	return psr_ppriv->link_up;
 }
 
 
@@ -472,10 +401,19 @@ static bool lw_psr_is_port_up(struct teamd_context *ctx,
  */
 
 struct lw_ap_port_priv {
-	struct lw_psr_port_priv psr; /* must be first */
+	union {
+		struct lw_common_port_priv common;
+		struct lw_psr_port_priv psr;
+	} start; /* must be first */
 	struct in_addr src;
 	struct in_addr dst;
 };
+
+static struct lw_ap_port_priv *
+lw_ap_ppriv_get(struct lw_psr_port_priv *psr_ppriv)
+{
+	return (struct lw_ap_port_priv *) psr_ppriv;
+}
 
 #define OFFSET_ARP_OP_CODE					\
 	in_struct_offset(struct arphdr, ar_op)
@@ -492,46 +430,47 @@ const struct sock_fprog arp_rpl_fprog = {
 	.filter = arp_rpl_flt,
 };
 
-static int lw_ap_sock_open(struct lw_psr_port_priv *port_priv)
+static int lw_ap_sock_open(struct lw_psr_port_priv *psr_ppriv)
 {
-	return teamd_packet_sock_open(&port_priv->sock,
-				      port_priv->tdport->ifindex,
+	return teamd_packet_sock_open(&psr_ppriv->sock,
+				      psr_ppriv->tdport->ifindex,
 				      htons(ETH_P_ARP), &arp_rpl_fprog);
 }
 
-static void lw_ap_sock_close(struct lw_psr_port_priv *port_priv)
+static void lw_ap_sock_close(struct lw_psr_port_priv *psr_ppriv)
 {
-	close(port_priv->sock);
+	close(psr_ppriv->sock);
 }
 
 static int lw_ap_load_options(struct teamd_context *ctx,
 			      struct teamd_port *tdport,
-			      struct lw_psr_port_priv *port_priv)
+			      struct lw_psr_port_priv *psr_ppriv)
 {
-	struct lw_ap_port_priv *ap_port_priv = (struct lw_ap_port_priv *) port_priv;
+	struct lw_ap_port_priv *ap_ppriv = lw_ap_ppriv_get(psr_ppriv);
+	json_t *link_watch_json = psr_ppriv->common.link_watch_json;
 	char *host;
 	int err;
 
-	err = json_unpack(tdport->link_watch_json, "{s:s}", "source_host", &host);
+	err = json_unpack(link_watch_json, "{s:s}", "source_host", &host);
 	if (err) {
 		teamd_log_err("Failed to get \"source_host\" link-watch option.");
 		return -ENOENT;
 	}
-	err = set_in_addr(&ap_port_priv->src, host);
+	err = set_in_addr(&ap_ppriv->src, host);
 	if (err)
 		return err;
 	teamd_log_dbg("Using source address \"%s\".",
-		      str_in_addr(&ap_port_priv->src));
+		      str_in_addr(&ap_ppriv->src));
 
-	err = json_unpack(tdport->link_watch_json, "{s:s}", "target_host", &host);
+	err = json_unpack(link_watch_json, "{s:s}", "target_host", &host);
 	if (err) {
 		teamd_log_err("Failed to get \"target_host\" link-watch option.");
 		return -ENOENT;
 	}
-	err = set_in_addr(&ap_port_priv->dst, host);
+	err = set_in_addr(&ap_ppriv->dst, host);
 	if (err)
 		return err;
-	teamd_log_dbg("Using target address \"%s\".", str_in_addr(&ap_port_priv->dst));
+	teamd_log_dbg("Using target address \"%s\".", str_in_addr(&ap_ppriv->dst));
 
 	return 0;
 }
@@ -548,9 +487,9 @@ static void buf_pull(char **pos, void *data, size_t data_len)
 	*pos += data_len;
 }
 
-static int lw_ap_send(struct lw_psr_port_priv *port_priv)
+static int lw_ap_send(struct lw_psr_port_priv *psr_ppriv)
 {
-	struct lw_ap_port_priv *ap_port_priv = (struct lw_ap_port_priv *) port_priv;
+	struct lw_ap_port_priv *ap_ppriv = lw_ap_ppriv_get(psr_ppriv);
 	int err;
 	char *buf;
 	size_t buf_len;
@@ -559,14 +498,14 @@ static int lw_ap_send(struct lw_psr_port_priv *port_priv)
 	struct sockaddr_ll ll_bcast;
 	struct arphdr ah;
 
-	err = teamd_getsockname_hwaddr(port_priv->sock, &ll_my, 0);
+	err = teamd_getsockname_hwaddr(psr_ppriv->sock, &ll_my, 0);
 	if (err)
 		return err;
 	ll_bcast = ll_my;
 	memset(ll_bcast.sll_addr, 0xFF, ll_bcast.sll_halen);
 
-	buf_len = sizeof(ah) + ll_my.sll_halen + sizeof(ap_port_priv->src) +
-				ll_bcast.sll_halen + sizeof(ap_port_priv->dst);
+	buf_len = sizeof(ah) + ll_my.sll_halen + sizeof(ap_ppriv->src) +
+				ll_bcast.sll_halen + sizeof(ap_ppriv->dst);
 	buf = malloc(buf_len);
 	if (!buf) {
 		teamd_log_err("Failed to alloc packet buffer.");
@@ -583,19 +522,19 @@ static int lw_ap_send(struct lw_psr_port_priv *port_priv)
 
 	buf_push(&pos, &ah, sizeof(ah));
 	buf_push(&pos, ll_my.sll_addr, ll_my.sll_halen);
-	buf_push(&pos, &ap_port_priv->src, sizeof(ap_port_priv->src));
+	buf_push(&pos, &ap_ppriv->src, sizeof(ap_ppriv->src));
 	buf_push(&pos, ll_bcast.sll_addr, ll_bcast.sll_halen);
-	buf_push(&pos, &ap_port_priv->dst, sizeof(ap_port_priv->dst));
+	buf_push(&pos, &ap_ppriv->dst, sizeof(ap_ppriv->dst));
 
-	err = teamd_sendto(port_priv->sock, buf, buf_len, 0,
+	err = teamd_sendto(psr_ppriv->sock, buf, buf_len, 0,
 			   (struct sockaddr *) &ll_bcast, sizeof(ll_bcast));
 	free(buf);
 	return err;
 }
 
-static int lw_ap_receive(struct lw_psr_port_priv *port_priv)
+static int lw_ap_receive(struct lw_psr_port_priv *psr_ppriv)
 {
-	struct lw_ap_port_priv *ap_port_priv = (struct lw_ap_port_priv *) port_priv;
+	struct lw_ap_port_priv *ap_ppriv = lw_ap_ppriv_get(psr_ppriv);
 	int err;
 	char buf[256];
 	socklen_t addr_len;
@@ -608,11 +547,11 @@ static int lw_ap_receive(struct lw_psr_port_priv *port_priv)
 	struct in_addr dst;
 	char *pos;
 
-	err = teamd_getsockname_hwaddr(port_priv->sock, &ll_my, 0);
+	err = teamd_getsockname_hwaddr(psr_ppriv->sock, &ll_my, 0);
 	if (err)
 		return err;
 
-	err = teamd_recvfrom(port_priv->sock, buf, sizeof(buf), 0,
+	err = teamd_recvfrom(psr_ppriv->sock, buf, sizeof(buf), 0,
 			     (struct sockaddr *) &ll_from, &addr_len);
 	if (err <= 0)
 		return err;
@@ -634,12 +573,12 @@ static int lw_ap_receive(struct lw_psr_port_priv *port_priv)
 	buf_pull(&pos, ll_msg2.sll_addr, ll_my.sll_halen);
 	buf_pull(&pos, &dst, sizeof(dst));
 
-	if (ap_port_priv->src.s_addr != dst.s_addr ||
-	    ap_port_priv->dst.s_addr != src.s_addr ||
+	if (ap_ppriv->src.s_addr != dst.s_addr ||
+	    ap_ppriv->dst.s_addr != src.s_addr ||
 	    memcmp(ll_msg2.sll_addr, ll_my.sll_addr, ll_my.sll_halen) != 0)
 		return 0;
 
-	port_priv->reply_received = true;
+	psr_ppriv->reply_received = true;
 	return 0;
 }
 
@@ -653,20 +592,24 @@ const struct lw_psr_ops lw_psr_ops_ap = {
 };
 
 static int lw_ap_port_added(struct teamd_context *ctx,
-			    struct teamd_port *tdport)
+			    struct teamd_port *tdport,
+			    void *priv, void *creator_priv)
 {
-	struct lw_psr_port_priv *port_priv = teamd_get_link_watch_port_priv(tdport);
+	struct lw_ap_port_priv *ap_ppriv = priv;
+	struct lw_psr_port_priv *psr_ppriv = &ap_ppriv->start.psr;
 
-	port_priv->ops = &lw_psr_ops_ap;
-	return lw_psr_port_added(ctx, tdport);
+	psr_ppriv->ops = &lw_psr_ops_ap;
+	return lw_psr_port_added(ctx, tdport, priv, creator_priv);
 }
 
 const struct teamd_link_watch teamd_link_watch_arp_ping = {
-	.name		= "arp_ping",
-	.port_added	= lw_ap_port_added,
-	.port_removed	= lw_psr_port_removed,
-	.is_port_up	= lw_psr_is_port_up,
-	.port_priv_size	= sizeof(struct lw_ap_port_priv),
+	.name			= "arp_ping",
+	.is_port_up		= lw_psr_is_port_up,
+	.port_priv = {
+		.init		= lw_ap_port_added,
+		.fini		= lw_psr_port_removed,
+		.priv_size	= sizeof(struct lw_ap_port_priv),
+	},
 };
 
 
@@ -675,10 +618,19 @@ const struct teamd_link_watch teamd_link_watch_arp_ping = {
  */
 
 struct lw_nsnap_port_priv {
-	struct lw_psr_port_priv psr; /* must be first */
+	union {
+		struct lw_common_port_priv common;
+		struct lw_psr_port_priv psr;
+	} start; /* must be first */
 	int tx_sock;
 	struct sockaddr_in6 dst;
 };
+
+static struct lw_nsnap_port_priv *
+lw_nsnap_ppriv_get(struct lw_psr_port_priv *psr_ppriv)
+{
+	return (struct lw_nsnap_port_priv *) psr_ppriv;
+}
 
 static int icmp6_sock_open(int *sock_p)
 {
@@ -738,9 +690,9 @@ const struct sock_fprog na_fprog = {
 	.filter = na_flt,
 };
 
-static int lw_nsnap_sock_open(struct lw_psr_port_priv *port_priv)
+static int lw_nsnap_sock_open(struct lw_psr_port_priv *psr_ppriv)
 {
-	struct lw_nsnap_port_priv *nsnap_port_priv = (struct lw_nsnap_port_priv *) port_priv;
+	struct lw_nsnap_port_priv *nsnap_ppriv = lw_nsnap_ppriv_get(psr_ppriv);
 	int err;
 
 	/*
@@ -749,46 +701,47 @@ static int lw_nsnap_sock_open(struct lw_psr_port_priv *port_priv)
 	 * deliver incoming ICMP6 packet on inactive ports into userspace.
 	 * So we use packet socket to get these packets.
 	 */
-	err = teamd_packet_sock_open(&port_priv->sock,
-				     port_priv->tdport->ifindex,
+	err = teamd_packet_sock_open(&psr_ppriv->sock,
+				     psr_ppriv->tdport->ifindex,
 				     htons(ETH_P_IPV6), &na_fprog);
 	if (err)
 		return err;
-	err = icmp6_sock_open(&nsnap_port_priv->tx_sock);
+	err = icmp6_sock_open(&nsnap_ppriv->tx_sock);
 	if (err)
 		goto close_packet_sock;
 	return 0;
 close_packet_sock:
-	close(port_priv->sock);
+	close(psr_ppriv->sock);
 	return err;
 }
 
-static void lw_nsnap_sock_close(struct lw_psr_port_priv *port_priv)
+static void lw_nsnap_sock_close(struct lw_psr_port_priv *psr_ppriv)
 {
-	struct lw_nsnap_port_priv *nsnap_port_priv = (struct lw_nsnap_port_priv *) port_priv;
+	struct lw_nsnap_port_priv *nsnap_ppriv = lw_nsnap_ppriv_get(psr_ppriv);
 
-	close(nsnap_port_priv->tx_sock);
-	close(port_priv->sock);
+	close(nsnap_ppriv->tx_sock);
+	close(psr_ppriv->sock);
 }
 
 static int lw_nsnap_load_options(struct teamd_context *ctx,
 				 struct teamd_port *tdport,
-				 struct lw_psr_port_priv *port_priv)
+				 struct lw_psr_port_priv *psr_ppriv)
 {
-	struct lw_nsnap_port_priv *nsnap_port_priv = (struct lw_nsnap_port_priv *) port_priv;
+	struct lw_nsnap_port_priv *nsnap_ppriv = lw_nsnap_ppriv_get(psr_ppriv);
+	json_t *link_watch_json = psr_ppriv->common.link_watch_json;
 	char *host;
 	int err;
 
-	err = json_unpack(tdport->link_watch_json, "{s:s}", "target_host", &host);
+	err = json_unpack(link_watch_json, "{s:s}", "target_host", &host);
 	if (err) {
 		teamd_log_err("Failed to get \"target_host\" link-watch option.");
 		return -ENOENT;
 	}
-	err = set_sockaddr_in6(&nsnap_port_priv->dst, host);
+	err = set_sockaddr_in6(&nsnap_ppriv->dst, host);
 	if (err)
 		return err;
 	teamd_log_dbg("Using target address \"%s\".",
-		      str_sockaddr_in6(&nsnap_port_priv->dst));
+		      str_sockaddr_in6(&nsnap_ppriv->dst));
 
 	return 0;
 }
@@ -807,15 +760,15 @@ struct ns_packet {
 	unsigned char			hwaddr[ETH_ALEN];
 };
 
-static int lw_nsnap_send(struct lw_psr_port_priv *port_priv)
+static int lw_nsnap_send(struct lw_psr_port_priv *psr_ppriv)
 {
-	struct lw_nsnap_port_priv *nsnap_port_priv = (struct lw_nsnap_port_priv *) port_priv;
+	struct lw_nsnap_port_priv *nsnap_ppriv = lw_nsnap_ppriv_get(psr_ppriv);
 	int err;
 	struct sockaddr_ll ll_my;
 	struct sockaddr_in6 sendto_addr;
 	struct ns_packet nsp;
 
-	err = teamd_getsockname_hwaddr(port_priv->sock, &ll_my,
+	err = teamd_getsockname_hwaddr(psr_ppriv->sock, &ll_my,
 				       sizeof(nsp.hwaddr));
 	if (err)
 		return err;
@@ -825,15 +778,15 @@ static int lw_nsnap_send(struct lw_psr_port_priv *port_priv)
 	/* setup ICMP6 header */
 	nsp.nsh.nd_ns_type = ND_NEIGHBOR_SOLICIT;
 	nsp.nsh.nd_ns_cksum = 0; /* kernel computes this */
-	nsp.nsh.nd_ns_target = nsnap_port_priv->dst.sin6_addr;
+	nsp.nsh.nd_ns_target = nsnap_ppriv->dst.sin6_addr;
 	nsp.opt.nd_opt_type = ND_OPT_SOURCE_LINKADDR;
 	nsp.opt.nd_opt_len = 1; /* 8 bytes */
 	memcpy(nsp.hwaddr, ll_my.sll_addr, sizeof(nsp.hwaddr));
 
-	sendto_addr = nsnap_port_priv->dst;
+	sendto_addr = nsnap_ppriv->dst;
 	compute_multi_in6_addr(&sendto_addr.sin6_addr);
-	sendto_addr.sin6_scope_id = port_priv->tdport->ifindex;
-	err = teamd_sendto(nsnap_port_priv->tx_sock, &nsp, sizeof(nsp), 0,
+	sendto_addr.sin6_scope_id = psr_ppriv->tdport->ifindex;
+	err = teamd_sendto(nsnap_ppriv->tx_sock, &nsp, sizeof(nsp), 0,
 			   (struct sockaddr *) &sendto_addr,
 			   sizeof(sendto_addr));
 	return err;
@@ -846,15 +799,15 @@ struct na_packet {
 	unsigned char			hwaddr[ETH_ALEN];
 };
 
-static int lw_nsnap_receive(struct lw_psr_port_priv *port_priv)
+static int lw_nsnap_receive(struct lw_psr_port_priv *psr_ppriv)
 {
-	struct lw_nsnap_port_priv *nsnap_port_priv = (struct lw_nsnap_port_priv *) port_priv;
+	struct lw_nsnap_port_priv *nsnap_ppriv = lw_nsnap_ppriv_get(psr_ppriv);
 	struct na_packet nap;
 	socklen_t addr_len;
 	struct sockaddr_ll ll_from;
 	int err;
 
-	err = teamd_recvfrom(port_priv->sock, &nap, sizeof(nap), 0,
+	err = teamd_recvfrom(psr_ppriv->sock, &nap, sizeof(nap), 0,
 			     (struct sockaddr *) &ll_from, &addr_len);
 	if (err <= 0)
 		return err;
@@ -864,7 +817,7 @@ static int lw_nsnap_receive(struct lw_psr_port_priv *port_priv)
 	    nap.ip6h.ip6_plen != htons(sizeof(nap) - sizeof(nap.ip6h)) ||
 	    nap.ip6h.ip6_nxt != IPPROTO_ICMPV6 ||
 	    nap.ip6h.ip6_hlim != 255 /* Do not route */ ||
-	    memcmp(&nap.ip6h.ip6_src, &nsnap_port_priv->dst.sin6_addr,
+	    memcmp(&nap.ip6h.ip6_src, &nsnap_ppriv->dst.sin6_addr,
 		   sizeof(struct in6_addr)))
 		return 0;
 
@@ -874,7 +827,7 @@ static int lw_nsnap_receive(struct lw_psr_port_priv *port_priv)
 	    nap.opt.nd_opt_len != 1 /* 8 bytes */)
 		return 0;
 
-	port_priv->reply_received = true;
+	psr_ppriv->reply_received = true;
 	return 0;
 }
 
@@ -888,18 +841,167 @@ const struct lw_psr_ops lw_psr_ops_nsnap = {
 };
 
 static int lw_nsnap_port_added(struct teamd_context *ctx,
-			       struct teamd_port *tdport)
+			       struct teamd_port *tdport,
+			       void *priv, void *creator_priv)
 {
-	struct lw_psr_port_priv *port_priv = teamd_get_link_watch_port_priv(tdport);
+	struct lw_psr_port_priv *psr_port_priv = priv;
 
-	port_priv->ops = &lw_psr_ops_nsnap;
-	return lw_psr_port_added(ctx, tdport);
+	psr_port_priv->ops = &lw_psr_ops_nsnap;
+	return lw_psr_port_added(ctx, tdport, priv, creator_priv);
 }
 
 const struct teamd_link_watch teamd_link_watch_nsnap = {
-	.name		= "nsna_ping",
-	.port_added	= lw_nsnap_port_added,
-	.port_removed	= lw_psr_port_removed,
-	.is_port_up	= lw_psr_is_port_up,
-	.port_priv_size	= sizeof(struct lw_nsnap_port_priv),
+	.name			= "nsna_ping",
+	.is_port_up		= lw_psr_is_port_up,
+	.port_priv = {
+		.init		= lw_nsnap_port_added,
+		.fini		= lw_psr_port_removed,
+		.priv_size	= sizeof(struct lw_nsnap_port_priv),
+	},
 };
+
+
+/*
+ * General link watch code
+ */
+static const struct teamd_link_watch *teamd_link_watch_list[] = {
+	&teamd_link_watch_ethtool,
+	&teamd_link_watch_arp_ping,
+	&teamd_link_watch_nsnap,
+};
+
+#define TEAMD_LINK_WATCH_LIST_SIZE ARRAY_SIZE(teamd_link_watch_list)
+
+/*
+ * For port priv identification purposes
+ */
+#define LW_PORT_PRIV_CREATOR_PRIV (&teamd_link_watch_list)
+
+static const struct teamd_link_watch *teamd_find_link_watch(const char *link_watch_name)
+{
+	int i;
+
+	for (i = 0; i < TEAMD_LINK_WATCH_LIST_SIZE; i++) {
+		if (strcmp(teamd_link_watch_list[i]->name, link_watch_name) == 0)
+			return teamd_link_watch_list[i];
+	}
+	return NULL;
+}
+
+static int call_link_watch_handler(struct teamd_context *ctx)
+{
+	if (ctx->link_watch_handler)
+		return ctx->link_watch_handler(ctx);
+	return 0;
+}
+
+static int port_change_handler_func(struct team_handle *th, void *arg,
+				    team_change_type_mask_t type_mask)
+{
+	struct teamd_context *ctx = team_get_user_priv(th);
+
+	return call_link_watch_handler(ctx);
+}
+
+static struct team_change_handler port_change_handler = {
+	.func = port_change_handler_func,
+	.type_mask = TEAM_PORT_CHANGE,
+};
+
+bool teamd_link_watch_port_up(struct teamd_context *ctx,
+			      struct teamd_port *tdport)
+{
+	struct lw_common_port_priv *common_ppriv;
+	const struct teamd_link_watch *link_watch;
+
+	if (!tdport)
+		return true;
+	teamd_for_each_port_priv_by_creator(common_ppriv, tdport,
+					    LW_PORT_PRIV_CREATOR_PRIV) {
+		link_watch = common_ppriv->link_watch;
+		if (link_watch->is_port_up)
+			return link_watch->is_port_up(ctx, tdport,
+						      common_ppriv);
+	}
+	return true;
+}
+
+static int link_watch_event_watch_port_added(struct teamd_context *ctx,
+					     struct teamd_port *tdport,
+					     void *priv)
+{
+	int err;
+	const char *link_watch_name;
+	json_t *link_watch_obj;
+	const struct teamd_link_watch *link_watch;
+	struct lw_common_port_priv *common_ppriv;
+
+	err = json_unpack(ctx->config_json, "{s:{s:{s:o}}}", "ports",
+			  tdport->ifname, "link_watch", &link_watch_obj);
+	if (err) {
+		teamd_log_dbg("%s: Failed to get link watch from port config.",
+			      tdport->ifname);
+		err = json_unpack(ctx->config_json, "{s:o}", "link_watch",
+				  &link_watch_obj);
+		if (err) {
+			teamd_log_info("%s: Failed to get link watch "
+				       "from config.", tdport->ifname);
+			goto nowatch;
+		}
+	}
+	err = json_unpack(link_watch_obj, "{s:s}", "name", &link_watch_name);
+	if (err) {
+		teamd_log_info("%s: Failed to get link watch name.",
+			       tdport->ifname);
+		goto nowatch;
+	}
+	link_watch = teamd_find_link_watch(link_watch_name);
+	if (!link_watch) {
+		teamd_log_info("No link_watch named \"%s\" available.",
+			       link_watch_name);
+		goto nowatch;
+	}
+	teamd_log_info("%s: Using link_watch \"%s\".",
+		       tdport->ifname, link_watch_name);
+	err = teamd_port_priv_create_and_get((void **) &common_ppriv, tdport,
+					     &link_watch->port_priv,
+					     LW_PORT_PRIV_CREATOR_PRIV);
+	if (err)
+		return err;
+	common_ppriv->link_watch = link_watch;
+	common_ppriv->link_watch_json = link_watch_obj;
+
+nowatch:
+	teamd_log_info("%s: Using no link watch!", tdport->ifname);
+	return 0;
+}
+
+static const struct teamd_event_watch_ops link_watch_port_watch_ops = {
+	.port_added = link_watch_event_watch_port_added,
+};
+
+int teamd_link_watch_init(struct teamd_context *ctx)
+{
+	int err;
+
+	err = team_change_handler_register(ctx->th, &port_change_handler);
+	if (err) {
+		teamd_log_err("Failed to register change handler.");
+		return err;
+	}
+	err = teamd_event_watch_register(ctx, &link_watch_port_watch_ops, NULL);
+	if (err) {
+		teamd_log_err("Failed to register event watch.");
+		goto change_handler_unregister;
+	}
+	return 0;
+change_handler_unregister:
+	team_change_handler_unregister(ctx->th, &port_change_handler);
+	return err;
+}
+
+void teamd_link_watch_fini(struct teamd_context *ctx)
+{
+	teamd_event_watch_unregister(ctx, &link_watch_port_watch_ops, NULL);
+	team_change_handler_unregister(ctx->th, &port_change_handler);
+}
