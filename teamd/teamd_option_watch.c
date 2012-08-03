@@ -62,9 +62,9 @@ void teamd_option_watch_fini(struct teamd_context *ctx)
 
 struct teamd_option_watch {
 	struct list_item list;
-	struct teamd_event_watch *event_watch;
 	const struct teamd_option_watch_ops *ops;
 	void *priv;
+	struct teamd_context *ctx;
 };
 
 static int tow_option_changed(struct teamd_context *ctx,
@@ -99,8 +99,8 @@ int teamd_option_watch_register(struct teamd_option_watch **pwatch,
 		return -ENOMEM;
 	watch->ops = ops;
 	watch->priv = priv;
-	err = teamd_event_watch_register(&watch->event_watch, ctx,
-					 &tow_event_watch_ops, watch);
+	watch->ctx = ctx;
+	err = teamd_event_watch_register(ctx, &tow_event_watch_ops, watch);
 	if (err) {
 		free(watch);
 		return err;
@@ -111,6 +111,6 @@ int teamd_option_watch_register(struct teamd_option_watch **pwatch,
 
 void teamd_option_watch_unregister(struct teamd_option_watch *watch)
 {
-	teamd_event_watch_unregister(watch->event_watch);
+	teamd_event_watch_unregister(watch->ctx, &tow_event_watch_ops, watch);
 	free(watch);
 }

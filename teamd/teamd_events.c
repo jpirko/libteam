@@ -28,7 +28,7 @@
 
 #include "teamd.h"
 
-struct teamd_event_watch {
+struct event_watch_item {
 	struct list_item list;
 	const struct teamd_event_watch_ops *ops;
 	void *priv;
@@ -37,7 +37,7 @@ struct teamd_event_watch {
 int teamd_event_port_added(struct teamd_context *ctx,
 			   struct teamd_port *tdport)
 {
-	struct teamd_event_watch *watch;
+	struct event_watch_item *watch;
 	int err;
 
 	list_for_each_node_entry(watch, &ctx->event_watch_list, list) {
@@ -53,7 +53,7 @@ int teamd_event_port_added(struct teamd_context *ctx,
 void teamd_event_port_removed(struct teamd_context *ctx,
 			      struct teamd_port *tdport)
 {
-	struct teamd_event_watch *watch;
+	struct event_watch_item *watch;
 
 	list_for_each_node_entry(watch, &ctx->event_watch_list, list) {
 		if (!watch->ops->port_removed)
@@ -65,7 +65,7 @@ void teamd_event_port_removed(struct teamd_context *ctx,
 int teamd_event_option_changed(struct teamd_context *ctx,
 			       struct team_option *option)
 {
-	struct teamd_event_watch *watch;
+	struct event_watch_item *watch;
 	int err;
 
 	list_for_each_node_entry(watch, &ctx->event_watch_list, list) {
@@ -88,25 +88,46 @@ void teamd_events_fini(struct teamd_context *ctx)
 {
 }
 
-int teamd_event_watch_register(struct teamd_event_watch **pwatch,
-			       struct teamd_context *ctx,
+static struct event_watch_item *
+__find_event_watch(struct teamd_context *ctx,
+		   const struct teamd_event_watch_ops *ops,
+		   void *priv)
+{
+	struct event_watch_item *watch;
+
+	list_for_each_node_entry(watch, &ctx->event_watch_list, list) {
+		if (watch->ops == ops && watch->priv == priv)
+			return watch;
+	}
+	return NULL;
+}
+
+int teamd_event_watch_register(struct teamd_context *ctx,
 			       const struct teamd_event_watch_ops *ops,
 			       void *priv)
 {
-	struct teamd_event_watch *watch;
+	struct event_watch_item *watch;
 
+	if (__find_event_watch(ctx, ops, priv))
+		return -EEXIST;
 	watch = malloc(sizeof(*watch));
 	if (!watch)
 		return -ENOMEM;
 	watch->ops = ops;
 	watch->priv = priv;
 	list_add_tail(&ctx->event_watch_list, &watch->list);
-	*pwatch = watch;
 	return 0;
 }
 
-void teamd_event_watch_unregister(struct teamd_event_watch *watch)
+void teamd_event_watch_unregister(struct teamd_context *ctx,
+				  const struct teamd_event_watch_ops *ops,
+				  void *priv)
 {
+	struct event_watch_item *watch;
+
+	watch = __find_event_watch(ctx, ops, priv);
+	if (!watch)
+		return;
 	list_del(&watch->list);
 	free(watch);
 }

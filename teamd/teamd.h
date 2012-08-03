@@ -108,8 +108,6 @@ struct teamd_runner {
 	void (*fini)(struct teamd_context *ctx);
 };
 
-struct teamd_event_watch;
-
 struct teamd_event_watch_ops {
 	int (*port_added)(struct teamd_context *ctx,
 			  struct teamd_port *tdport, void *priv);
@@ -127,11 +125,12 @@ int teamd_event_option_changed(struct teamd_context *ctx,
 			       struct team_option *option);
 int teamd_events_init(struct teamd_context *ctx);
 void teamd_events_fini(struct teamd_context *ctx);
-int teamd_event_watch_register(struct teamd_event_watch **pwatch,
-			       struct teamd_context *ctx,
+int teamd_event_watch_register(struct teamd_context *ctx,
 			       const struct teamd_event_watch_ops *ops,
 			       void *priv);
-void teamd_event_watch_unregister(struct teamd_event_watch *watch);
+void teamd_event_watch_unregister(struct teamd_context *ctx,
+				  const struct teamd_event_watch_ops *ops,
+				  void *priv);
 
 struct teamd_link_watch {
 	const char *name;

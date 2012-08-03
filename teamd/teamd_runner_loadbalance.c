@@ -25,7 +25,6 @@
 
 struct lb_priv {
 	struct teamd_balancer *tb;
-	struct teamd_event_watch *event_watch;
 };
 
 static int lb_event_watch_port_added(struct teamd_context *ctx,
@@ -65,8 +64,7 @@ static int lb_init(struct teamd_context *ctx)
 	err = teamd_hash_func_set(ctx);
 	if (err)
 		return err;
-	err = teamd_event_watch_register(&lb_priv->event_watch, ctx,
-					 &lb_port_watch_ops, lb_priv);
+	err = teamd_event_watch_register(ctx, &lb_port_watch_ops, lb_priv);
 	if (err) {
 		teamd_log_err("Failed to register event watch.");
 		return err;
@@ -87,7 +85,7 @@ static void lb_fini(struct teamd_context *ctx)
 	struct lb_priv *lb_priv = ctx->runner_priv;
 
 	teamd_balancer_fini(lb_priv->tb);
-	teamd_event_watch_unregister(lb_priv->event_watch);
+	teamd_event_watch_unregister(ctx, &lb_port_watch_ops, lb_priv);
 }
 
 const struct teamd_runner teamd_runner_loadbalance = {

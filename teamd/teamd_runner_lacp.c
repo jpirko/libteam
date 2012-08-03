@@ -106,7 +106,6 @@ static bool lacpdu_check(struct lacpdu *lacpdu)
 
 struct lacp {
 	struct teamd_context *ctx;
-	struct teamd_event_watch *event_watch;
 	uint32_t selected_aggregator_id;
 	struct {
 		bool active;
@@ -948,8 +947,7 @@ static int lacp_init(struct teamd_context *ctx)
 		teamd_log_err("Failed to register change handler.");
 		return err;
 	}
-	err = teamd_event_watch_register(&lacp->event_watch, ctx,
-					 &lacp_port_watch_ops, lacp);
+	err = teamd_event_watch_register(ctx, &lacp_port_watch_ops, lacp);
 	if (err) {
 		teamd_log_err("Failed to register event watch.");
 		goto change_handler_unregister;
@@ -965,7 +963,7 @@ static void lacp_fini(struct teamd_context *ctx)
 	struct lacp *lacp = ctx->runner_priv;
 
 	team_change_handler_unregister(ctx->th, &lacp_port_change_handler);
-	teamd_event_watch_unregister(lacp->event_watch);
+	teamd_event_watch_unregister(ctx, &lacp_port_watch_ops, lacp);
 }
 
 const struct teamd_runner teamd_runner_lacp = {
