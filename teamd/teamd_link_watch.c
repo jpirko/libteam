@@ -223,6 +223,9 @@ static int lw_psr_callback_periodic(struct teamd_context *ctx, int events,
 	if (psr_ppriv->link_up != orig_link_up) {
 		teamd_log_info("%s: %s-link went %s.", tdport->ifname, lw_name,
 			       psr_ppriv->link_up ? "up" : "down");
+		err = teamd_event_port_link_changed(ctx, tdport);
+		if (err)
+			return err;
 		err = call_link_watch_handler(ctx);
 		if (err)
 			return err;
@@ -967,6 +970,11 @@ static int link_watch_event_watch_port_changed(struct teamd_context *ctx,
 					       struct teamd_port *tdport,
 					       void *priv)
 {
+	int err;
+
+	err = teamd_event_port_link_changed(ctx, tdport);
+	if (err)
+		return err;
 	return call_link_watch_handler(ctx);
 }
 
