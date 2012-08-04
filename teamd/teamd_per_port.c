@@ -251,6 +251,11 @@ static int port_priv_change_handler_func(struct team_handle *th, void *arg,
 			if (err)
 				return err;
 		}
+		if (team_is_port_changed(port)) {
+			err = teamd_event_port_changed(ctx, _port(port_obj));
+			if (err)
+				return err;
+		}
 		if (team_is_port_removed(port)) {
 			port_obj_destroy(ctx, port_obj);
 			port_obj->to_be_freed = true;

@@ -110,6 +110,8 @@ struct teamd_event_watch_ops {
 			  struct teamd_port *tdport, void *priv);
 	void (*port_removed)(struct teamd_context *ctx,
 			     struct teamd_port *tdport, void *priv);
+	int (*port_changed)(struct teamd_context *ctx,
+			      struct teamd_port *tdport, void *priv);
 	int (*option_changed)(struct teamd_context *ctx,
 			      struct team_option *option, void *priv);
 };
@@ -118,6 +120,8 @@ int teamd_event_port_added(struct teamd_context *ctx,
 			   struct teamd_port *tdport);
 void teamd_event_port_removed(struct teamd_context *ctx,
 			      struct teamd_port *tdport);
+int teamd_event_port_changed(struct teamd_context *ctx,
+			     struct teamd_port *tdport);
 int teamd_event_option_changed(struct teamd_context *ctx,
 			       struct team_option *option);
 int teamd_events_init(struct teamd_context *ctx);

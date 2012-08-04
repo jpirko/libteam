@@ -62,6 +62,22 @@ void teamd_event_port_removed(struct teamd_context *ctx,
 	}
 }
 
+int teamd_event_port_changed(struct teamd_context *ctx,
+			     struct teamd_port *tdport)
+{
+	struct event_watch_item *watch;
+	int err;
+
+	list_for_each_node_entry(watch, &ctx->event_watch_list, list) {
+		if (!watch->ops->port_changed)
+			continue;
+		err = watch->ops->port_changed(ctx, tdport, watch->priv);
+		if (err)
+			return err;
+	}
+	return 0;
+}
+
 int teamd_event_option_changed(struct teamd_context *ctx,
 			       struct team_option *option)
 {
