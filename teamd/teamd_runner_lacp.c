@@ -887,31 +887,6 @@ static void lacp_port_removed(struct teamd_context *ctx,
 	close(lacp_port->sock);
 }
 
-static int lacp_port_change_handler_func(struct team_handle *th, void *arg,
-					 team_change_type_mask_t type_mask)
-{
-	struct teamd_context *ctx = team_get_user_priv(th);
-	struct lacp *lacp = ctx->runner_priv;
-	struct teamd_port *tdport;
-	struct lacp_port *lacp_port;
-	int err;
-
-	teamd_for_each_tdport(tdport, ctx) {
-		if (team_is_port_changed(tdport->team_port)) {
-			lacp_port = lacp_port_get(lacp, tdport);
-			err = lacp_port_link_update(lacp_port);
-			if (err)
-				return err;
-		}
-	}
-	return 0;
-}
-
-static struct team_change_handler lacp_port_change_handler = {
-	.func = lacp_port_change_handler_func,
-	.type_mask = TEAM_PORT_CHANGE,
-};
-
 static const struct teamd_port_priv lacp_port_priv = {
 	.init = lacp_port_added,
 	.fini = lacp_port_removed,
@@ -924,8 +899,18 @@ static int lacp_event_watch_port_added(struct teamd_context *ctx,
 	return teamd_port_priv_create(tdport, &lacp_port_priv, priv);
 }
 
+static int lacp_event_watch_port_changed(struct teamd_context *ctx,
+					 struct teamd_port *tdport, void *priv)
+{
+	struct lacp *lacp = priv;
+	struct lacp_port *lacp_port = lacp_port_get(lacp, tdport);
+
+	return lacp_port_link_update(lacp_port);
+}
+
 static const struct teamd_event_watch_ops lacp_port_watch_ops = {
 	.port_added = lacp_event_watch_port_added,
+	.port_changed = lacp_event_watch_port_changed,
 };
 
 static int lacp_init(struct teamd_context *ctx)
@@ -942,27 +927,18 @@ static int lacp_init(struct teamd_context *ctx)
 		teamd_log_err("Failed to load config values.");
 		return err;
 	}
-	err = team_change_handler_register(ctx->th, &lacp_port_change_handler);
-	if (err) {
-		teamd_log_err("Failed to register change handler.");
-		return err;
-	}
 	err = teamd_event_watch_register(ctx, &lacp_port_watch_ops, lacp);
 	if (err) {
 		teamd_log_err("Failed to register event watch.");
-		goto change_handler_unregister;
+		return err;
 	}
 	return 0;
-change_handler_unregister:
-	team_change_handler_unregister(ctx->th, &lacp_port_change_handler);
-	return err;
 }
 
 static void lacp_fini(struct teamd_context *ctx)
 {
 	struct lacp *lacp = ctx->runner_priv;
 
-	team_change_handler_unregister(ctx->th, &lacp_port_change_handler);
 	teamd_event_watch_unregister(ctx, &lacp_port_watch_ops, lacp);
 }
 
