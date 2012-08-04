@@ -895,19 +895,6 @@ static int call_link_watch_handler(struct teamd_context *ctx)
 	return 0;
 }
 
-static int port_change_handler_func(struct team_handle *th, void *arg,
-				    team_change_type_mask_t type_mask)
-{
-	struct teamd_context *ctx = team_get_user_priv(th);
-
-	return call_link_watch_handler(ctx);
-}
-
-static struct team_change_handler port_change_handler = {
-	.func = port_change_handler_func,
-	.type_mask = TEAM_PORT_CHANGE,
-};
-
 bool teamd_link_watch_port_up(struct teamd_context *ctx,
 			      struct teamd_port *tdport)
 {
@@ -976,32 +963,31 @@ nowatch:
 	return 0;
 }
 
+static int link_watch_event_watch_port_changed(struct teamd_context *ctx,
+					       struct teamd_port *tdport,
+					       void *priv)
+{
+	return call_link_watch_handler(ctx);
+}
+
 static const struct teamd_event_watch_ops link_watch_port_watch_ops = {
 	.port_added = link_watch_event_watch_port_added,
+	.port_changed = link_watch_event_watch_port_changed,
 };
 
 int teamd_link_watch_init(struct teamd_context *ctx)
 {
 	int err;
 
-	err = team_change_handler_register(ctx->th, &port_change_handler);
-	if (err) {
-		teamd_log_err("Failed to register change handler.");
-		return err;
-	}
 	err = teamd_event_watch_register(ctx, &link_watch_port_watch_ops, NULL);
 	if (err) {
 		teamd_log_err("Failed to register event watch.");
-		goto change_handler_unregister;
+		return err;
 	}
 	return 0;
-change_handler_unregister:
-	team_change_handler_unregister(ctx->th, &port_change_handler);
-	return err;
 }
 
 void teamd_link_watch_fini(struct teamd_context *ctx)
 {
 	teamd_event_watch_unregister(ctx, &link_watch_port_watch_ops, NULL);
-	team_change_handler_unregister(ctx->th, &port_change_handler);
 }
