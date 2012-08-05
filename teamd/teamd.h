@@ -116,6 +116,7 @@ struct teamd_event_watch_ops {
 				 struct teamd_port *tdport, void *priv);
 	int (*option_changed)(struct teamd_context *ctx,
 			      struct team_option *option, void *priv);
+	char *option_changed_match_name;
 };
 
 int teamd_event_port_added(struct teamd_context *ctx,

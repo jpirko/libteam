@@ -103,6 +103,10 @@ int teamd_event_option_changed(struct teamd_context *ctx,
 	list_for_each_node_entry(watch, &ctx->event_watch_list, list) {
 		if (!watch->ops->option_changed)
 			continue;
+		if (watch->ops->option_changed_match_name &&
+		    strcmp(team_get_option_name(option),
+			   watch->ops->option_changed_match_name))
+			continue;
 		err = watch->ops->option_changed(ctx, option, watch->priv);
 		if (err)
 			return err;
