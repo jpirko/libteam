@@ -196,8 +196,6 @@ lw_psr_ppriv_get(struct lw_common_port_priv *common_ppriv)
 	return (struct lw_psr_port_priv *) common_ppriv;
 }
 
-static int call_link_watch_handler(struct teamd_context *ctx);
-
 static int lw_psr_callback_periodic(struct teamd_context *ctx, int events,
 				    void *func_priv)
 {
@@ -224,9 +222,6 @@ static int lw_psr_callback_periodic(struct teamd_context *ctx, int events,
 		teamd_log_info("%s: %s-link went %s.", tdport->ifname, lw_name,
 			       psr_ppriv->link_up ? "up" : "down");
 		err = teamd_event_port_link_changed(ctx, tdport);
-		if (err)
-			return err;
-		err = call_link_watch_handler(ctx);
 		if (err)
 			return err;
 		err = team_set_port_user_linkup(ctx->th,
@@ -891,13 +886,6 @@ static const struct teamd_link_watch *teamd_find_link_watch(const char *link_wat
 	return NULL;
 }
 
-static int call_link_watch_handler(struct teamd_context *ctx)
-{
-	if (ctx->link_watch_handler)
-		return ctx->link_watch_handler(ctx);
-	return 0;
-}
-
 bool teamd_link_watch_port_up(struct teamd_context *ctx,
 			      struct teamd_port *tdport)
 {
@@ -970,12 +958,7 @@ static int link_watch_event_watch_port_changed(struct teamd_context *ctx,
 					       struct teamd_port *tdport,
 					       void *priv)
 {
-	int err;
-
-	err = teamd_event_port_link_changed(ctx, tdport);
-	if (err)
-		return err;
-	return call_link_watch_handler(ctx);
+	return teamd_event_port_link_changed(ctx, tdport);
 }
 
 static const struct teamd_event_watch_ops link_watch_port_watch_ops = {

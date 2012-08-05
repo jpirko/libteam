@@ -53,8 +53,6 @@ enum teamd_command {
 struct teamd_runner;
 struct teamd_context;
 
-typedef int (*teamd_link_watch_handler_t)(struct teamd_context *ctx);
-
 struct teamd_context {
 	enum teamd_command		cmd;
 	bool				daemonize;
@@ -69,7 +67,6 @@ struct teamd_context {
 	struct team_handle *		th;
 	const struct teamd_runner *	runner;
 	void *				runner_priv;
-	teamd_link_watch_handler_t	link_watch_handler;
 	struct list_item		port_obj_list;
 	unsigned int			port_obj_list_count;
 	struct list_item                option_watch_list;
@@ -234,12 +231,6 @@ bool teamd_link_watch_port_up(struct teamd_context *ctx,
 			      struct teamd_port *tdport);
 int teamd_link_watch_init(struct teamd_context *ctx);
 void teamd_link_watch_fini(struct teamd_context *ctx);
-
-static inline void teamd_link_watch_set_handler(struct teamd_context *ctx,
-						teamd_link_watch_handler_t handler)
-{
-	ctx->link_watch_handler = handler;
-}
 
 int teamd_option_watch_init(struct teamd_context *ctx);
 void teamd_option_watch_fini(struct teamd_context *ctx);
