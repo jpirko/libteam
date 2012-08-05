@@ -164,6 +164,12 @@ static int link_watch_handler(struct teamd_context *ctx)
 	return 0;
 }
 
+static int abl_port_link_changed(struct teamd_context *ctx,
+				 struct teamd_port *tdport, void *priv)
+{
+	return link_watch_handler(ctx);
+}
+
 static int abl_prio_option_changed(struct teamd_context *ctx,
 				   struct team_option *option, void *priv)
 {
@@ -171,6 +177,7 @@ static int abl_prio_option_changed(struct teamd_context *ctx,
 }
 
 static const struct teamd_event_watch_ops abl_event_watch_ops = {
+	.port_link_changed = abl_port_link_changed,
 	.option_changed = abl_prio_option_changed,
 	.option_changed_match_name = "priority",
 };
@@ -184,13 +191,11 @@ static int abl_init(struct teamd_context *ctx)
 		teamd_log_err("Failed to register event watch.");
 		return err;
 	}
-	teamd_link_watch_set_handler(ctx, link_watch_handler);
 	return 0;
 }
 
 static void abl_fini(struct teamd_context *ctx)
 {
-	teamd_link_watch_set_handler(ctx, NULL);
 	teamd_event_watch_unregister(ctx, &abl_event_watch_ops, NULL);
 }
 
