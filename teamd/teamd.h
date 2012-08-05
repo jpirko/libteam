@@ -241,25 +241,8 @@ static inline void teamd_link_watch_set_handler(struct teamd_context *ctx,
 	ctx->link_watch_handler = handler;
 }
 
-typedef int (*teamd_option_watch_handler_t)(struct teamd_context *ctx,
-					    struct team_option *option,
-					    void *option_watch_priv);
-struct teamd_option_watch;
-
-struct teamd_option_watch_ops {
-	const char *option_name;
-	int (*option_changed)(struct teamd_context *ctx,
-			      struct team_option *option,
-			      void *option_watch_priv);
-};
-
 int teamd_option_watch_init(struct teamd_context *ctx);
 void teamd_option_watch_fini(struct teamd_context *ctx);
-int teamd_option_watch_register(struct teamd_option_watch **pwatch,
-				struct teamd_context *ctx,
-				const struct teamd_option_watch_ops *ops,
-				void *priv);
-void teamd_option_watch_unregister(struct teamd_option_watch *watch);
 
 int teamd_dbus_init(struct teamd_context *ctx);
 void teamd_dbus_fini(struct teamd_context *ctx);
