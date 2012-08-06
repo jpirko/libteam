@@ -224,11 +224,6 @@ static int lw_psr_callback_periodic(struct teamd_context *ctx, int events,
 		err = teamd_event_port_link_changed(ctx, tdport);
 		if (err)
 			return err;
-		err = team_set_port_user_linkup(ctx->th,
-						psr_ppriv->tdport->ifindex,
-						psr_ppriv->link_up);
-		if (err)
-			return err;
 	}
 	psr_ppriv->reply_received = false;
 	return psr_ppriv->ops->send(psr_ppriv);
@@ -250,19 +245,20 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 	int err;
 	int tmp;
 
+	teamd_log_info("%s: Using link_watch \"%s\":",
+		       tdport->ifname, psr_ppriv->common.link_watch->name);
 	err = json_unpack(link_watch_json, "{s:i}", "interval", &tmp);
 	if (err) {
 		teamd_log_err("%s: Failed to get \"interval\" link-watch "
 			      "option.", tdport->ifname);
 		return -ENOENT;
 	}
-	teamd_log_dbg("%s: Using interval \"%d\".", tdport->ifname, tmp);
+	teamd_log_dbg("\tinterval \"%d\".", tmp);
 	ms_to_timespec(&psr_ppriv->interval, tmp);
 
 	err = json_unpack(link_watch_json, "{s:i}", "init_wait", &tmp);
 	if (!err) {
-		teamd_log_dbg("%s: Using init_wait \"%d\".",
-			      tdport->ifname, tmp);
+		teamd_log_dbg("\tinit_wait \"%d\".", tmp);
 		ms_to_timespec(&psr_ppriv->init_wait, tmp);
 	} else {
 		psr_ppriv->init_wait = psr_ppriv->ops->default_init_wait;
@@ -270,16 +266,14 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 
 	err = json_unpack(link_watch_json, "{s:i}", "missed_max", &tmp);
 	if (err) {
-		teamd_log_err("%s: Failed to get \"missed_max\" link-watch "
-			      "option.", tdport->ifname);
+		teamd_log_err("Failed to get \"missed_max\" link-watch option.");
 		return -ENOENT;
 	}
 	if (tmp < 0) {
-		teamd_log_err("%s: \"missed_max\" must not be negative "
-			      "number.", tdport->ifname);
+		teamd_log_err("\"missed_max\" must not be negative number.");
 		return -EINVAL;
 	}
-	teamd_log_dbg("%s: Using missed_max \"%d\".", tdport->ifname, tmp);
+	teamd_log_dbg("\tmissed_max \"%d\".", tmp);
 	psr_ppriv->missed_max = tmp;
 	return 0;
 }
@@ -457,7 +451,7 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 	err = set_in_addr(&ap_ppriv->src, host);
 	if (err)
 		return err;
-	teamd_log_dbg("Using source address \"%s\".",
+	teamd_log_dbg("\tsource address \"%s\".",
 		      str_in_addr(&ap_ppriv->src));
 
 	err = json_unpack(link_watch_json, "{s:s}", "target_host", &host);
@@ -468,7 +462,7 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 	err = set_in_addr(&ap_ppriv->dst, host);
 	if (err)
 		return err;
-	teamd_log_dbg("Using target address \"%s\".", str_in_addr(&ap_ppriv->dst));
+	teamd_log_dbg("\ttarget address \"%s\".", str_in_addr(&ap_ppriv->dst));
 
 	return 0;
 }
@@ -738,7 +732,7 @@ static int lw_nsnap_load_options(struct teamd_context *ctx,
 	err = set_sockaddr_in6(&nsnap_ppriv->dst, host);
 	if (err)
 		return err;
-	teamd_log_dbg("Using target address \"%s\".",
+	teamd_log_dbg("\ttarget address \"%s\".",
 		      str_sockaddr_in6(&nsnap_ppriv->dst));
 
 	return 0;
@@ -886,61 +880,84 @@ static const struct teamd_link_watch *teamd_find_link_watch(const char *link_wat
 	return NULL;
 }
 
+bool teamd_link_watch_instance_port_up(struct teamd_context *ctx,
+				       struct teamd_port *tdport,
+				       struct lw_common_port_priv *common_ppriv)
+{
+	const struct teamd_link_watch *link_watch = common_ppriv->link_watch;
+
+	if (!link_watch->is_port_up)
+		return true;
+	return link_watch->is_port_up(ctx, tdport, common_ppriv);
+}
+
 bool teamd_link_watch_port_up(struct teamd_context *ctx,
 			      struct teamd_port *tdport)
 {
 	struct lw_common_port_priv *common_ppriv;
-	const struct teamd_link_watch *link_watch;
+	bool link;
 
 	if (!tdport)
 		return true;
+	link = true;
 	teamd_for_each_port_priv_by_creator(common_ppriv, tdport,
 					    LW_PORT_PRIV_CREATOR_PRIV) {
-		link_watch = common_ppriv->link_watch;
-		if (link_watch->is_port_up)
-			return link_watch->is_port_up(ctx, tdport,
-						      common_ppriv);
+		link = teamd_link_watch_instance_port_up(ctx, tdport,
+							 common_ppriv);
+		if (link)
+			return link;
 	}
-	return true;
+	return link;
 }
 
-static int link_watch_event_watch_port_added(struct teamd_context *ctx,
-					     struct teamd_port *tdport,
-					     void *priv)
+int teamd_link_watch_refresh_user_linkup(struct teamd_context *ctx,
+					 struct teamd_port *tdport)
 {
+	struct lw_common_port_priv *common_ppriv;
+	bool link;
+	bool cur_link;
+	int err;
+
+	teamd_for_each_port_priv_by_creator(common_ppriv, tdport,
+					    LW_PORT_PRIV_CREATOR_PRIV) {
+		link = teamd_link_watch_instance_port_up(ctx, tdport,
+							 common_ppriv);
+		err = team_get_port_user_linkup(ctx->th, tdport->ifindex,
+						&cur_link);
+		if (err)
+			continue;
+		if (link == cur_link)
+			continue;
+		err = team_set_port_user_linkup(ctx->th, tdport->ifindex,
+						link);
+		if (err)
+			return err;
+	}
+	return 0;
+}
+
+static int link_watch_load_one_json_obj(struct teamd_context *ctx,
+					struct teamd_port *tdport,
+					json_t *link_watch_obj)
+{
+	int ret;
 	int err;
 	const char *link_watch_name;
-	json_t *link_watch_obj;
 	const struct teamd_link_watch *link_watch;
 	struct lw_common_port_priv *common_ppriv;
 
-	err = json_unpack(ctx->config_json, "{s:{s:{s:o}}}", "ports",
-			  tdport->ifname, "link_watch", &link_watch_obj);
-	if (err) {
-		teamd_log_dbg("%s: Failed to get link watch from port config.",
+	ret = json_unpack(link_watch_obj, "{s:s}", "name", &link_watch_name);
+	if (ret) {
+		teamd_log_err("%s: Failed to get link watch name.",
 			      tdport->ifname);
-		err = json_unpack(ctx->config_json, "{s:o}", "link_watch",
-				  &link_watch_obj);
-		if (err) {
-			teamd_log_info("%s: Failed to get link watch "
-				       "from config.", tdport->ifname);
-			goto nowatch;
-		}
-	}
-	err = json_unpack(link_watch_obj, "{s:s}", "name", &link_watch_name);
-	if (err) {
-		teamd_log_info("%s: Failed to get link watch name.",
-			       tdport->ifname);
-		goto nowatch;
+		return -EINVAL;
 	}
 	link_watch = teamd_find_link_watch(link_watch_name);
 	if (!link_watch) {
-		teamd_log_info("No link_watch named \"%s\" available.",
-			       link_watch_name);
-		goto nowatch;
+		teamd_log_err("No link_watch named \"%s\" available.",
+			      link_watch_name);
+		return -ENOENT;
 	}
-	teamd_log_info("%s: Using link_watch \"%s\".",
-		       tdport->ifname, link_watch_name);
 	err = teamd_port_priv_create_and_get((void **) &common_ppriv, tdport,
 					     &link_watch->port_priv,
 					     LW_PORT_PRIV_CREATOR_PRIV);
@@ -948,9 +965,59 @@ static int link_watch_event_watch_port_added(struct teamd_context *ctx,
 		return err;
 	common_ppriv->link_watch = link_watch;
 	common_ppriv->link_watch_json = link_watch_obj;
+	return 0;
+}
 
-nowatch:
-	teamd_log_info("%s: Using no link watch!", tdport->ifname);
+static int link_watch_load_json_obj(struct teamd_context *ctx,
+				    struct teamd_port *tdport,
+				    json_t *link_watch_obj)
+{
+	size_t i;
+	int err;
+
+	if (!json_is_array(link_watch_obj))
+		return link_watch_load_one_json_obj(ctx, tdport,
+						    link_watch_obj);
+	for (i = 0; i < json_array_size(link_watch_obj); i++) {
+		json_t *obj = json_array_get(link_watch_obj, i);
+
+		err = link_watch_load_one_json_obj(ctx, tdport, obj);
+		if (err)
+			return err;
+	}
+	return 0;
+}
+
+static int link_watch_event_watch_port_added(struct teamd_context *ctx,
+					     struct teamd_port *tdport,
+					     void *priv)
+{
+	int ret;
+	int err;
+	json_t *link_watch_obj;
+
+	ret = json_unpack(ctx->config_json, "{s:{s:{s:o}}}", "ports",
+			  tdport->ifname, "link_watch", &link_watch_obj);
+	if (!ret) {
+		teamd_log_dbg("%s: Got link watch from port config.",
+			      tdport->ifname);
+		err = link_watch_load_json_obj(ctx, tdport, link_watch_obj);
+		if (err)
+			return err;
+	}
+
+	ret = json_unpack(ctx->config_json, "{s:o}", "link_watch",
+			  &link_watch_obj);
+	if (!ret) {
+		teamd_log_dbg("Got link watch from global config.");
+		err = link_watch_load_json_obj(ctx, tdport, link_watch_obj);
+		if (err)
+			return err;
+	}
+
+	if (!teamd_get_first_port_priv_by_creator(tdport,
+						  LW_PORT_PRIV_CREATOR_PRIV))
+		teamd_log_info("%s: Using no link watch.", tdport->ifname);
 	return 0;
 }
 
@@ -961,9 +1028,17 @@ static int link_watch_event_watch_port_changed(struct teamd_context *ctx,
 	return teamd_event_port_link_changed(ctx, tdport);
 }
 
+static int link_watch_event_watch_port_link_changed(struct teamd_context *ctx,
+						    struct teamd_port *tdport,
+						    void *priv)
+{
+	return teamd_link_watch_refresh_user_linkup(ctx, tdport);
+}
+
 static const struct teamd_event_watch_ops link_watch_port_watch_ops = {
 	.port_added = link_watch_event_watch_port_added,
 	.port_changed = link_watch_event_watch_port_changed,
+	.port_link_changed = link_watch_event_watch_port_link_changed,
 };
 
 int teamd_link_watch_init(struct teamd_context *ctx)
