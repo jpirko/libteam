@@ -1003,6 +1003,29 @@ int team_set_port_user_linkup_enabled(struct team_handle *th,
 }
 
 /**
+ * team_get_port_user_linkup:
+ * @th: libteam library context
+ * @port_ifindex: port interface index
+ * @ifindex: where the port user link state will be stored
+ *
+ * Gets user linkup for port identified by @port_ifindex
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_get_port_user_linkup(struct team_handle *th,
+			      uint32_t port_ifindex, bool *linkup)
+{
+	struct team_option *option;
+
+	option = team_get_option(th, "np", "user_linkup", port_ifindex);
+	if (!option)
+		return -ENOENT;
+	*linkup = team_get_option_value_bool(option);
+	return 0;
+}
+
+/**
  * team_set_port_user_linkup:
  * @th: libteam library context
  * @port_ifindex: port interface index
