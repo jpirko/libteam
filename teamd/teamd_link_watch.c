@@ -311,8 +311,8 @@ static int lw_psr_port_added(struct teamd_context *ctx,
 		goto close_sock;
 	}
 
-	err = asprintf(&psr_ppriv->cb_name_socket, "%s_socket_if%d", lw_name,
-		       tdport->ifindex);
+	err = asprintf(&psr_ppriv->cb_name_socket, "%s_socket_if%d_ptr%p",
+		       lw_name, tdport->ifindex, priv);
 	if (err == -1) {
 		teamd_log_err("Failed generate callback name.");
 		err = -ENOMEM;
@@ -328,8 +328,8 @@ static int lw_psr_port_added(struct teamd_context *ctx,
 		goto free_cb_name_socket;
 	}
 
-	err = asprintf(&psr_ppriv->cb_name_periodic, "%s_periodic_if%d", lw_name,
-		       tdport->ifindex);
+	err = asprintf(&psr_ppriv->cb_name_periodic, "%s_periodic_if%d_ptr%p",
+		       lw_name, tdport->ifindex, priv);
 	if (err == -1) {
 		teamd_log_err("Failed generate callback name.");
 		err = -ENOMEM;
