@@ -239,6 +239,7 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 		bool changed;
 		int nla_type;
 		int opt_type;
+		long tmp;
 		void *data;
 		int data_len = 0;
 		int err;
@@ -283,17 +284,12 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 
 		switch (nla_type) {
 		case NLA_U32:
-			{
-				__u32 arg = nla_get_u32(data_attr);
-				data = &arg;
-			}
+			tmp = (long) nla_get_u32(data_attr);
+			data = &tmp;
 			opt_type = TEAM_OPTION_TYPE_U32;
 			break;
 		case NLA_STRING:
-			{
-				char *arg = nla_get_string(data_attr);
-				data = arg;
-			}
+			data = nla_get_string(data_attr);
 			opt_type = TEAM_OPTION_TYPE_STRING;
 			break;
 		case NLA_BINARY:
@@ -302,17 +298,13 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 			opt_type = TEAM_OPTION_TYPE_BINARY;
 			break;
 		case NLA_FLAG:
-			{
-				bool arg = data_attr ? true : false;
-				data = &arg;
-			}
+			tmp = (long) (data_attr ? true : false);
+			data = &tmp;
 			opt_type = TEAM_OPTION_TYPE_BOOL;
 			break;
 		case NLA_S32:
-			{
-				__s32 arg = nla_get_s32(data_attr);
-				data = &arg;
-			}
+			tmp = (long) nla_get_s32(data_attr);
+			data = &tmp;
 			opt_type = TEAM_OPTION_TYPE_S32;
 			break;
 		default:
