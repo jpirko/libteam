@@ -29,8 +29,6 @@ need_config "${CONFIG}"
 
 source_config
 
-. /etc/sysconfig/teamd
-
 # If the device is a team, create it with teamd, if available.
 if [ "${DEVICETYPE}" = "Team" ]; then
 	if [ ! -x /usr/bin/teamd ]; then
