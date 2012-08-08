@@ -168,7 +168,7 @@ static DBusMessage *config_dump(DBusMessage *message, struct teamd_context *ctx)
 	DBusMessage *reply = NULL;
 	char *cfg;
 
-	cfg = json_dumps(ctx->config_json, JSON_COMPACT | JSON_ENSURE_ASCII | JSON_SORT_KEYS);
+	cfg = json_dumps(ctx->config_json, JSON_INDENT(4) | JSON_ENSURE_ASCII | JSON_SORT_KEYS);
 	if (!cfg) {
 		teamd_log_err("Failed to get config dump.");
 		reply = dbus_message_new_error(message,
