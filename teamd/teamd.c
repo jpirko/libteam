@@ -1517,7 +1517,7 @@ int main(int argc, char **argv)
 	case DAEMON_CMD_RUN:
 		err = teamd_start(ctx);
 		if (err)
-			teamd_log_err("Failed to start daemon: %s", strerror(-err));
+			teamd_log_err("Failed: %s", strerror(-err));
 		else
 			ret = EXIT_SUCCESS;
 		break;
