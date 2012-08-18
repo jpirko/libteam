@@ -30,8 +30,8 @@
 #include "teamd.h"
 #include "teamd_dbus.h"
 
-static DBusMessage *port_config_update(DBusMessage *message,
-				       struct teamd_context *ctx)
+static DBusMessage *dbus_method_port_config_update(DBusMessage *message,
+						   struct teamd_context *ctx)
 {
 	DBusMessage *reply;
 	DBusError error;
@@ -79,7 +79,8 @@ out:
 	return reply;
 }
 
-static DBusMessage *port_add(DBusMessage *message, struct teamd_context *ctx)
+static DBusMessage *dbus_method_port_add(DBusMessage *message,
+					 struct teamd_context *ctx)
 {
 	DBusMessage *reply;
 	DBusError error;
@@ -121,7 +122,8 @@ out:
 	return reply;
 }
 
-static DBusMessage *port_remove(DBusMessage *message, struct teamd_context *ctx)
+static DBusMessage *dbus_method_port_remove(DBusMessage *message,
+					    struct teamd_context *ctx)
 {
 	DBusMessage *reply;
 	DBusError error;
@@ -163,7 +165,8 @@ out:
 	return reply;
 }
 
-static DBusMessage *config_dump(DBusMessage *message, struct teamd_context *ctx)
+static DBusMessage *dbus_method_config_dump(DBusMessage *message,
+					    struct teamd_context *ctx)
 {
 	DBusMessage *reply = NULL;
 	char *cfg;
@@ -239,13 +242,13 @@ static DBusHandlerResult message_handler(DBusConnection *con,
 
 	if (!strcmp(msg_interface, TEAMD_DBUS_IFACE)) {
 		if (!strcmp(method, "PortConfigUpdate")) {
-			reply = port_config_update(message, ctx);
+			reply = dbus_method_port_config_update(message, ctx);
 		} else if (!strcmp(method, "PortAdd")) {
-			reply = port_add(message, ctx);
+			reply = dbus_method_port_add(message, ctx);
 		} else if (!strcmp(method, "PortRemove")) {
-			reply = port_remove(message, ctx);
+			reply = dbus_method_port_remove(message, ctx);
 		} else if (!strcmp(method, "ConfigDump")) {
-			reply = config_dump(message, ctx);
+			reply = dbus_method_config_dump(message, ctx);
 		}
 	}
 
