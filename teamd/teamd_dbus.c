@@ -188,6 +188,30 @@ out:
 	return reply;
 }
 
+static DBusMessage *dbus_method_state_dump(DBusMessage *message,
+					   struct teamd_context *ctx)
+{
+	DBusMessage *reply = NULL;
+	char *state;
+	json_t *obj = json_object();
+
+	state = json_dumps(obj, JSON_INDENT(4) | JSON_ENSURE_ASCII);
+	if (!state) {
+		teamd_log_err("Failed to get state dump.");
+		reply = dbus_message_new_error(message,
+					       TEAMD_DBUS_IFACE ".StateDumpFail",
+					       "Failed to dump state.");
+		goto out;
+	}
+	reply = dbus_message_new_method_return(message);
+	if (reply)
+		dbus_message_append_args(reply, DBUS_TYPE_STRING, &state,
+					 DBUS_TYPE_INVALID);
+	free(state);
+out:
+	return reply;
+}
+
 static char *introspection_xml =
 	"<node name='" TEAMD_DBUS_PATH "'>"
 	"  <interface name='" TEAMD_DBUS_IFACE "'>"
@@ -202,6 +226,8 @@ static char *introspection_xml =
 	"      <arg type='s' name='port_devname' direction='in'/>"
 	"    </method>"
 	"    <method name='ConfigDump'>"
+	"    </method>"
+	"    <method name='StateDump'>"
 	"    </method>"
 	"  </interface>"
 	"</node>";
@@ -249,6 +275,8 @@ static DBusHandlerResult message_handler(DBusConnection *con,
 			reply = dbus_method_port_remove(message, ctx);
 		} else if (!strcmp(method, "ConfigDump")) {
 			reply = dbus_method_config_dump(message, ctx);
+		} else if (!strcmp(method, "StateDump")) {
+			reply = dbus_method_state_dump(message, ctx);
 		}
 	}
 

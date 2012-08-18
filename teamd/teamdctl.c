@@ -60,13 +60,13 @@ static int noreply_msg_process(char *method_name, DBusMessage *msg)
 	return -EINVAL;
 }
 
-static int configdump_msg_prepare(char *method_name, DBusMessage *msg,
-				  int argc, char **argv)
+static int norequest_msg_prepare(char *method_name, DBusMessage *msg,
+				 int argc, char **argv)
 {
 	return 0;
 }
 
-static int configdump_msg_process(char *method_name, DBusMessage *msg)
+static int stringdump_msg_process(char *method_name, DBusMessage *msg)
 {
 	DBusMessageIter args;
 	dbus_bool_t dbres;
@@ -148,8 +148,14 @@ static struct method_type method_types[] = {
 	{
 		.name = "ConfigDump",
 		.params = { NULL },
-		.msg_prepare = configdump_msg_prepare,
-		.msg_process = configdump_msg_process,
+		.msg_prepare = norequest_msg_prepare,
+		.msg_process = stringdump_msg_process,
+	},
+	{
+		.name = "StateDump",
+		.params = { NULL },
+		.msg_prepare = norequest_msg_prepare,
+		.msg_process = stringdump_msg_process,
 	},
 	{
 		.name = "PortAdd",
