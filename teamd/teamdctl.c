@@ -27,19 +27,15 @@
 
 #include "teamd_dbus.h"
 
-static void print_help(const char *argv0) {
-	printf(
-            "%s [options] teamdevname command [command args]\n"
-            "    -h --help                Show this help\n",
-            argv0);
-}
-
 typedef int (*msg_prepare_t)(char *method_name, DBusMessage *msg,
 			     int argc, char **argv);
 typedef int (*msg_process_t)(char *method_name, DBusMessage *msg);
 
+#define METHOD_PARAM_MAX_CNT 8
+
 struct method_type {
 	char *name;
+	char *params[METHOD_PARAM_MAX_CNT];
 	msg_prepare_t msg_prepare;
 	msg_process_t msg_process;
 };
@@ -151,21 +147,25 @@ static int portconfigupdate_msg_prepare(char *method_name, DBusMessage *msg,
 static struct method_type method_types[] = {
 	{
 		.name = "ConfigDump",
+		.params = { NULL },
 		.msg_prepare = configdump_msg_prepare,
 		.msg_process = configdump_msg_process,
 	},
 	{
 		.name = "PortAdd",
+		.params = { "PORTDEV", NULL },
 		.msg_prepare = portaddrm_msg_prepare,
 		.msg_process = noreply_msg_process,
 	},
 	{
 		.name = "PortRemove",
+		.params = { "PORTDEV", NULL },
 		.msg_prepare = portaddrm_msg_prepare,
 		.msg_process = noreply_msg_process,
 	},
 	{
 		.name = "PortConfigUpdate",
+		.params = { "PORTDEV", "PORTCONFIG", NULL },
 		.msg_prepare = portconfigupdate_msg_prepare,
 		.msg_process = noreply_msg_process,
 	},
@@ -249,8 +249,25 @@ free_err:
 	return err;
 }
 
+static void print_help(const char *argv0) {
+	int i, j;
+
+	printf(
+            "%s [options] teamdevname method [method args]\n"
+            "\t-h --help                Show this help\n",
+            argv0);
+	printf("Methods:\n");
+	for (i = 0; i < METHOD_TYPE_COUNT; i++) {
+		printf("\t%s", method_types[i].name);
+		for (j = 0; method_types[i].params[j]; j++)
+			printf(" %s", method_types[i].params[j]);
+		printf("\n");
+	}
+}
+
 int main(int argc, char **argv)
 {
+	char *argv0 = argv[0];
 	char *team_devname;
 	char *method_name;
 	static const struct option long_options[] = {
@@ -266,22 +283,29 @@ int main(int argc, char **argv)
 
 		switch(opt) {
 		case 'h':
-			print_help(argv[0]);
+			print_help(argv0);
 			return EXIT_SUCCESS;
 		case '?':
 			fprintf(stderr, "unknown option.\n");
-			print_help(argv[0]);
+			print_help(argv0);
 			return EXIT_FAILURE;
 		default:
 			fprintf(stderr, "unknown option \"%c\".\n", opt);
-			print_help(argv[0]);
+			print_help(argv0);
 			return EXIT_FAILURE;
 		}
 	}
 
+	if (optind >= argc) {
+		fprintf(stderr, "No team device specified.\n");
+		printf("\n");
+		print_help(argv0);
+		return EXIT_FAILURE;
+	}
 	if (optind + 1 >= argc) {
-		fprintf(stderr, "Expected argument after options.\n");
-		print_help(argv[0]);
+		fprintf(stderr, "No method to call specified.\n");
+		printf("\n");
+		print_help(argv0);
 		return EXIT_FAILURE;
 	}
 
@@ -302,6 +326,8 @@ int main(int argc, char **argv)
 	}
 	if (i == METHOD_TYPE_COUNT) {
 		fprintf(stderr, "Unknown method \"%s\".\n", method_name);
+		printf("\n");
+		print_help(argv0);
 		return EXIT_FAILURE;
 	}
 	return EXIT_SUCCESS;
