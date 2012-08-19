@@ -192,12 +192,22 @@ static DBusMessage *dbus_method_state_dump(DBusMessage *message,
 					   struct teamd_context *ctx)
 {
 	DBusMessage *reply = NULL;
+	json_t *state_json;
+	int err;
 	char *state;
-	json_t *obj = json_object();
 
-	state = json_dumps(obj, JSON_INDENT(4) | JSON_ENSURE_ASCII);
+	err = teamd_state_json_dump(ctx, &state_json);
+	if (err) {
+		teamd_log_err("Failed to get state.");
+		reply = dbus_message_new_error(message,
+					       TEAMD_DBUS_IFACE ".StateDumpFail",
+					       "Failed to get state.");
+		goto out;
+	}
+	state = json_dumps(state_json, JSON_INDENT(4) | JSON_ENSURE_ASCII);
+	json_decref(state_json);
 	if (!state) {
-		teamd_log_err("Failed to get state dump.");
+		teamd_log_err("Failed to dump state.");
 		reply = dbus_message_new_error(message,
 					       TEAMD_DBUS_IFACE ".StateDumpFail",
 					       "Failed to dump state.");

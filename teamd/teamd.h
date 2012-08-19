@@ -71,6 +71,7 @@ struct teamd_context {
 	unsigned int			port_obj_list_count;
 	struct list_item                option_watch_list;
 	struct list_item		event_watch_list;
+	struct list_item		state_json_list;
 	uint32_t			ifindex;
 	struct team_ifinfo *		ifinfo;
 	char *				hwaddr;
@@ -134,6 +135,22 @@ int teamd_event_watch_register(struct teamd_context *ctx,
 void teamd_event_watch_unregister(struct teamd_context *ctx,
 				  const struct teamd_event_watch_ops *ops,
 				  void *priv);
+
+struct teamd_state_json_ops {
+	int (*dump)(struct teamd_context *ctx,
+		    json_t **pstate_json, void *priv);
+	char *name;
+};
+
+int teamd_state_json_init(struct teamd_context *ctx);
+void teamd_state_json_fini(struct teamd_context *ctx);
+int teamd_state_json_register(struct teamd_context *ctx,
+			      const struct teamd_state_json_ops *ops,
+			      void *priv);
+void teamd_state_json_unregister(struct teamd_context *ctx,
+				 const struct teamd_state_json_ops *ops,
+				 void *priv);
+int teamd_state_json_dump(struct teamd_context *ctx, json_t **pstate_json);
 
 int teamd_update_port_config(struct teamd_context *ctx, const char *port_name,
 			     const char *json_port_cfg_str);

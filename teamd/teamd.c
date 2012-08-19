@@ -1263,10 +1263,16 @@ static int teamd_init(struct teamd_context *ctx)
 		goto events_fini;
 	}
 
+	err = teamd_state_json_init(ctx);
+	if (err) {
+		teamd_log_err("Failed to init state json infrastructure.");
+		goto option_watch_fini;
+	}
+
 	err = teamd_per_port_init(ctx);
 	if (err) {
 		teamd_log_err("Failed to init per-port.");
-		goto option_watch_fini;
+		goto state_json_fini;
 	}
 
 	err = teamd_link_watch_init(ctx);
@@ -1313,6 +1319,8 @@ link_watch_fini:
 	teamd_link_watch_fini(ctx);
 per_port_fini:
 	teamd_per_port_fini(ctx);
+state_json_fini:
+	teamd_state_json_fini(ctx);
 option_watch_fini:
 	teamd_option_watch_fini(ctx);
 events_fini:
@@ -1336,6 +1344,7 @@ static void teamd_fini(struct teamd_context *ctx)
 	teamd_runner_fini(ctx);
 	teamd_link_watch_fini(ctx);
 	teamd_per_port_fini(ctx);
+	teamd_state_json_fini(ctx);
 	teamd_option_watch_fini(ctx);
 	teamd_events_fini(ctx);
 	teamd_unregister_default_handlers(ctx);
