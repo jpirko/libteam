@@ -1119,7 +1119,7 @@ static void debug_log_ifinfo_list(struct teamd_context *ctx)
 	team_for_each_ifinfo(ifinfo, ctx->th) {
 		uint32_t ifindex = team_get_ifinfo_ifindex(ifinfo);
 		size_t hwaddr_len = team_get_ifinfo_hwaddr_len(ifinfo);
-		char str[hwaddr_len];
+		char str[hwaddr_str_len(hwaddr_len)];
 
 		hwaddr_str(str, team_get_ifinfo_hwaddr(ifinfo), hwaddr_len);
 		teamd_log_dbg("%d: hwaddr: %s%s", ifindex, str,

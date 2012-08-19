@@ -41,4 +41,9 @@ static inline void hwaddr_str(char *str, char *hwaddr, size_t len)
 	*(str - 1) = '\0';
 }
 
+static inline size_t hwaddr_str_len(size_t len)
+{
+	return len * 3 + 1;
+}
+
 #endif /* _T_MISC_H_ */
