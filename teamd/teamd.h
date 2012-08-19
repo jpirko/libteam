@@ -152,6 +152,9 @@ void teamd_state_json_unregister(struct teamd_context *ctx,
 				 void *priv);
 int teamd_state_json_dump(struct teamd_context *ctx, json_t **pstate_json);
 
+int teamd_state_json_basics_init(struct teamd_context *ctx);
+void teamd_state_json_basics_fini(struct teamd_context *ctx);
+
 int teamd_update_port_config(struct teamd_context *ctx, const char *port_name,
 			     const char *json_port_cfg_str);
 

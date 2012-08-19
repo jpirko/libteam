@@ -204,7 +204,8 @@ static DBusMessage *dbus_method_state_dump(DBusMessage *message,
 					       "Failed to get state.");
 		goto out;
 	}
-	state = json_dumps(state_json, JSON_INDENT(4) | JSON_ENSURE_ASCII);
+	state = json_dumps(state_json, JSON_INDENT(4) | JSON_ENSURE_ASCII |
+			   JSON_SORT_KEYS);
 	json_decref(state_json);
 	if (!state) {
 		teamd_log_err("Failed to dump state.");

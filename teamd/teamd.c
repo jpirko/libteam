@@ -1287,10 +1287,16 @@ static int teamd_init(struct teamd_context *ctx)
 		goto link_watch_fini;
 	}
 
+	err = teamd_state_json_basics_init(ctx);
+	if (err) {
+		teamd_log_err("Failed to init state json basics.");
+		goto runner_fini;
+	}
+
 	err = teamd_dbus_init(ctx);
 	if (err) {
 		teamd_log_err("Failed to init dbus.");
-		goto runner_fini;
+		goto state_json_basics_fini;
 	}
 
 	err = teamd_add_ports(ctx);
@@ -1313,6 +1319,8 @@ static int teamd_init(struct teamd_context *ctx)
 
 dbus_fini:
 	teamd_dbus_fini(ctx);
+state_json_basics_fini:
+	teamd_state_json_basics_fini(ctx);
 runner_fini:
 	teamd_runner_fini(ctx);
 link_watch_fini:
