@@ -105,9 +105,23 @@ static int change_active_port(struct teamd_context *ctx,
 	return 0;
 }
 
+static int abl_get_active_tdport(struct teamd_context *ctx,
+				 struct teamd_port **pactive_tdport)
+{
+	int err;
+	uint32_t ifindex;
+
+	err = team_get_active_port(ctx->th, &ifindex);
+	if (err) {
+		teamd_log_err("Failed to get active port.");
+		return err;
+	}
+	*pactive_tdport = teamd_get_port(ctx, ifindex);
+	return 0;
+}
+
 static int link_watch_handler(struct teamd_context *ctx)
 {
-	uint32_t ifindex;
 	struct teamd_port *tdport;
 	struct teamd_port *active_tdport;
 	struct teamd_port *best_tdport = NULL;
@@ -116,12 +130,9 @@ static int link_watch_handler(struct teamd_context *ctx)
 	int best_prio = INT_MIN;
 	int err;
 
-	err = team_get_active_port(ctx->th, &ifindex);
-	if (err) {
-		teamd_log_err("Failed to get active port.");
+	err = abl_get_active_tdport(ctx, &active_tdport);
+	if (err)
 		return err;
-	}
-	active_tdport = teamd_get_port(ctx, ifindex);
 	if (active_tdport)
 		teamd_log_dbg("Current active port: \"%s\" (ifindex \"%d\", prio \"%d\").",
 			      active_tdport->ifname, active_tdport->ifindex,
@@ -199,10 +210,31 @@ static void abl_fini(struct teamd_context *ctx)
 	teamd_event_watch_unregister(ctx, &abl_event_watch_ops, NULL);
 }
 
+static int abl_state_json_dump(struct teamd_context *ctx,
+			       json_t **pstate_json, void *priv)
+{
+	int err;
+	struct teamd_port *active_tdport;
+	json_t *state_json;
+	char *active_port;
+
+	err = abl_get_active_tdport(ctx, &active_tdport);
+	if (err)
+		return err;
+
+	active_port = active_tdport ? active_tdport->ifname : "";
+	state_json = json_pack("{s:s}", "active_port", active_port);
+	if (!state_json)
+		return -ENOMEM;
+	*pstate_json = state_json;
+	return 0;
+}
+
 const struct teamd_runner teamd_runner_activebackup = {
-	.name		= "activebackup",
-	.team_mode_name	= "activebackup",
-	.init		= abl_init,
-	.fini		= abl_fini,
-	.priv_size	= sizeof(struct abl_priv),
+	.name			= "activebackup",
+	.team_mode_name		= "activebackup",
+	.priv_size		= sizeof(struct abl_priv),
+	.init			= abl_init,
+	.fini			= abl_fini,
+	.state_json_dump	= abl_state_json_dump,
 };
