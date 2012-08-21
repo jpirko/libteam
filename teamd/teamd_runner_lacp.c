@@ -29,6 +29,7 @@
 #include <netinet/in.h>
 #include <errno.h>
 #include <team.h>
+#include <private/misc.h>
 
 #include "teamd.h"
 
@@ -947,10 +948,110 @@ static void lacp_fini(struct teamd_context *ctx)
 	teamd_event_watch_unregister(ctx, &lacp_port_watch_ops, lacp);
 }
 
+json_t *__fill_lacpdu_info(struct lacpdu_info *lacpdu_info)
+{
+	char addr_str[hwaddr_str_len(ETH_ALEN)];
+
+	hwaddr_str(addr_str, (char *) lacpdu_info->system, ETH_ALEN);
+	return json_pack("{s:i, s:s, s:i, s:i, s:i, s:i}",
+			 "system_priority", lacpdu_info->system_priority,
+			 "system", addr_str,
+			 "key", lacpdu_info->key,
+			 "port_priority", lacpdu_info->port_priority,
+			 "port", lacpdu_info->port,
+			 "state", lacpdu_info->state);
+}
+
+json_t *__fill_lacp_port(struct lacp_port *lacp_port)
+{
+	json_t *s_json;
+	json_t *actor_json;
+	json_t *partner_json;
+
+	actor_json = __fill_lacpdu_info(&lacp_port->actor);
+	if (!actor_json)
+		return NULL;
+
+	partner_json = __fill_lacpdu_info(&lacp_port->partner);
+	if (!partner_json) {
+		json_decref(actor_json);
+		return NULL;
+	}
+
+	s_json = json_pack("{s:b, s:i, s:s, s:i, s:i, s:o, s:o}",
+			   "selected", lacp_port->selected,
+			   "aggregator_id", lacp_port->aggregator_id,
+			   "state", lacp_port_state_name[lacp_port->state],
+			   "key", lacp_port->cfg.key,
+			   "prio", lacp_port->cfg.prio,
+			   "actor_lacpdu_info", actor_json,
+			   "partner_lacpdu_info", partner_json);
+	if (!s_json) {
+		json_decref(actor_json);
+		json_decref(partner_json);
+		return NULL;
+	}
+	return s_json;
+}
+
+json_t *__fill_lacp_ports(struct lacp *lacp)
+{
+	struct teamd_port *tdport;
+	json_t *lacp_ports_json;
+	json_t *lacp_port_json;
+	int err;
+
+	lacp_ports_json = json_object();
+	if (!lacp_ports_json)
+		return NULL;
+	teamd_for_each_tdport(tdport, lacp->ctx) {
+		lacp_port_json = __fill_lacp_port(lacp_port_get(lacp, tdport));
+		if (!lacp_port_json)
+			goto errout;
+		err = json_object_set_new(lacp_ports_json, tdport->ifname,
+					  lacp_port_json);
+		if (err) {
+			err = -ENOMEM;
+			goto errout;
+		}
+	}
+	return lacp_ports_json;
+
+errout:
+	json_decref(lacp_ports_json);
+	return NULL;
+}
+
+static int lacp_state_json_dump(struct teamd_context *ctx,
+				json_t **pstate_json, void *priv)
+{
+	struct lacp *lacp = priv;
+	json_t *state_json;
+	json_t *lacp_ports_json;
+
+	lacp_ports_json = __fill_lacp_ports(lacp);
+	if (!lacp_ports_json)
+		return -ENOMEM;
+	state_json = json_pack("{s:i, s:b, s:i, s:b, s:o}",
+			       "selected_aggregator_id",
+			       lacp->selected_aggregator_id,
+			       "active", lacp->cfg.active,
+			       "sys_prio", lacp->cfg.sys_prio,
+			       "fast_rate", lacp->cfg.fast_rate,
+			       "lacp_ports", lacp_ports_json);
+	if (!state_json) {
+		json_decref(lacp_ports_json);
+		return -ENOMEM;
+	}
+	*pstate_json = state_json;
+	return 0;
+}
+
 const struct teamd_runner teamd_runner_lacp = {
-	.name		= "lacp",
-	.team_mode_name	= "loadbalance",
-	.init		= lacp_init,
-	.fini		= lacp_fini,
-	.priv_size	= sizeof(struct lacp),
+	.name			= "lacp",
+	.team_mode_name		= "loadbalance",
+	.priv_size		= sizeof(struct lacp),
+	.init			= lacp_init,
+	.fini			= lacp_fini,
+	.state_json_dump	= lacp_state_json_dump,
 };
