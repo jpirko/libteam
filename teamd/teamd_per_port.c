@@ -77,9 +77,13 @@ void *teamd_get_next_port_priv_by_creator(struct teamd_port *tdport,
 	if (priv)
 		ppitem = get_container(priv, struct port_priv_item, priv);
 	port_obj = get_container(tdport, struct port_obj, port);
+
+next_ppitem:
 	ppitem = list_get_next_node_entry(&port_obj->priv_list, ppitem, list);
 	if (!ppitem)
 		return NULL;
+	if (ppitem->creator_priv != creator_priv)
+		goto next_ppitem;
 	return ppitem->priv;
 }
 
