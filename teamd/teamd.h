@@ -101,6 +101,8 @@ struct teamd_runner {
 	size_t priv_size;
 	int (*init)(struct teamd_context *ctx);
 	void (*fini)(struct teamd_context *ctx);
+	int (*state_json_dump)(struct teamd_context *ctx,
+			       json_t **pstate_json, void *priv);
 };
 
 struct teamd_event_watch_ops {

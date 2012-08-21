@@ -944,6 +944,25 @@ static int teamd_add_ports(struct teamd_context *ctx)
 	return 0;
 }
 
+static int runner_state_dump(struct teamd_context *ctx,
+			     json_t **pstate_json, void *priv)
+{
+	json_t *state_json;
+
+	if (ctx->runner->state_json_dump)
+		return ctx->runner->state_json_dump(ctx, pstate_json, priv);
+	state_json = json_object();
+	if (!state_json)
+		return -ENOMEM;
+	*pstate_json = state_json;
+	return 0;
+}
+
+struct teamd_state_json_ops runner_state_ops = {
+	.dump = runner_state_dump,
+	.name = "runner",
+};
+
 static int teamd_runner_init(struct teamd_context *ctx)
 {
 	int err;
@@ -980,14 +999,23 @@ static int teamd_runner_init(struct teamd_context *ctx)
 			return -ENOMEM;
 	}
 
+	err = teamd_state_json_register(ctx, &runner_state_ops,
+					ctx->runner_priv);
+	if (err)
+		goto free_runner_priv;
+
 	if (ctx->runner->init) {
 		err = ctx->runner->init(ctx);
-		if (err) {
-			free(ctx->runner_priv);
-			return err;
-		}
+		if (err)
+			goto runner_state_unreg;
 	}
 	return 0;
+
+runner_state_unreg:
+	teamd_state_json_unregister(ctx, &runner_state_ops, ctx);
+free_runner_priv:
+	free(ctx->runner_priv);
+	return err;
 }
 
 static void teamd_runner_fini(struct teamd_context *ctx)
