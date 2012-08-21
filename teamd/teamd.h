@@ -288,5 +288,9 @@ static inline void ms_to_timespec(struct timespec *ts, int ms)
 	ts->tv_nsec = (ms % 1000) * 1000000;
 }
 
+static inline int timespec_to_ms(struct timespec *ts)
+{
+	return ts->tv_sec * 1000 + ts->tv_nsec / 1000000;
+}
 
 #endif /* _TEAMD_H_ */

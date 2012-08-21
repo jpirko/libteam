@@ -47,6 +47,9 @@ struct teamd_link_watch {
 	const char *name;
 	bool (*is_port_up)(struct teamd_context *ctx, struct teamd_port *tdport,
 			   struct lw_common_port_priv *common_ppriv);
+	json_t *(*state_json)(struct teamd_context *ctx,
+			      struct teamd_port *tdport,
+			      struct lw_common_port_priv *common_ppriv);
 	struct teamd_port_priv port_priv;
 };
 
@@ -594,9 +597,30 @@ static int lw_ap_port_added(struct teamd_context *ctx,
 	return lw_psr_port_added(ctx, tdport, priv, creator_priv);
 }
 
+static json_t *lw_ap_state_json(struct teamd_context *ctx,
+				struct teamd_port *tdport,
+				struct lw_common_port_priv *common_ppriv)
+{
+	struct lw_psr_port_priv *psr_ppriv = lw_psr_ppriv_get(common_ppriv);
+	struct lw_ap_port_priv *ap_ppriv = lw_ap_ppriv_get(psr_ppriv);
+	static char src[NI_MAXHOST];
+	static char dst[NI_MAXHOST];
+
+	strcpy(src, str_in_addr(&ap_ppriv->src));
+	strcpy(dst, str_in_addr(&ap_ppriv->dst));
+	return json_pack("{s:s, s:s, s:i, s:i, s:i, s:i}",
+			 "source_host", src,
+			 "target_host", dst,
+			 "interval", timespec_to_ms(&psr_ppriv->interval),
+			 "init_wait", timespec_to_ms(&psr_ppriv->init_wait),
+			 "missed_max", psr_ppriv->missed_max,
+			 "missed", psr_ppriv->missed);
+}
+
 const struct teamd_link_watch teamd_link_watch_arp_ping = {
 	.name			= "arp_ping",
 	.is_port_up		= lw_psr_is_port_up,
+	.state_json		= lw_ap_state_json,
 	.port_priv = {
 		.init		= lw_ap_port_added,
 		.fini		= lw_psr_port_removed,
@@ -842,9 +866,24 @@ static int lw_nsnap_port_added(struct teamd_context *ctx,
 	return lw_psr_port_added(ctx, tdport, priv, creator_priv);
 }
 
+static json_t *lw_nsnap_state_json(struct teamd_context *ctx,
+				   struct teamd_port *tdport,
+				   struct lw_common_port_priv *common_ppriv)
+{
+	struct lw_psr_port_priv *psr_ppriv = lw_psr_ppriv_get(common_ppriv);
+	struct lw_nsnap_port_priv *nsnap_ppriv = lw_nsnap_ppriv_get(psr_ppriv);
+	return json_pack("{s:s, s:i, s:i, s:i, s:i}",
+			 "target_host", str_sockaddr_in6(&nsnap_ppriv->dst),
+			 "interval", timespec_to_ms(&psr_ppriv->interval),
+			 "init_wait", timespec_to_ms(&psr_ppriv->init_wait),
+			 "missed_max", psr_ppriv->missed_max,
+			 "missed", psr_ppriv->missed);
+}
+
 const struct teamd_link_watch teamd_link_watch_nsnap = {
 	.name			= "nsna_ping",
 	.is_port_up		= lw_psr_is_port_up,
+	.state_json		= lw_nsnap_state_json,
 	.port_priv = {
 		.init		= lw_nsnap_port_added,
 		.fini		= lw_psr_port_removed,
@@ -1041,6 +1080,99 @@ static const struct teamd_event_watch_ops link_watch_port_watch_ops = {
 	.port_link_changed = link_watch_event_watch_port_link_changed,
 };
 
+json_t *__fill_lw_instance(struct teamd_context *ctx,
+			   struct teamd_port *tdport,
+			   struct lw_common_port_priv *common_ppriv)
+{
+	bool link;
+	const struct teamd_link_watch *lw = common_ppriv->link_watch;
+	json_t *lwinfo_json;
+	json_t *state_json;
+
+	if (!lw->state_json)
+		lwinfo_json = json_object();
+	else
+		lwinfo_json = lw->state_json(ctx, tdport, common_ppriv);
+
+	link = teamd_link_watch_instance_port_up(ctx, tdport, common_ppriv);
+	state_json = json_pack("{s:s, s:b, s:o}",
+			       "name", lw->name,
+			       "up", link,
+			       "info", lwinfo_json);
+	if (!state_json)
+		json_decref(lwinfo_json);
+	return state_json;
+}
+
+json_t *__fill_tdport_lw(struct teamd_context *ctx, struct teamd_port *tdport)
+{
+	struct lw_common_port_priv *common_ppriv;
+	int err;
+	json_t *state_json;
+	json_t *array_json;
+	json_t *instance_json;
+	bool link;
+
+	array_json = json_array();
+	if (!array_json)
+		return NULL;
+
+	teamd_for_each_port_priv_by_creator(common_ppriv, tdport,
+					    LW_PORT_PRIV_CREATOR_PRIV) {
+		instance_json = __fill_lw_instance(ctx, tdport, common_ppriv);
+		if (!instance_json)
+			goto errout;
+		err = json_array_append_new(array_json, instance_json);
+		if (err)
+			goto errout;
+	}
+	link = teamd_link_watch_port_up(ctx, tdport);
+	state_json = json_pack("{s:o, s:b}",
+			       "list", array_json,
+			       "up", link);
+	if (!state_json)
+		goto errout;
+	return state_json;
+errout:
+	json_decref(array_json);
+	return NULL;
+}
+
+static int link_watch_state_dump(struct teamd_context *ctx,
+				 json_t **pstate_json, void *priv)
+{
+	struct teamd_port *tdport;
+	int err;
+	json_t *state_json;
+	json_t *tdport_lw_json;
+
+	state_json = json_object();
+	if (!state_json)
+		return -ENOMEM;
+
+	teamd_for_each_tdport(tdport, ctx) {
+		tdport_lw_json = __fill_tdport_lw(ctx, tdport);
+		if (!tdport_lw_json)
+			goto errout;
+		err = json_object_set_new(state_json, tdport->ifname,
+					  tdport_lw_json);
+		if (err) {
+			err = -ENOMEM;
+			goto errout;
+		}
+	}
+	*pstate_json = state_json;
+	return 0;
+errout:
+	json_decref(state_json);
+	return -ENOMEM;
+}
+
+struct teamd_state_json_ops link_watch_state_ops = {
+	.dump = link_watch_state_dump,
+	.name = "link_watch",
+};
+
 int teamd_link_watch_init(struct teamd_context *ctx)
 {
 	int err;
@@ -1050,7 +1182,14 @@ int teamd_link_watch_init(struct teamd_context *ctx)
 		teamd_log_err("Failed to register event watch.");
 		return err;
 	}
+	err = teamd_state_json_register(ctx, &link_watch_state_ops, ctx);
+	if (err)
+		goto event_watch_unregister;
 	return 0;
+
+event_watch_unregister:
+	teamd_event_watch_unregister(ctx, &link_watch_port_watch_ops, NULL);
+	return err;
 }
 
 void teamd_link_watch_fini(struct teamd_context *ctx)
