@@ -918,6 +918,11 @@ static int lacp_init(struct teamd_context *ctx)
 	struct lacp *lacp = ctx->runner_priv;
 	int err;
 
+	if (ctx->hwaddr_len != ETH_ALEN) {
+		teamd_log_err("Unsupported device type.");
+		return -EINVAL;
+	}
+
 	lacp->ctx = ctx;
 	err = teamd_hash_func_set(ctx);
 	if (err)
