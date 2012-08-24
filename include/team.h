@@ -221,6 +221,14 @@ void team_change_handler_unregister(struct team_handle *th,
 				    struct team_change_handler *handler);
 
 /*
+ * stringify helper functions
+ */
+bool team_option_value_str(struct team_option *option, char *buf, size_t bufsiz);
+bool team_option_str(struct team_handle *th, struct team_option *option,
+		     char *buf, size_t bufsiz);
+bool team_port_str(struct team_port *port, char *buf, size_t bufsiz);
+
+/*
  * route netlink helper functions
  */
 uint32_t team_ifname2ifindex(struct team_handle *th, const char *ifname);
