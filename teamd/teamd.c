@@ -1029,112 +1029,30 @@ static void teamd_runner_fini(struct teamd_context *ctx)
 static void debug_log_port_list(struct teamd_context *ctx)
 {
 	struct team_port *port;
+	char buf[120];
+	bool trunc;
 
 	teamd_log_dbg("<port_list>");
 	team_for_each_port(port, ctx->th) {
-		uint32_t ifindex = team_get_port_ifindex(port);
-		struct team_ifinfo *ifinfo = team_get_port_ifinfo(port);
-
-		teamd_log_dbg("%d: %s: %s %u %s%s%s", ifindex,
-			      team_get_ifinfo_ifname(ifinfo),
-			      team_is_port_link_up(port) ? "up": "down",
-			      team_get_port_speed(port),
-			      team_get_port_duplex(port) ? "fullduplex" : "halfduplex",
-			      team_is_port_changed(port) ? " changed" : "",
-			      team_is_port_removed(port) ? " removed" : "");
+		trunc = team_port_str(port, buf, sizeof(buf));
+		teamd_log_dbg("%s %s", buf, trunc ? "<trunc>" : "");
 	}
 	teamd_log_dbg("</port_list>");
-}
-
-static void __print_port_str(char *buf, size_t bufsiz,
-			     struct team_option *option)
-{
-	if (team_is_option_per_port(option)) {
-		snprintf(buf, bufsiz, "@if%u",
-			 team_get_option_port_ifindex(option));
-	} else {
-		*buf = '\0';
-	}
-}
-
-static void __print_array_str(char *buf, size_t bufsiz,
-			      struct team_option *option)
-{
-	if (team_is_option_array(option)) {
-		snprintf(buf, bufsiz, "[%u]",
-			 team_get_option_array_index(option));
-	} else {
-		*buf = '\0';
-	}
-}
-
-static bool __print_value_str(char *buf, size_t bufsiz,
-			      struct team_option *option)
-{
-	int n;
-
-	switch (team_get_option_type(option)) {
-	case TEAM_OPTION_TYPE_U32:
-		n = snprintf(buf, bufsiz, "%u",
-			     team_get_option_value_u32(option));
-		break;
-	case TEAM_OPTION_TYPE_STRING:
-		n = snprintf(buf, bufsiz, "\"%s\"",
-			     team_get_option_value_string(option));
-		break;
-	case TEAM_OPTION_TYPE_BINARY:
-		{
-			unsigned int len = team_get_option_value_len(option);
-			char *data = team_get_option_value_binary(option);
-			int i;
-
-			for (i = 0; i < len; i++) {
-				if ((long) bufsiz - 1 - (i + 1) * 3 < 0)
-					break;
-				sprintf(buf, "\\%02x", data[i]);
-				buf += 3;
-			}
-			*buf = '\0';
-			n = 3 * len;
-		}
-		break;
-	case TEAM_OPTION_TYPE_BOOL:
-		n = snprintf(buf, bufsiz, "%s",
-			     team_get_option_value_bool(option) ? "true" : "false");
-		break;
-	case TEAM_OPTION_TYPE_S32:
-		n = snprintf(buf, bufsiz, "%d",
-			     team_get_option_value_s32(option));
-		break;
-	default:
-		n = snprintf(buf, bufsiz, "<unknown>");
-		break;
-	}
-	return n > bufsiz ? true : false;
 }
 
 static void debug_log_option_list(struct teamd_context *ctx)
 {
 	struct team_option *option;
-	char value_str[80];
-	char port_str[16];
-	char array_str[16];
+	char buf[120];
+	bool trunc;
 
 	teamd_log_dbgx(ctx, 2, "<changed_option_list>");
 	team_for_each_option(option, ctx->th) {
-		char *name = team_get_option_name(option);
-		bool changed = team_is_option_changed(option);
-		bool changed_locally = team_is_option_changed_locally(option);
-		bool val_trunc;
-
-		if (!changed || changed_locally)
+		if (!team_is_option_changed(option) ||
+		    team_is_option_changed_locally(option))
 			continue;
-		val_trunc = __print_value_str(value_str, sizeof(value_str),
-					      option);
-		__print_port_str(port_str, sizeof(port_str), option);
-		__print_array_str(array_str, sizeof(array_str), option);
-		teamd_log_dbgx(ctx, 2, "%s%s%s #%s%s#", name, array_str,
-			       port_str, value_str, val_trunc ? "<trunc>" : "");
+		trunc = team_option_str(ctx->th, option, buf, sizeof(buf));
+		teamd_log_dbgx(ctx, 2, "%s %s", buf, trunc ? "<trunc>" : "");
 	}
 	teamd_log_dbgx(ctx, 2, "</changed_option_list>");
 }
