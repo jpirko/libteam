@@ -6,3 +6,5 @@ AM_CFLAGS = -I${top_srcdir}/include
 
 LDADD = $(top_builddir)/lib/libteam.la
 
+bin_PROGRAMS=teamnl
+teamnl_SOURCES=teamnl.c

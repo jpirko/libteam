@@ -1,0 +1,49 @@
+.TH teamnl 8 "26 August 2012" "libteam"
+.SH NAME
+teamnl \(em team network device Netlink interface tool
+.SH SYNOPSIS
+.B teamnl
+.B \-h
+.TP
+.B teamnl
+.RB [ "\-p port_name" ]
+.RB [ "\-a array_index" ]
+.RB TEAMDEV
+.RB COMMAND
+.RB [COMMAND_ARGS..]
+.TP
+.SH DESCRIPTION
+.PP
+teamnl is a tool which provides possibility to interact with team
+device via team driver Netlink interface.
+
+.SH OPTIONS
+.TP
+.B "\-h, \-\-help"
+.TP
+.B "\-p ifname, \-\-port_name ifname"
+Select per-port option of provided interface name.
+.TP
+.B "\-a index, \-\-array_index index"
+Select array option of provided array index.
+
+.SH COMMAND
+.TP
+.B ports
+Dumps team ports.
+.TP
+.B option
+Dumps team options.
+.TP
+.B "getoption OPT_NAME"
+Gets option by selected name.
+.TP
+.B "getoption OPT_NAME OPT_VALUE"
+Sets option by selected name.
+
+.SH AUTHOR
+.PP
+Jiri Pirko is the original author and current maintainer of libteam.
+.SH VERSION
+.PP
+This manual page applies to libteam @PACKAGE_VERSION@.
