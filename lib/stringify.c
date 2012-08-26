@@ -19,9 +19,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <errno.h>
 #include <team.h>
 #include "team_private.h"
 
@@ -125,6 +127,141 @@ TEAM_EXPORT
 bool team_option_value_str(struct team_option *option, char *buf, size_t bufsiz)
 {
 	return __team_option_value_str(option, &buf, &bufsiz, true);
+}
+
+static int __set_optval_from_str_u32(struct team_handle *th,
+				     struct team_option *option,
+				     const char *str)
+{
+	uint32_t val;
+	unsigned long int tmp;
+	char *endptr;
+
+	tmp = strtoul(str, &endptr, 10);
+	if (tmp == ULONG_MAX)
+		return -errno;
+	if (strlen(endptr) != 0)
+		return -EINVAL;
+	val = tmp;
+	if (tmp != val)
+		return -ERANGE;
+	return team_set_option_value_u32(th, option, val);
+}
+
+static int __set_optval_from_str_s32(struct team_handle *th,
+				     struct team_option *option,
+				     const char *str)
+{
+	int32_t val;
+	long int tmp;
+	char *endptr;
+
+	tmp = strtol(str, &endptr, 10);
+	if (tmp == LONG_MIN || tmp == LONG_MAX)
+		return -errno;
+	if (strlen(endptr) != 0)
+		return -EINVAL;
+	val = tmp;
+	if (tmp != val)
+		return -ERANGE;
+	return team_set_option_value_s32(th, option, val);
+}
+
+static int __one_char_from_str(char *pc, char *byte_str)
+{
+	unsigned long int tmp;
+	char *endptr;
+	unsigned char c;
+
+	if (byte_str[0] != '\\')
+		return -EINVAL;
+
+	tmp = strtoul(byte_str + 1, &endptr, 16);
+	if (tmp == ULONG_MAX)
+		return -errno;
+	if (strlen(endptr) != 0)
+		return -EINVAL;
+	c = tmp;
+	if (tmp != c)
+		return -ERANGE;
+	*pc = c;
+	return 0;
+}
+
+static int __set_optval_from_str_binary(struct team_handle *th,
+					struct team_option *option,
+					const char *str)
+{
+	char byte_str[4];
+	char *buf;
+	size_t i;
+	size_t numbytes;
+	int err;
+
+	if (strlen(str) % 3)
+		return -EINVAL;
+	numbytes = strlen(str) / 3;
+	buf = malloc(numbytes);
+	if (!buf)
+		return -ENOMEM;
+	byte_str[3] = '\0';
+	for (i = 0; i < numbytes; i++) {
+		memcpy(byte_str, str, 3);
+		err = __one_char_from_str(&buf[i], byte_str);
+		if (err)
+			goto errout;
+		str += 3;
+	}
+
+	err = team_set_option_value_binary(th, option, buf, numbytes);
+errout:
+	free(buf);
+	return err;
+}
+
+static int __set_optval_from_str_bool(struct team_handle *th,
+				      struct team_option *option,
+				      const char *str)
+{
+	bool val;
+
+	if (!strcmp(str, "true"))
+		val = true;
+	else if (!strcmp(str, "false"))
+		val = false;
+	else
+		return -EINVAL;
+	return team_set_option_value_bool(th, option, val);
+}
+
+/**
+ * team_set_option_value_from_string:
+ * @th: libteam library context
+ * @option: option structure
+ * @str: string containing option value
+ *
+ * Convert option value from string and set it.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+int team_set_option_value_from_string(struct team_handle *th,
+				      struct team_option *option,
+				      const char *str)
+{
+	switch (team_get_option_type(option)) {
+	case TEAM_OPTION_TYPE_U32:
+		return __set_optval_from_str_u32(th, option, str);
+	case TEAM_OPTION_TYPE_STRING:
+		return team_set_option_value_string(th, option, str);
+	case TEAM_OPTION_TYPE_BINARY:
+		return __set_optval_from_str_binary(th, option, str);
+	case TEAM_OPTION_TYPE_BOOL:
+		return __set_optval_from_str_bool(th, option, str);
+	case TEAM_OPTION_TYPE_S32:
+		return __set_optval_from_str_s32(th, option, str);
+	default:
+		return -EINVAL;
+	}
 }
 
 static bool __team_option_str(struct team_handle *th,

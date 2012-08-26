@@ -224,6 +224,9 @@ void team_change_handler_unregister(struct team_handle *th,
  * stringify helper functions
  */
 bool team_option_value_str(struct team_option *option, char *buf, size_t bufsiz);
+int team_set_option_value_from_string(struct team_handle *th,
+				      struct team_option *option,
+				      const char *str);
 bool team_option_str(struct team_handle *th, struct team_option *option,
 		     char *buf, size_t bufsiz);
 bool team_port_str(struct team_port *port, char *buf, size_t bufsiz);
