@@ -78,10 +78,12 @@ static bool __team_option_value_str(struct team_option *option,
 			unsigned int len = team_get_option_value_len(option);
 			char *data = team_get_option_value_binary(option);
 			int i;
+			unsigned char c;
 
 			for (i = 0; i < len; i++) {
+				c = data[i];
 				trunc = __buf_append(pbuf, pbufsiz,
-						     "\\%02x", data[i]);
+						     "\\%02x", c);
 				if (trunc)
 					return true;
 			}
