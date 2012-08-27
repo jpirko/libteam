@@ -958,7 +958,7 @@ static int runner_state_dump(struct teamd_context *ctx,
 	return 0;
 }
 
-struct teamd_state_json_ops runner_state_ops = {
+static const struct teamd_state_json_ops runner_state_ops = {
 	.dump = runner_state_dump,
 	.name = "runner",
 };

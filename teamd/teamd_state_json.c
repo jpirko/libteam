@@ -134,7 +134,7 @@ errout:
  * state basics
  */
 
-json_t *__fill_ifinfo(struct team_ifinfo *ifinfo)
+static json_t *__fill_ifinfo(struct team_ifinfo *ifinfo)
 {
 	size_t hwaddr_len = team_get_ifinfo_hwaddr_len(ifinfo);
 	char addr_str[hwaddr_str_len(hwaddr_len)];
@@ -165,12 +165,12 @@ static int teamdev_state_dump(struct teamd_context *ctx,
 	return 0;
 }
 
-struct teamd_state_json_ops teamdev_state_ops = {
+static const struct teamd_state_json_ops teamdev_state_ops = {
 	.dump = teamdev_state_dump,
 	.name = "team_device",
 };
 
-json_t *__fill_tdport(struct teamd_port *tdport)
+static json_t *__fill_tdport(struct teamd_port *tdport)
 {
 	struct team_port *port = tdport->team_port;
 	json_t *ifinfo_json;
@@ -223,7 +223,7 @@ errout:
 	return -ENOMEM;
 }
 
-struct teamd_state_json_ops portdevs_state_ops = {
+static const struct teamd_state_json_ops portdevs_state_ops = {
 	.dump = portdevs_state_dump,
 	.name = "port_devices",
 };
@@ -247,7 +247,7 @@ static int setup_state_dump(struct teamd_context *ctx,
 	return 0;
 }
 
-struct teamd_state_json_ops setup_state_ops = {
+static const struct teamd_state_json_ops setup_state_ops = {
 	.dump = setup_state_dump,
 	.name = "setup",
 };

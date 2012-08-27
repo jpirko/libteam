@@ -223,7 +223,7 @@ out:
 	return reply;
 }
 
-static char *introspection_xml =
+static const char *introspection_xml =
 	"<node name='" TEAMD_DBUS_PATH "'>"
 	"  <interface name='" TEAMD_DBUS_IFACE "'>"
 	"    <method name='PortConfigUpdate'>"
@@ -304,7 +304,7 @@ static DBusHandlerResult message_handler(DBusConnection *con,
 	return DBUS_HANDLER_RESULT_HANDLED;
 }
 
-static DBusObjectPathVTable vtable = {
+static const DBusObjectPathVTable vtable = {
 	.message_function = message_handler,
 };
 

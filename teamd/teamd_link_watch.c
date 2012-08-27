@@ -152,7 +152,7 @@ struct lw_ethtool_port_priv {
 	struct lw_common_port_priv common; /* must be first */
 };
 
-const struct teamd_link_watch teamd_link_watch_ethtool = {
+static const struct teamd_link_watch teamd_link_watch_ethtool = {
 	.name			= "ethtool",
 	.is_port_up		= lw_ethtool_is_port_up,
 	.port_priv = {
@@ -420,7 +420,7 @@ struct sock_filter arp_rpl_flt[] = {
 	BPF_STMT(BPF_RET + BPF_K, 0),
 };
 
-const struct sock_fprog arp_rpl_fprog = {
+static const struct sock_fprog arp_rpl_fprog = {
 	.len = ARRAY_SIZE(arp_rpl_flt),
 	.filter = arp_rpl_flt,
 };
@@ -577,7 +577,7 @@ static int lw_ap_receive(struct lw_psr_port_priv *psr_ppriv)
 	return 0;
 }
 
-const struct lw_psr_ops lw_psr_ops_ap = {
+static const struct lw_psr_ops lw_psr_ops_ap = {
 	.sock_open		= lw_ap_sock_open,
 	.sock_close		= lw_ap_sock_close,
 	.load_options		= lw_ap_load_options,
@@ -617,7 +617,7 @@ static json_t *lw_ap_state_json(struct teamd_context *ctx,
 			 "missed", psr_ppriv->missed);
 }
 
-const struct teamd_link_watch teamd_link_watch_arp_ping = {
+static const struct teamd_link_watch teamd_link_watch_arp_ping = {
 	.name			= "arp_ping",
 	.is_port_up		= lw_psr_is_port_up,
 	.state_json		= lw_ap_state_json,
@@ -692,7 +692,7 @@ close_sock:
 	sizeof (struct ip6_hdr) +				\
 	in_struct_offset(struct nd_neighbor_advert, nd_na_type)
 
-struct sock_filter na_flt[] = {
+static struct sock_filter na_flt[] = {
 	BPF_STMT(BPF_LD + BPF_B + BPF_ABS, OFFSET_NEXT_HEADER),
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, IPPROTO_ICMPV6, 0, 3),
 	BPF_STMT(BPF_LD + BPF_B + BPF_ABS, OFFSET_NA_TYPE),
@@ -701,7 +701,7 @@ struct sock_filter na_flt[] = {
 	BPF_STMT(BPF_RET + BPF_K, 0),
 };
 
-const struct sock_fprog na_fprog = {
+static const struct sock_fprog na_fprog = {
 	.len = ARRAY_SIZE(na_flt),
 	.filter = na_flt,
 };
@@ -847,7 +847,7 @@ static int lw_nsnap_receive(struct lw_psr_port_priv *psr_ppriv)
 	return 0;
 }
 
-const struct lw_psr_ops lw_psr_ops_nsnap = {
+static const struct lw_psr_ops lw_psr_ops_nsnap = {
 	.sock_open		= lw_nsnap_sock_open,
 	.sock_close		= lw_nsnap_sock_close,
 	.load_options		= lw_nsnap_load_options,
@@ -880,7 +880,7 @@ static json_t *lw_nsnap_state_json(struct teamd_context *ctx,
 			 "missed", psr_ppriv->missed);
 }
 
-const struct teamd_link_watch teamd_link_watch_nsnap = {
+static const struct teamd_link_watch teamd_link_watch_nsnap = {
 	.name			= "nsna_ping",
 	.is_port_up		= lw_psr_is_port_up,
 	.state_json		= lw_nsnap_state_json,
@@ -919,9 +919,9 @@ static const struct teamd_link_watch *teamd_find_link_watch(const char *link_wat
 	return NULL;
 }
 
-bool teamd_link_watch_instance_port_up(struct teamd_context *ctx,
-				       struct teamd_port *tdport,
-				       struct lw_common_port_priv *common_ppriv)
+static bool teamd_link_watch_instance_port_up(struct teamd_context *ctx,
+					      struct teamd_port *tdport,
+					      struct lw_common_port_priv *common_ppriv)
 {
 	const struct teamd_link_watch *link_watch = common_ppriv->link_watch;
 
@@ -949,8 +949,8 @@ bool teamd_link_watch_port_up(struct teamd_context *ctx,
 	return link;
 }
 
-int teamd_link_watch_refresh_user_linkup(struct teamd_context *ctx,
-					 struct teamd_port *tdport)
+static int teamd_link_watch_refresh_user_linkup(struct teamd_context *ctx,
+						struct teamd_port *tdport)
 {
 	struct lw_common_port_priv *common_ppriv;
 	bool link;
@@ -1080,9 +1080,9 @@ static const struct teamd_event_watch_ops link_watch_port_watch_ops = {
 	.port_link_changed = link_watch_event_watch_port_link_changed,
 };
 
-json_t *__fill_lw_instance(struct teamd_context *ctx,
-			   struct teamd_port *tdport,
-			   struct lw_common_port_priv *common_ppriv)
+static json_t *__fill_lw_instance(struct teamd_context *ctx,
+				  struct teamd_port *tdport,
+				  struct lw_common_port_priv *common_ppriv)
 {
 	bool link;
 	const struct teamd_link_watch *lw = common_ppriv->link_watch;
@@ -1104,7 +1104,8 @@ json_t *__fill_lw_instance(struct teamd_context *ctx,
 	return state_json;
 }
 
-json_t *__fill_tdport_lw(struct teamd_context *ctx, struct teamd_port *tdport)
+static json_t *__fill_tdport_lw(struct teamd_context *ctx,
+				struct teamd_port *tdport)
 {
 	struct lw_common_port_priv *common_ppriv;
 	int err;
@@ -1168,7 +1169,7 @@ errout:
 	return -ENOMEM;
 }
 
-struct teamd_state_json_ops link_watch_state_ops = {
+static const struct teamd_state_json_ops link_watch_state_ops = {
 	.dump = link_watch_state_dump,
 	.name = "link_watch",
 };

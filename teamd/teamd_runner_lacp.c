@@ -948,7 +948,7 @@ static void lacp_fini(struct teamd_context *ctx)
 	teamd_event_watch_unregister(ctx, &lacp_port_watch_ops, lacp);
 }
 
-json_t *__fill_lacpdu_info(struct lacpdu_info *lacpdu_info)
+static json_t *__fill_lacpdu_info(struct lacpdu_info *lacpdu_info)
 {
 	char addr_str[hwaddr_str_len(ETH_ALEN)];
 
@@ -962,7 +962,7 @@ json_t *__fill_lacpdu_info(struct lacpdu_info *lacpdu_info)
 			 "state", lacpdu_info->state);
 }
 
-json_t *__fill_lacp_port(struct lacp_port *lacp_port)
+static json_t *__fill_lacp_port(struct lacp_port *lacp_port)
 {
 	json_t *s_json;
 	json_t *actor_json;
@@ -994,7 +994,7 @@ json_t *__fill_lacp_port(struct lacp_port *lacp_port)
 	return s_json;
 }
 
-json_t *__fill_lacp_ports(struct lacp *lacp)
+static json_t *__fill_lacp_ports(struct lacp *lacp)
 {
 	struct teamd_port *tdport;
 	json_t *lacp_ports_json;
