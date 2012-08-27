@@ -40,13 +40,13 @@
 
 struct lw_common_port_priv {
 	const struct teamd_link_watch *link_watch;
+	struct teamd_port *tdport;
+	bool link_up;
 	json_t *link_watch_json;
 };
 
 struct teamd_link_watch {
 	const char *name;
-	bool (*is_port_up)(struct teamd_context *ctx, struct teamd_port *tdport,
-			   struct lw_common_port_priv *common_ppriv);
 	json_t *(*state_json)(struct teamd_context *ctx,
 			      struct teamd_port *tdport,
 			      struct lw_common_port_priv *common_ppriv);
@@ -132,30 +132,80 @@ static char *str_sockaddr_in6(struct sockaddr_in6 *sin6)
 			      sizeof(*sin6), AF_INET6);
 }
 
+static int teamd_link_watch_check_link_up(struct teamd_context *ctx,
+					  struct teamd_port *tdport,
+					  struct lw_common_port_priv *common_ppriv,
+					  bool new_link_up)
+{
+	const char *lw_name = common_ppriv->link_watch->name;
+	int err;
+
+	if (new_link_up != common_ppriv->link_up) {
+		common_ppriv->link_up = new_link_up;
+		teamd_log_info("%s: %s-link went %s.", tdport->ifname, lw_name,
+			       new_link_up ? "up" : "down");
+		err = teamd_event_port_link_changed(ctx, tdport);
+		if (err)
+			return err;
+	}
+	return 0;
+}
+
+
 /*
  * Ethtool link watch
  */
-
-static bool lw_ethtool_is_port_up(struct teamd_context *ctx,
-				  struct teamd_port *tdport,
-				  struct lw_common_port_priv *common_ppriv)
-{
-	struct team_port *port;
-
-	team_for_each_port(port, ctx->th)
-		if (team_get_port_ifindex(port) == tdport->ifindex)
-			return team_is_port_link_up(port);
-	return false;
-}
 
 struct lw_ethtool_port_priv {
 	struct lw_common_port_priv common; /* must be first */
 };
 
+static int lw_ethtool_event_watch_port_changed(struct teamd_context *ctx,
+					       struct teamd_port *tdport,
+					       void *priv)
+{
+	struct lw_common_port_priv *common_ppriv = priv;
+	bool link_up;
+
+	if (common_ppriv->tdport != tdport ||
+	    !team_is_port_changed(tdport->team_port))
+		return 0;
+
+	link_up = team_is_port_link_up(tdport->team_port);
+	return teamd_link_watch_check_link_up(ctx, tdport, common_ppriv,
+					      link_up);
+}
+
+static const struct teamd_event_watch_ops lw_ethtool_port_watch_ops = {
+	.port_changed = lw_ethtool_event_watch_port_changed,
+};
+
+static int lw_ethtool_port_added(struct teamd_context *ctx,
+				 struct teamd_port *tdport,
+				 void *priv, void *creator_priv)
+{
+	int err;
+
+	err = teamd_event_watch_register(ctx, &lw_ethtool_port_watch_ops, priv);
+	if (err) {
+		teamd_log_err("Failed to register event watch.");
+		return err;
+	}
+	return 0;
+}
+
+static void lw_ethtool_port_removed(struct teamd_context *ctx,
+				    struct teamd_port *tdport,
+				    void *priv, void *creator_priv)
+{
+	teamd_event_watch_unregister(ctx, &lw_ethtool_port_watch_ops, priv);
+}
+
 static const struct teamd_link_watch teamd_link_watch_ethtool = {
 	.name			= "ethtool",
-	.is_port_up		= lw_ethtool_is_port_up,
 	.port_priv = {
+		.init		= lw_ethtool_port_added,
+		.fini		= lw_ethtool_port_removed,
 		.priv_size	= sizeof(struct lw_ethtool_port_priv),
 	},
 };
@@ -180,7 +230,6 @@ struct lw_psr_ops {
 
 struct lw_psr_port_priv {
 	struct lw_common_port_priv common; /* must be first */
-	struct teamd_port *tdport;
 	const struct lw_psr_ops *ops;
 	struct timespec interval;
 	struct timespec init_wait;
@@ -190,7 +239,6 @@ struct lw_psr_port_priv {
 	char *cb_name_socket;
 	unsigned int missed;
 	bool reply_received;
-	bool link_up;
 };
 
 static struct lw_psr_port_priv *
@@ -202,32 +250,28 @@ lw_psr_ppriv_get(struct lw_common_port_priv *common_ppriv)
 static int lw_psr_callback_periodic(struct teamd_context *ctx, int events,
 				    void *func_priv)
 {
+	struct lw_common_port_priv *common_ppriv = func_priv;
 	struct lw_psr_port_priv *psr_ppriv = func_priv;
-	struct teamd_port *tdport = psr_ppriv->tdport;
-	bool orig_link_up = psr_ppriv->link_up;
-	const char *lw_name = psr_ppriv->common.link_watch->name;
+	struct teamd_port *tdport = common_ppriv->tdport;
+	bool link_up = common_ppriv->link_up;
 	int err;
 
 	if (psr_ppriv->reply_received) {
-		psr_ppriv->link_up = true;
+		link_up = true;
 		psr_ppriv->missed = 0;
 	} else {
 		psr_ppriv->missed++;
-		if (psr_ppriv->missed > psr_ppriv->missed_max &&
-		    orig_link_up) {
+		if (psr_ppriv->missed > psr_ppriv->missed_max && link_up) {
 			teamd_log_dbg("%s: Missed %u replies (max %u).",
 				      tdport->ifname, psr_ppriv->missed,
 				      psr_ppriv->missed_max);
-			psr_ppriv->link_up = false;
+			link_up = false;
 		}
 	}
-	if (psr_ppriv->link_up != orig_link_up) {
-		teamd_log_info("%s: %s-link went %s.", tdport->ifname, lw_name,
-			       psr_ppriv->link_up ? "up" : "down");
-		err = teamd_event_port_link_changed(ctx, tdport);
-		if (err)
-			return err;
-	}
+	err = teamd_link_watch_check_link_up(ctx, tdport,
+					     common_ppriv, link_up);
+	if (err)
+		return err;
 	psr_ppriv->reply_received = false;
 	return psr_ppriv->ops->send(psr_ppriv);
 }
@@ -289,7 +333,6 @@ static int lw_psr_port_added(struct teamd_context *ctx,
 	const char *lw_name = psr_ppriv->common.link_watch->name;
 	int err;
 
-	psr_ppriv->tdport = tdport;
 	err = psr_ppriv->ops->sock_open(psr_ppriv);
 	if (err) {
 		teamd_log_err("Failed to create socket.");
@@ -381,15 +424,6 @@ static void lw_psr_port_removed(struct teamd_context *ctx,
 	psr_ppriv->ops->sock_close(psr_ppriv);
 }
 
-static bool lw_psr_is_port_up(struct teamd_context *ctx,
-			      struct teamd_port *tdport,
-			      struct lw_common_port_priv *common_ppriv)
-{
-	struct lw_psr_port_priv *psr_ppriv = lw_psr_ppriv_get(common_ppriv);
-
-	return psr_ppriv->link_up;
-}
-
 
 /*
  * ARP ping link watch
@@ -428,7 +462,7 @@ static const struct sock_fprog arp_rpl_fprog = {
 static int lw_ap_sock_open(struct lw_psr_port_priv *psr_ppriv)
 {
 	return teamd_packet_sock_open(&psr_ppriv->sock,
-				      psr_ppriv->tdport->ifindex,
+				      psr_ppriv->common.tdport->ifindex,
 				      htons(ETH_P_ARP), &arp_rpl_fprog);
 }
 
@@ -619,7 +653,6 @@ static json_t *lw_ap_state_json(struct teamd_context *ctx,
 
 static const struct teamd_link_watch teamd_link_watch_arp_ping = {
 	.name			= "arp_ping",
-	.is_port_up		= lw_psr_is_port_up,
 	.state_json		= lw_ap_state_json,
 	.port_priv = {
 		.init		= lw_ap_port_added,
@@ -718,7 +751,7 @@ static int lw_nsnap_sock_open(struct lw_psr_port_priv *psr_ppriv)
 	 * So we use packet socket to get these packets.
 	 */
 	err = teamd_packet_sock_open(&psr_ppriv->sock,
-				     psr_ppriv->tdport->ifindex,
+				     psr_ppriv->common.tdport->ifindex,
 				     htons(ETH_P_IPV6), &na_fprog);
 	if (err)
 		return err;
@@ -801,7 +834,7 @@ static int lw_nsnap_send(struct lw_psr_port_priv *psr_ppriv)
 
 	sendto_addr = nsnap_ppriv->dst;
 	compute_multi_in6_addr(&sendto_addr.sin6_addr);
-	sendto_addr.sin6_scope_id = psr_ppriv->tdport->ifindex;
+	sendto_addr.sin6_scope_id = psr_ppriv->common.tdport->ifindex;
 	err = teamd_sendto(nsnap_ppriv->tx_sock, &nsp, sizeof(nsp), 0,
 			   (struct sockaddr *) &sendto_addr,
 			   sizeof(sendto_addr));
@@ -882,7 +915,6 @@ static json_t *lw_nsnap_state_json(struct teamd_context *ctx,
 
 static const struct teamd_link_watch teamd_link_watch_nsnap = {
 	.name			= "nsna_ping",
-	.is_port_up		= lw_psr_is_port_up,
 	.state_json		= lw_nsnap_state_json,
 	.port_priv = {
 		.init		= lw_nsnap_port_added,
@@ -919,17 +951,6 @@ static const struct teamd_link_watch *teamd_find_link_watch(const char *link_wat
 	return NULL;
 }
 
-static bool teamd_link_watch_instance_port_up(struct teamd_context *ctx,
-					      struct teamd_port *tdport,
-					      struct lw_common_port_priv *common_ppriv)
-{
-	const struct teamd_link_watch *link_watch = common_ppriv->link_watch;
-
-	if (!link_watch->is_port_up)
-		return true;
-	return link_watch->is_port_up(ctx, tdport, common_ppriv);
-}
-
 bool teamd_link_watch_port_up(struct teamd_context *ctx,
 			      struct teamd_port *tdport)
 {
@@ -941,8 +962,7 @@ bool teamd_link_watch_port_up(struct teamd_context *ctx,
 	link = true;
 	teamd_for_each_port_priv_by_creator(common_ppriv, tdport,
 					    LW_PORT_PRIV_CREATOR_PRIV) {
-		link = teamd_link_watch_instance_port_up(ctx, tdport,
-							 common_ppriv);
+		link = common_ppriv->link_up;
 		if (link)
 			return link;
 	}
@@ -959,8 +979,7 @@ static int teamd_link_watch_refresh_user_linkup(struct teamd_context *ctx,
 
 	teamd_for_each_port_priv_by_creator(common_ppriv, tdport,
 					    LW_PORT_PRIV_CREATOR_PRIV) {
-		link = teamd_link_watch_instance_port_up(ctx, tdport,
-							 common_ppriv);
+		link = common_ppriv->link_up;
 		err = team_get_port_user_linkup(ctx->th, tdport->ifindex,
 						&cur_link);
 		if (err)
@@ -1003,6 +1022,7 @@ static int link_watch_load_one_json_obj(struct teamd_context *ctx,
 	if (err)
 		return err;
 	common_ppriv->link_watch = link_watch;
+	common_ppriv->tdport = tdport;
 	common_ppriv->link_watch_json = link_watch_obj;
 	return 0;
 }
@@ -1060,13 +1080,6 @@ static int link_watch_event_watch_port_added(struct teamd_context *ctx,
 	return 0;
 }
 
-static int link_watch_event_watch_port_changed(struct teamd_context *ctx,
-					       struct teamd_port *tdport,
-					       void *priv)
-{
-	return teamd_event_port_link_changed(ctx, tdport);
-}
-
 static int link_watch_event_watch_port_link_changed(struct teamd_context *ctx,
 						    struct teamd_port *tdport,
 						    void *priv)
@@ -1076,7 +1089,6 @@ static int link_watch_event_watch_port_link_changed(struct teamd_context *ctx,
 
 static const struct teamd_event_watch_ops link_watch_port_watch_ops = {
 	.port_added = link_watch_event_watch_port_added,
-	.port_changed = link_watch_event_watch_port_changed,
 	.port_link_changed = link_watch_event_watch_port_link_changed,
 };
 
@@ -1084,7 +1096,6 @@ static json_t *__fill_lw_instance(struct teamd_context *ctx,
 				  struct teamd_port *tdport,
 				  struct lw_common_port_priv *common_ppriv)
 {
-	bool link;
 	const struct teamd_link_watch *lw = common_ppriv->link_watch;
 	json_t *lwinfo_json;
 	json_t *state_json;
@@ -1094,10 +1105,9 @@ static json_t *__fill_lw_instance(struct teamd_context *ctx,
 	else
 		lwinfo_json = lw->state_json(ctx, tdport, common_ppriv);
 
-	link = teamd_link_watch_instance_port_up(ctx, tdport, common_ppriv);
 	state_json = json_pack("{s:s, s:b, s:o}",
 			       "name", lw->name,
-			       "up", link,
+			       "up", common_ppriv->link_up,
 			       "info", lwinfo_json);
 	if (!state_json)
 		json_decref(lwinfo_json);
