@@ -947,25 +947,19 @@ bool teamd_link_watch_port_up(struct teamd_context *ctx,
 static int teamd_link_watch_refresh_user_linkup(struct teamd_context *ctx,
 						struct teamd_port *tdport)
 {
-	struct lw_common_port_priv *common_ppriv;
 	bool link;
 	bool cur_link;
 	int err;
 
-	teamd_for_each_port_priv_by_creator(common_ppriv, tdport,
-					    LW_PORT_PRIV_CREATOR_PRIV) {
-		link = common_ppriv->link_up;
-		err = team_get_port_user_linkup(ctx->th, tdport->ifindex,
-						&cur_link);
-		if (err)
-			continue;
-		if (link == cur_link)
-			continue;
-		err = team_set_port_user_linkup(ctx->th, tdport->ifindex,
-						link);
-		if (err)
-			return err;
-	}
+	link = teamd_link_watch_port_up(ctx, tdport);
+	err = team_get_port_user_linkup(ctx->th, tdport->ifindex,
+					&cur_link);
+	if (!err && link == cur_link)
+		return 0;
+	err = team_set_port_user_linkup(ctx->th, tdport->ifindex,
+					link);
+	if (err)
+		return err;
 	return 0;
 }
 
