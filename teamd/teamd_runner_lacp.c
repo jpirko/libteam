@@ -630,12 +630,11 @@ static int lacpdu_send(struct lacp_port *lacp_port)
 static int lacpdu_recv(struct lacp_port *lacp_port)
 {
 	struct lacpdu lacpdu;
-	socklen_t addr_len;
 	struct sockaddr_ll ll_from;
 	int err;
 
 	err = teamd_recvfrom(lacp_port->sock, &lacpdu, sizeof(lacpdu), 0,
-			     (struct sockaddr *) &ll_from, &addr_len);
+			     (struct sockaddr *) &ll_from, sizeof(ll_from));
 	if (err <= 0)
 		return err;
 

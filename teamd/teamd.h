@@ -278,7 +278,7 @@ int teamd_getsockname_hwaddr(int sock, struct sockaddr_ll *addr,
 int teamd_sendto(int sockfd, const void *buf, size_t len, int flags,
 		 const struct sockaddr *dest_addr, socklen_t addrlen);
 int teamd_recvfrom(int sockfd, void *buf, size_t len, int flags,
-		   struct sockaddr *src_addr, socklen_t *addrlen);
+		   struct sockaddr *src_addr, socklen_t addrlen);
 
 /* Various helpers */
 static inline void ms_to_timespec(struct timespec *ts, int ms)

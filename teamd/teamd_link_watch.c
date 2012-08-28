@@ -543,7 +543,6 @@ static int lw_ap_receive(struct lw_psr_port_priv *psr_ppriv)
 	struct lw_ap_port_priv *ap_ppriv = lw_ap_ppriv_get(psr_ppriv);
 	int err;
 	char buf[256];
-	socklen_t addr_len;
 	struct sockaddr_ll ll_my;
 	struct sockaddr_ll ll_from;
 	struct sockaddr_ll ll_msg1;
@@ -558,7 +557,7 @@ static int lw_ap_receive(struct lw_psr_port_priv *psr_ppriv)
 		return err;
 
 	err = teamd_recvfrom(psr_ppriv->sock, buf, sizeof(buf), 0,
-			     (struct sockaddr *) &ll_from, &addr_len);
+			     (struct sockaddr *) &ll_from, sizeof(ll_from));
 	if (err <= 0)
 		return err;
 
@@ -829,12 +828,11 @@ static int lw_nsnap_receive(struct lw_psr_port_priv *psr_ppriv)
 {
 	struct lw_nsnap_port_priv *nsnap_ppriv = lw_nsnap_ppriv_get(psr_ppriv);
 	struct na_packet nap;
-	socklen_t addr_len;
 	struct sockaddr_ll ll_from;
 	int err;
 
 	err = teamd_recvfrom(psr_ppriv->sock, &nap, sizeof(nap), 0,
-			     (struct sockaddr *) &ll_from, &addr_len);
+			     (struct sockaddr *) &ll_from, sizeof(ll_from));
 	if (err <= 0)
 		return err;
 

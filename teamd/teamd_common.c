@@ -111,12 +111,13 @@ resend:
 }
 
 int teamd_recvfrom(int sockfd, void *buf, size_t len, int flags,
-		   struct sockaddr *src_addr, socklen_t *addrlen)
+		   struct sockaddr *src_addr, socklen_t addrlen)
 {
 	size_t ret;
+	socklen_t tmp_addrlen = addrlen;
 
 rerecv:
-	ret = recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+	ret = recvfrom(sockfd, buf, len, flags, src_addr, &tmp_addrlen);
 	if (ret == -1) {
 		switch(errno) {
 		case EINTR:
