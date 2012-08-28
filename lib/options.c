@@ -750,9 +750,9 @@ static int set_option_value(struct team_handle *th, struct team_option *option,
 		case NLA_FLAG:
 			if (*((bool *) data))
 				NLA_PUT_FLAG(msg, TEAM_ATTR_OPTION_DATA);
+			break;
 		case NLA_S32:
 			NLA_PUT_S32(msg, TEAM_ATTR_OPTION_DATA, *((__u32 *) data));
-			break;
 			break;
 		default:
 			goto nla_put_failure;
