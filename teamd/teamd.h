@@ -169,31 +169,30 @@ int teamd_update_port_config(struct teamd_context *ctx, const char *port_name,
 					 TEAMD_LOOP_FD_EVENT_EXCEPTION)
 
 typedef int (*teamd_loop_callback_func_t)(struct teamd_context *ctx,
-					   int events, void *func_priv);
+					  int events, void *priv);
 
 int teamd_loop_callback_fd_add(struct teamd_context *ctx,
-			       const char *cb_name,
-			       int fd, int fd_event,
+			       const char *cb_name, void *priv,
 			       teamd_loop_callback_func_t func,
-			       void *func_priv);
+			       int fd, int fd_event);
 int teamd_loop_callback_timer_add_set(struct teamd_context *ctx,
-				      const char *cb_name,
-				      struct timespec *interval,
-				      struct timespec *initial,
+				      const char *cb_name, void *priv,
 				      teamd_loop_callback_func_t func,
-				      void *func_priv);
+				      struct timespec *interval,
+				      struct timespec *initial);
 int teamd_loop_callback_timer_add(struct teamd_context *ctx,
-				  const char *cb_name,
-				  teamd_loop_callback_func_t func,
-				  void *func_priv);
+				  const char *cb_name, void *priv,
+				  teamd_loop_callback_func_t func);
 int teamd_loop_callback_timer_set(struct teamd_context *ctx,
-				  const char *cb_name,
+				  const char *cb_name, void *priv,
 				  struct timespec *interval,
 				  struct timespec *initial);
-void teamd_loop_callback_del(struct teamd_context *ctx, const char *cb_name);
-int teamd_loop_callback_enable(struct teamd_context *ctx, const char *cb_name);
-int teamd_loop_callback_disable(struct teamd_context *ctx, const char *cb_name);
-bool teamd_loop_callback_is_enabled(struct teamd_context *ctx, const char *cb_name);
+void teamd_loop_callback_del(struct teamd_context *ctx, const char *cb_name,
+			     void *priv);
+int teamd_loop_callback_enable(struct teamd_context *ctx, const char *cb_name,
+			       void *priv);
+int teamd_loop_callback_disable(struct teamd_context *ctx, const char *cb_name,
+				void *priv);
 void teamd_run_loop_restart(struct teamd_context *ctx);
 
 /* Runner structures */

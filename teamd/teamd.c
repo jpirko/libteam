@@ -212,8 +212,8 @@ static int handle_period_fd(int fd)
 struct teamd_loop_callback {
 	struct list_item list;
 	char *name;
+	void *priv;
 	teamd_loop_callback_func_t func;
-	void *func_priv;
 	int fd;
 	int fd_event;
 	bool is_period;
@@ -259,7 +259,7 @@ static int teamd_run_loop_do_callbacks(struct list_item *lcb_list, fd_set *fds,
 						if (err)
 							return err;
 					}
-					err = lcb->func(ctx, events, lcb->func_priv);
+					err = lcb->func(ctx, events, lcb->priv);
 					if (err)
 						return err;
 				}
@@ -372,57 +372,57 @@ void teamd_run_loop_restart(struct teamd_context *ctx)
 }
 
 static struct teamd_loop_callback *__get_lcb(struct teamd_context *ctx,
-					     const char *cb_name,
-					     struct teamd_loop_callback *last,
-					     bool wildcard_enabled)
+					     const char *cb_name, void *priv,
+					     struct teamd_loop_callback *last)
 {
 	struct teamd_loop_callback *lcb;
-	size_t len;
 	bool last_found;
 
-	if (!wildcard_enabled && strchr(cb_name, '*')) {
-		teamd_log_err("Wildcard callback named \"%s\" not permitted.",
-			      cb_name);
-		return NULL;
-	}
 	last_found = last == NULL ? true: false;
-	len = strchrnul(cb_name, '*') - cb_name;
 	list_for_each_node_entry(lcb, &ctx->run_loop.callback_list, list) {
-		if (last_found && !strncmp(lcb->name, cb_name, len))
-			return lcb;
-		if (lcb == last)
-			last_found = true;
+		if (!last_found) {
+			if (lcb == last)
+				last_found = true;
+			continue;
+		}
+		if (cb_name && strcmp(lcb->name, cb_name))
+			continue;
+		if (priv && lcb->priv != priv)
+			continue;
+		return lcb;
 	}
 	return NULL;
 }
 
 static struct teamd_loop_callback *get_lcb(struct teamd_context *ctx,
-					   const char *cb_name)
+					   const char *cb_name, void *priv)
 {
-	return __get_lcb(ctx, cb_name, NULL, false);
+	return __get_lcb(ctx, cb_name, priv, NULL);
 }
 
 static struct teamd_loop_callback *get_lcb_multi(struct teamd_context *ctx,
-						 struct teamd_loop_callback *last,
-						 const char *cb_name)
+						 const char *cb_name,
+						 void *priv,
+						 struct teamd_loop_callback *last)
 {
-	return __get_lcb(ctx, cb_name, last, true);
+	return __get_lcb(ctx, cb_name, priv, last);
 }
 
-#define for_each_lcb_multi_match(lcb, ctx, cb_name)		\
-	for (lcb = get_lcb_multi(ctx, NULL, cb_name); lcb;	\
-	     lcb = get_lcb_multi(ctx, lcb, cb_name))
+#define for_each_lcb_multi_match(lcb, ctx, cb_name, priv)		\
+	for (lcb = get_lcb_multi(ctx, cb_name, priv, NULL); lcb;	\
+	     lcb = get_lcb_multi(ctx, cb_name, priv, lcb))
 
 int teamd_loop_callback_fd_add(struct teamd_context *ctx,
-			       const char *cb_name,
-			       int fd, int fd_event,
+			       const char *cb_name, void *priv,
 			       teamd_loop_callback_func_t func,
-			       void *func_priv)
+			       int fd, int fd_event)
 {
 	int err;
 	struct teamd_loop_callback *lcb;
 
-	if (get_lcb(ctx, cb_name)) {
+	if (!cb_name || !priv)
+		return -EINVAL;
+	if (get_lcb(ctx, cb_name, priv)) {
 		teamd_log_err("Callback named \"%s\" is already registered.",
 			      cb_name);
 		return -EEXIST;
@@ -437,10 +437,10 @@ int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 		err = -ENOMEM;
 		goto lcb_free;
 	}
+	lcb->priv = priv;
+	lcb->func = func;
 	lcb->fd = fd;
 	lcb->fd_event = fd_event & TEAMD_LOOP_FD_EVENT_MASK;
-	lcb->func = func;
-	lcb->func_priv = func_priv;
 	list_add(&ctx->run_loop.callback_list, &lcb->list);
 	return 0;
 
@@ -469,11 +469,10 @@ static int __timerfd_reset(int fd, struct timespec *interval,
 }
 
 int teamd_loop_callback_timer_add_set(struct teamd_context *ctx,
-				      const char *cb_name,
-				      struct timespec *interval,
-				      struct timespec *initial,
+				      const char *cb_name, void *priv,
 				      teamd_loop_callback_func_t func,
-				      void *func_priv)
+				      struct timespec *interval,
+				      struct timespec *initial)
 {
 	int err;
 	int fd = fd;
@@ -490,34 +489,35 @@ int teamd_loop_callback_timer_add_set(struct teamd_context *ctx,
 			return err;
 		}
 	}
-	err = teamd_loop_callback_fd_add(ctx, cb_name, fd,
-					 TEAMD_LOOP_FD_EVENT_READ,
-					 func, func_priv);
+	err = teamd_loop_callback_fd_add(ctx, cb_name, priv, func, fd,
+					 TEAMD_LOOP_FD_EVENT_READ);
 	if (err) {
 		close(fd);
 		return err;
 	}
-	get_lcb(ctx, cb_name)->is_period = true;
+	get_lcb(ctx, cb_name, priv)->is_period = true;
 	return 0;
 }
 
 int teamd_loop_callback_timer_add(struct teamd_context *ctx,
-				  const char *cb_name,
-				  teamd_loop_callback_func_t func,
-				  void *func_priv)
+				  const char *cb_name, void *priv,
+				  teamd_loop_callback_func_t func)
 {
-	return teamd_loop_callback_timer_add_set(ctx, cb_name, NULL, NULL,
-						 func, func_priv);
+	return teamd_loop_callback_timer_add_set(ctx, cb_name, priv, func,
+						 NULL, NULL);
 }
 
 int teamd_loop_callback_timer_set(struct teamd_context *ctx,
 				  const char *cb_name,
+				  void *priv,
 				  struct timespec *interval,
 				  struct timespec *initial)
 {
 	struct teamd_loop_callback *lcb;
 
-	lcb = get_lcb(ctx, cb_name);
+	if (!cb_name || !priv)
+		return -EINVAL;
+	lcb = get_lcb(ctx, cb_name, priv);
 	if (!lcb) {
 		teamd_log_err("Callback named \"%s\" not found.", cb_name);
 		return -ENOENT;
@@ -529,12 +529,13 @@ int teamd_loop_callback_timer_set(struct teamd_context *ctx,
 	return __timerfd_reset(lcb->fd, interval, initial);
 }
 
-void teamd_loop_callback_del(struct teamd_context *ctx, const char *cb_name)
+void teamd_loop_callback_del(struct teamd_context *ctx, const char *cb_name,
+			     void *priv)
 {
 	struct teamd_loop_callback *lcb;
 	bool found = false;
 
-	for_each_lcb_multi_match(lcb, ctx, cb_name) {
+	for_each_lcb_multi_match(lcb, ctx, cb_name, priv) {
 		list_del(&lcb->list);
 		if (lcb->is_period)
 			close(lcb->fd);
@@ -548,12 +549,13 @@ void teamd_loop_callback_del(struct teamd_context *ctx, const char *cb_name)
 		teamd_log_dbg("Callback named \"%s\" not found.", cb_name);
 }
 
-int teamd_loop_callback_enable(struct teamd_context *ctx, const char *cb_name)
+int teamd_loop_callback_enable(struct teamd_context *ctx, const char *cb_name,
+			       void *priv)
 {
 	struct teamd_loop_callback *lcb;
 	bool found = false;
 
-	for_each_lcb_multi_match(lcb, ctx, cb_name) {
+	for_each_lcb_multi_match(lcb, ctx, cb_name, priv) {
 		lcb->enabled = true;
 		found = true;
 	}
@@ -563,12 +565,13 @@ int teamd_loop_callback_enable(struct teamd_context *ctx, const char *cb_name)
 	return 0;
 }
 
-int teamd_loop_callback_disable(struct teamd_context *ctx, const char *cb_name)
+int teamd_loop_callback_disable(struct teamd_context *ctx, const char *cb_name,
+				void *priv)
 {
 	struct teamd_loop_callback *lcb;
 	bool found = false;
 
-	for_each_lcb_multi_match(lcb, ctx, cb_name) {
+	for_each_lcb_multi_match(lcb, ctx, cb_name, priv) {
 		lcb->enabled = false;
 		found = true;
 	}
@@ -578,20 +581,8 @@ int teamd_loop_callback_disable(struct teamd_context *ctx, const char *cb_name)
 	return 0;
 }
 
-bool teamd_loop_callback_is_enabled(struct teamd_context *ctx, const char *cb_name)
-{
-	struct teamd_loop_callback *lcb;
-
-	lcb = get_lcb(ctx, cb_name);
-	if (!lcb) {
-		teamd_log_dbg("Callback named \"%s\" not found.", cb_name);
-		return false;
-	}
-	return lcb->enabled;
-}
-
 static int callback_daemon_signal(struct teamd_context *ctx, int events,
-				  void *func_priv)
+				  void *priv)
 {
 	int sig;
 
@@ -614,12 +605,15 @@ static int callback_daemon_signal(struct teamd_context *ctx, int events,
 }
 
 static int callback_libteam_event(struct teamd_context *ctx, int events,
-				  void *func_priv)
+				  void *priv)
 {
-	const struct team_eventfd *eventfd = func_priv;
+	const struct team_eventfd *eventfd = priv;
 
 	return team_call_eventfd_handler(ctx->th, eventfd);
 }
+
+#define DAEMON_CB_NAME "daemon"
+#define LIBTEAM_EVENTS_CB_NAME "libteam_events"
 
 static int teamd_run_loop_init(struct teamd_context *ctx)
 {
@@ -634,10 +628,10 @@ static int teamd_run_loop_init(struct teamd_context *ctx)
 	ctx->run_loop.ctrl_pipe_r = fds[0];
 	ctx->run_loop.ctrl_pipe_w = fds[1];
 
-	err = teamd_loop_callback_fd_add(ctx, "daemon",
+	err = teamd_loop_callback_fd_add(ctx, DAEMON_CB_NAME, ctx,
+					 callback_daemon_signal,
 					 daemon_signal_fd(),
-					 TEAMD_LOOP_FD_EVENT_READ,
-					 callback_daemon_signal, NULL);
+					 TEAMD_LOOP_FD_EVENT_READ);
 	if (err) {
 		teamd_log_err("Failed to add daemon loop callback");
 		goto close_pipe;
@@ -645,33 +639,24 @@ static int teamd_run_loop_init(struct teamd_context *ctx)
 
 	team_for_each_event_fd(eventfd, ctx->th) {
 		int fd = team_get_eventfd_fd(ctx->th, eventfd);
-		char *cb_name;
-
-		err = asprintf(&cb_name, "libteam_events_%d", fd);
-		if (err == -1) {
-			teamd_log_err("Failed generate callback name.");
-			err = -ENOMEM;
-			goto unroll_libteam_events_callbacks;
-		}
-		err = teamd_loop_callback_fd_add(ctx, cb_name, fd,
-						 TEAMD_LOOP_FD_EVENT_READ,
+		err = teamd_loop_callback_fd_add(ctx, LIBTEAM_EVENTS_CB_NAME,
+						 (void *) eventfd,
 						 callback_libteam_event,
-						 (void *) eventfd);
-		free(cb_name);
+						 fd, TEAMD_LOOP_FD_EVENT_READ);
 		if (err) {
 			teamd_log_err("Failed to add libteam event loop callback");
 			goto unroll_libteam_events_callbacks;
 		}
 	}
 
-	teamd_loop_callback_enable(ctx, "daemon");
-	teamd_loop_callback_enable(ctx, "libteam_events_*");
+	teamd_loop_callback_enable(ctx, DAEMON_CB_NAME, ctx);
+	teamd_loop_callback_enable(ctx, LIBTEAM_EVENTS_CB_NAME, NULL);
 
 	return 0;
 
 unroll_libteam_events_callbacks:
-	teamd_loop_callback_del(ctx, "libteam_events_*");
-	teamd_loop_callback_del(ctx, "daemon");
+	teamd_loop_callback_del(ctx, LIBTEAM_EVENTS_CB_NAME, NULL);
+	teamd_loop_callback_del(ctx, DAEMON_CB_NAME, ctx);
 
 close_pipe:
 	close(ctx->run_loop.ctrl_pipe_r);
@@ -681,8 +666,8 @@ close_pipe:
 
 static void teamd_run_loop_fini(struct teamd_context *ctx)
 {
-	teamd_loop_callback_del(ctx, "libteam_events_*");
-	teamd_loop_callback_del(ctx, "daemon");
+	teamd_loop_callback_del(ctx, LIBTEAM_EVENTS_CB_NAME, NULL);
+	teamd_loop_callback_del(ctx, DAEMON_CB_NAME, ctx);
 	close(ctx->run_loop.ctrl_pipe_r);
 	close(ctx->run_loop.ctrl_pipe_w);
 }

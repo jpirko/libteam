@@ -349,10 +349,9 @@ static void teamd_dbus_con_fini(struct teamd_context *ctx)
 	dbus_connection_unref(ctx->dbus.con);
 }
 
-static int callback_watch(struct teamd_context *ctx, int events,
-			  void *func_priv)
+static int callback_watch(struct teamd_context *ctx, int events, void *priv)
 {
-	DBusWatch *watch = func_priv;
+	DBusWatch *watch = priv;
 
 	dbus_connection_ref(ctx->dbus.con);
 	if (events & TEAMD_LOOP_FD_EVENT_READ)
@@ -365,12 +364,13 @@ static int callback_watch(struct teamd_context *ctx, int events,
 	return 0;
 }
 
+#define WATCH_CB_NAME "dbus_watch"
+
 static dbus_bool_t add_watch(DBusWatch *watch, void *priv)
 {
 	struct teamd_context *ctx = priv;
 	unsigned int flags;
 	int err;
-	char *cb_name;
 	int fd;
 	int fd_events;
 
@@ -382,91 +382,73 @@ static dbus_bool_t add_watch(DBusWatch *watch, void *priv)
 	if (flags & DBUS_WATCH_WRITABLE)
 		fd_events |= TEAMD_LOOP_FD_EVENT_WRITE;
 
-	err = asprintf(&cb_name, "dbus_watch_%p", watch);
-	if (err == -1)
-		return FALSE;
-
-	dbus_watch_set_data(watch, cb_name, free);
-
-	err = teamd_loop_callback_fd_add(ctx, cb_name, fd, fd_events,
-					 callback_watch, watch);
+	err = teamd_loop_callback_fd_add(ctx, WATCH_CB_NAME, watch,
+					 callback_watch, fd, fd_events);
 	if (err)
 		return FALSE;
 	if (dbus_watch_get_enabled(watch))
-		teamd_loop_callback_enable(ctx, cb_name);
+		teamd_loop_callback_enable(ctx, WATCH_CB_NAME, watch);
 	return TRUE;
 }
 
 static void remove_watch(DBusWatch *watch, void *priv)
 {
 	struct teamd_context *ctx = priv;
-	char *cb_name = dbus_watch_get_data(watch);
 
-	teamd_loop_callback_del(ctx, cb_name);
-	dbus_watch_set_data(watch, NULL, NULL);
+	teamd_loop_callback_del(ctx, WATCH_CB_NAME, watch);
 }
 
 static void toggle_watch(DBusWatch *watch, void *priv)
 {
 	struct teamd_context *ctx = priv;
-	char *cb_name = dbus_watch_get_data(watch);
 
 	if (dbus_watch_get_enabled(watch))
-		teamd_loop_callback_enable(ctx, cb_name);
+		teamd_loop_callback_enable(ctx, WATCH_CB_NAME, watch);
 	else
-		teamd_loop_callback_disable(ctx, cb_name);
+		teamd_loop_callback_disable(ctx, WATCH_CB_NAME, watch);
 }
 
-static int callback_timeout(struct teamd_context *ctx, int events,
-			    void *func_priv)
+static int callback_timeout(struct teamd_context *ctx, int events, void *priv)
 {
-	DBusTimeout *timeout = func_priv;
+	DBusTimeout *timeout = priv;
 
 	dbus_timeout_handle(timeout);
 	return 0;
 }
 
+#define TIMEOUT_CB_NAME "dbus_timeout"
+
 static dbus_bool_t add_timeout(DBusTimeout *timeout, void *priv)
 {
 	struct teamd_context *ctx = priv;
 	int err;
-	char *cb_name;
 	struct timespec ts;
 
-	err = asprintf(&cb_name, "dbus_timeout_%p", timeout);
-	if (err == -1)
-		return FALSE;
-
-	dbus_timeout_set_data(timeout, cb_name, free);
-
 	ms_to_timespec(&ts, dbus_timeout_get_interval(timeout));
-	err = teamd_loop_callback_timer_add_set(ctx, cb_name, NULL, &ts,
-						callback_timeout, timeout);
+	err = teamd_loop_callback_timer_add_set(ctx, TIMEOUT_CB_NAME, timeout,
+						callback_timeout, NULL, &ts);
 	if (err)
 		return FALSE;
 	if (dbus_timeout_get_enabled(timeout))
-		teamd_loop_callback_enable(ctx, cb_name);
+		teamd_loop_callback_enable(ctx, TIMEOUT_CB_NAME, timeout);
 	return TRUE;
 }
 
 static void remove_timeout(DBusTimeout *timeout, void *priv)
 {
 	struct teamd_context *ctx = priv;
-	char *cb_name = dbus_timeout_get_data(timeout);
 
-	teamd_loop_callback_del(ctx, cb_name);
-	dbus_timeout_set_data(timeout, NULL, NULL);
+	teamd_loop_callback_del(ctx, TIMEOUT_CB_NAME, timeout);
 }
 
 static void toggle_timeout(DBusTimeout *timeout, void *priv)
 {
 	struct teamd_context *ctx = priv;
-	char *cb_name = dbus_timeout_get_data(timeout);
 
 	if (dbus_timeout_get_enabled(timeout))
-		teamd_loop_callback_enable(ctx, cb_name);
+		teamd_loop_callback_enable(ctx, TIMEOUT_CB_NAME, timeout);
 	else
-		teamd_loop_callback_disable(ctx, cb_name);
+		teamd_loop_callback_disable(ctx, TIMEOUT_CB_NAME, timeout);
 }
 
 static void wakeup_main(void *priv)
@@ -482,10 +464,9 @@ struct dispatch_priv {
 	struct teamd_context *ctx;
 };
 
-static int callback_dispatch(struct teamd_context *ctx, int events,
-			      void *func_priv)
+static int callback_dispatch(struct teamd_context *ctx, int events, void *priv)
 {
-	struct dispatch_priv *dp = func_priv;
+	struct dispatch_priv *dp = priv;
 	char byte;
 	int err;
 
@@ -542,10 +523,10 @@ static int dispatch_init(struct dispatch_priv **pdp, struct teamd_context *ctx)
 	dp->fd_w = fds[1];
 	dp->ctx = ctx;
 
-	err = teamd_loop_callback_fd_add(ctx, DISPATCH_CB_NAME, dp->fd_r,
-					 TEAMD_LOOP_FD_EVENT_READ,
-					 callback_dispatch, dp);
-	teamd_loop_callback_enable(ctx, DISPATCH_CB_NAME);
+	err = teamd_loop_callback_fd_add(ctx, DISPATCH_CB_NAME, dp,
+					 callback_dispatch,
+					 dp->fd_r, TEAMD_LOOP_FD_EVENT_READ);
+	teamd_loop_callback_enable(ctx, DISPATCH_CB_NAME, dp);
 	if (err)
 		goto close_pipe;
 	*pdp = dp;
@@ -562,7 +543,7 @@ static void dispatch_exit(void *priv)
 {
 	struct dispatch_priv *dp = priv;
 
-	teamd_loop_callback_del(dp->ctx, DISPATCH_CB_NAME);
+	teamd_loop_callback_del(dp->ctx, DISPATCH_CB_NAME, dp);
 	close(dp->fd_w);
 	close(dp->fd_r);
 	free(dp);

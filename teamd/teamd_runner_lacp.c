@@ -137,9 +137,6 @@ struct lacp_port {
 	struct teamd_port *tdport;
 	struct lacp *lacp;
 	int sock;
-	char *cb_name_socket;
-	char *cb_name_periodic;
-	char *cb_name_timeout;
 	struct lacpdu_info actor;
 	struct lacpdu_info partner;
 	struct lacpdu_info __partner_last; /* last state before update */
@@ -424,6 +421,10 @@ static int slow_addr_del(struct lacp_port *lacp_port)
 /* time = periodic_interval * LACP_PERIODIC_MUL */
 #define LACP_PERIODIC_MUL 3
 
+#define LACP_SOCKET_CB_NAME "lacp_socket"
+#define LACP_PERIODIC_CB_NAME "lacp_periodic"
+#define LACP_TIMEOUT_CB_NAME "lacp_timeout"
+
 static int lacp_port_timeout_set(struct lacp_port *lacp_port, bool fast_forced)
 {
 	int err;
@@ -435,8 +436,8 @@ static int lacp_port_timeout_set(struct lacp_port *lacp_port, bool fast_forced)
 	ms *= LACP_PERIODIC_MUL;
 	ms_to_timespec(&ts, ms);
 	err = teamd_loop_callback_timer_set(lacp_port->ctx,
-					    lacp_port->cb_name_timeout,
-					    NULL, &ts);
+					    LACP_TIMEOUT_CB_NAME,
+					    lacp_port, NULL, &ts);
 	if (err) {
 		teamd_log_err("Failed to set timeout timer.");
 		return err;
@@ -457,8 +458,8 @@ static int lacp_port_periodic_set(struct lacp_port *lacp_port)
 	ms = fast_on ? LACP_PERIODIC_SHORT: LACP_PERIODIC_LONG;
 	ms_to_timespec(&ts, ms);
 	err = teamd_loop_callback_timer_set(lacp_port->ctx,
-					    lacp_port->cb_name_periodic,
-					    &ts, NULL);
+					    LACP_PERIODIC_CB_NAME,
+					    lacp_port, &ts, NULL);
 	if (err) {
 		teamd_log_err("Failed to set periodic timer.");
 		return err;
@@ -533,17 +534,17 @@ static int lacp_port_set_state(struct lacp_port *lacp_port,
 		return 0;
 	if (new_state == PORT_STATE_DISABLED)
 		teamd_loop_callback_disable(lacp_port->ctx,
-					    lacp_port->cb_name_periodic);
+					    LACP_PERIODIC_CB_NAME, lacp_port);
 	else
 		teamd_loop_callback_enable(lacp_port->ctx,
-					   lacp_port->cb_name_periodic);
+					   LACP_PERIODIC_CB_NAME, lacp_port);
 
 	switch(new_state) {
 	case PORT_STATE_CURRENT:
 		break;
 	case PORT_STATE_EXPIRED:
 		teamd_loop_callback_enable(lacp_port->ctx,
-					   lacp_port->cb_name_periodic);
+					   LACP_PERIODIC_CB_NAME, lacp_port);
 		/*
 		 * This is a transient state; the LACP_Timeout settings allow
 		 * the Actor to transmit LACPDUs rapidly in an attempt to
@@ -558,7 +559,7 @@ static int lacp_port_set_state(struct lacp_port *lacp_port,
 		break;
 	case PORT_STATE_DEFAULTED:
 		teamd_loop_callback_disable(lacp_port->ctx,
-					    lacp_port->cb_name_timeout);
+					    LACP_TIMEOUT_CB_NAME, lacp_port);
 		/* fall through */
 	case PORT_STATE_DISABLED:
 		memset(&lacp_port->partner, 0, sizeof(lacp_port->partner));
@@ -667,14 +668,15 @@ static int lacpdu_recv(struct lacp_port *lacp_port)
 	if (err) {
 		return err;
 	}
-	teamd_loop_callback_enable(lacp_port->ctx, lacp_port->cb_name_timeout);
+	teamd_loop_callback_enable(lacp_port->ctx,
+				   LACP_TIMEOUT_CB_NAME, lacp_port);
 	return 0;
 }
 
 static int lacp_callback_timeout(struct teamd_context *ctx, int events,
-				 void *func_priv)
+				 void *priv)
 {
-	struct lacp_port *lacp_port = func_priv;
+	struct lacp_port *lacp_port = priv;
 	int err = 0;
 
 	switch (lacp_port_get_state(lacp_port)) {
@@ -693,17 +695,17 @@ static int lacp_callback_timeout(struct teamd_context *ctx, int events,
 }
 
 static int lacp_callback_periodic(struct teamd_context *ctx, int events,
-				  void *func_priv)
+				  void *priv)
 {
-	struct lacp_port *lacp_port = func_priv;
+	struct lacp_port *lacp_port = priv;
 
 	return lacpdu_send(lacp_port);
 }
 
 static int lacp_callback_socket(struct teamd_context *ctx, int events,
-				void *func_priv)
+				void *priv)
 {
-	struct lacp_port *lacp_port = func_priv;
+	struct lacp_port *lacp_port = priv;
 
 	return lacpdu_recv(lacp_port);
 }
@@ -788,53 +790,30 @@ static int lacp_port_added(struct teamd_context *ctx,
 	if (err)
 		goto close_sock;
 
-	err = asprintf(&lacp_port->cb_name_socket, "lacp_socket_if%d",
-		       tdport->ifindex);
-	if (err == -1) {
-		teamd_log_err("Failed generate socket callback name.");
-		err = -ENOMEM;
-		goto slow_addr_del;
-	}
-	err = teamd_loop_callback_fd_add(ctx, lacp_port->cb_name_socket,
+	err = teamd_loop_callback_fd_add(ctx, LACP_SOCKET_CB_NAME, lacp_port,
+					 lacp_callback_socket,
 					 lacp_port->sock,
-					 TEAMD_LOOP_FD_EVENT_READ,
-					 lacp_callback_socket, lacp_port);
+					 TEAMD_LOOP_FD_EVENT_READ);
 	if (err) {
 		teamd_log_err("Failed add socket callback.");
-		goto free_cb_name_socket;
+		goto slow_addr_del;
 	}
 
-	err = asprintf(&lacp_port->cb_name_periodic, "lacp_periodic_if%d",
-		       tdport->ifindex);
-	if (err == -1) {
-		teamd_log_err("Failed generate periodic callback name.");
-		err = -ENOMEM;
-		goto socket_callback_del;
-	}
-	err = teamd_loop_callback_timer_add(ctx, lacp_port->cb_name_periodic,
-					    lacp_callback_periodic,
-					    lacp_port);
+	err = teamd_loop_callback_timer_add(ctx, LACP_PERIODIC_CB_NAME,
+					    lacp_port, lacp_callback_periodic);
 	if (err) {
 		teamd_log_err("Failed add periodic callback timer");
-		goto free_periodic_cb_name;
+		goto socket_callback_del;
 	}
 	err = lacp_port_periodic_set(lacp_port);
 	if (err)
 		goto periodic_callback_del;
 
-	err = asprintf(&lacp_port->cb_name_timeout, "lacp_timeout_if%d",
-		       tdport->ifindex);
-	if (err == -1) {
-		teamd_log_err("Failed generate timeout callback name.");
-		err = -ENOMEM;
-		goto periodic_callback_del;
-	}
-	err = teamd_loop_callback_timer_add(ctx, lacp_port->cb_name_timeout,
-					    lacp_callback_timeout,
-					    lacp_port);
+	err = teamd_loop_callback_timer_add(ctx, LACP_TIMEOUT_CB_NAME,
+					    lacp_port, lacp_callback_timeout);
 	if (err) {
 		teamd_log_err("Failed add timeout callback timer");
-		goto free_timeout_cb_name;
+		goto periodic_callback_del;
 	}
 
 	/* Newly added ports are enabled */
@@ -851,21 +830,15 @@ static int lacp_port_added(struct teamd_context *ctx,
 	lacp_port_actor_init(lacp_port);
 	lacp_port_link_update(lacp_port);
 
-	teamd_loop_callback_enable(ctx, lacp_port->cb_name_socket);
+	teamd_loop_callback_enable(ctx, LACP_SOCKET_CB_NAME, lacp_port);
 	return 0;
 
 timeout_callback_del:
-	teamd_loop_callback_del(ctx, lacp_port->cb_name_timeout);
-free_timeout_cb_name:
-	free(lacp_port->cb_name_timeout);
+	teamd_loop_callback_del(ctx, LACP_TIMEOUT_CB_NAME, lacp_port);
 periodic_callback_del:
-	teamd_loop_callback_del(ctx, lacp_port->cb_name_periodic);
-free_periodic_cb_name:
-	free(lacp_port->cb_name_periodic);
+	teamd_loop_callback_del(ctx, LACP_PERIODIC_CB_NAME, lacp_port);
 socket_callback_del:
-	teamd_loop_callback_del(ctx, lacp_port->cb_name_socket);
-free_cb_name_socket:
-	free(lacp_port->cb_name_socket);
+	teamd_loop_callback_del(ctx, LACP_SOCKET_CB_NAME, lacp_port);
 slow_addr_del:
 	slow_addr_del(lacp_port);
 close_sock:
@@ -880,10 +853,9 @@ static void lacp_port_removed(struct teamd_context *ctx,
 	struct lacp_port *lacp_port = priv;
 
 	lacp_port_set_state(lacp_port, PORT_STATE_DISABLED);
-	teamd_loop_callback_del(ctx, lacp_port->cb_name_periodic);
-	free(lacp_port->cb_name_periodic);
-	teamd_loop_callback_del(ctx, lacp_port->cb_name_socket);
-	free(lacp_port->cb_name_socket);
+	teamd_loop_callback_del(ctx, LACP_TIMEOUT_CB_NAME, lacp_port);
+	teamd_loop_callback_del(ctx, LACP_PERIODIC_CB_NAME, lacp_port);
+	teamd_loop_callback_del(ctx, LACP_SOCKET_CB_NAME, lacp_port);
 	slow_addr_del(lacp_port);
 	close(lacp_port->sock);
 }

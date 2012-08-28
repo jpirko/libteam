@@ -235,8 +235,6 @@ struct lw_psr_port_priv {
 	struct timespec init_wait;
 	unsigned int missed_max;
 	int sock;
-	char *cb_name_periodic;
-	char *cb_name_socket;
 	unsigned int missed;
 	bool reply_received;
 };
@@ -248,10 +246,10 @@ lw_psr_ppriv_get(struct lw_common_port_priv *common_ppriv)
 }
 
 static int lw_psr_callback_periodic(struct teamd_context *ctx, int events,
-				    void *func_priv)
+				    void *priv)
 {
-	struct lw_common_port_priv *common_ppriv = func_priv;
-	struct lw_psr_port_priv *psr_ppriv = func_priv;
+	struct lw_common_port_priv *common_ppriv = priv;
+	struct lw_psr_port_priv *psr_ppriv = priv;
 	struct teamd_port *tdport = common_ppriv->tdport;
 	bool link_up = common_ppriv->link_up;
 	int err;
@@ -277,9 +275,9 @@ static int lw_psr_callback_periodic(struct teamd_context *ctx, int events,
 }
 
 static int lw_psr_callback_socket(struct teamd_context *ctx, int events,
-				  void *func_priv)
+				  void *priv)
 {
-	struct lw_psr_port_priv *psr_ppriv = func_priv;
+	struct lw_psr_port_priv *psr_ppriv = priv;
 
 	return psr_ppriv->ops->receive(psr_ppriv);
 }
@@ -325,12 +323,14 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 	return 0;
 }
 
+#define LW_PERIODIC_CB_NAME "lw_periodic"
+#define LW_SOCKET_CB_NAME "lw_socket"
+
 static int lw_psr_port_added(struct teamd_context *ctx,
 			     struct teamd_port *tdport,
 			     void *priv, void *creator_priv)
 {
 	struct lw_psr_port_priv *psr_ppriv = priv;
-	const char *lw_name = psr_ppriv->common.link_watch->name;
 	int err;
 
 	err = psr_ppriv->ops->sock_open(psr_ppriv);
@@ -351,40 +351,23 @@ static int lw_psr_port_added(struct teamd_context *ctx,
 		goto close_sock;
 	}
 
-	err = asprintf(&psr_ppriv->cb_name_socket, "%s_socket_if%d_ptr%p",
-		       lw_name, tdport->ifindex, priv);
-	if (err == -1) {
-		teamd_log_err("Failed generate callback name.");
-		err = -ENOMEM;
+	err = teamd_loop_callback_fd_add(ctx, LW_SOCKET_CB_NAME, psr_ppriv,
+					 lw_psr_callback_socket,
+					 psr_ppriv->sock,
+					 TEAMD_LOOP_FD_EVENT_READ);
+	if (err) {
+		teamd_log_err("Failed add socket callback.");
 		goto close_sock;
 	}
 
-	err = teamd_loop_callback_fd_add(ctx, psr_ppriv->cb_name_socket,
-					 psr_ppriv->sock,
-					 TEAMD_LOOP_FD_EVENT_READ,
-					 lw_psr_callback_socket, psr_ppriv);
-	if (err) {
-		teamd_log_err("Failed add socket callback.");
-		goto free_cb_name_socket;
-	}
-
-	err = asprintf(&psr_ppriv->cb_name_periodic, "%s_periodic_if%d_ptr%p",
-		       lw_name, tdport->ifindex, priv);
-	if (err == -1) {
-		teamd_log_err("Failed generate callback name.");
-		err = -ENOMEM;
-		goto socket_callback_del;
-	}
-
-	err = teamd_loop_callback_timer_add_set(ctx,
-						psr_ppriv->cb_name_periodic,
-						&psr_ppriv->interval,
-						&psr_ppriv->init_wait,
+	err = teamd_loop_callback_timer_add_set(ctx, LW_PERIODIC_CB_NAME,
+						psr_ppriv,
 						lw_psr_callback_periodic,
-						psr_ppriv);
+						&psr_ppriv->interval,
+						&psr_ppriv->init_wait);
 	if (err) {
 		teamd_log_err("Failed add callback timer");
-		goto free_periodic_cb_name;
+		goto socket_callback_del;
 	}
 
 	err = team_set_port_user_linkup_enabled(ctx->th, tdport->ifindex, true);
@@ -394,18 +377,14 @@ static int lw_psr_port_added(struct teamd_context *ctx,
 		goto periodic_callback_del;
 	}
 
-	teamd_loop_callback_enable(ctx, psr_ppriv->cb_name_socket);
-	teamd_loop_callback_enable(ctx, psr_ppriv->cb_name_periodic);
+	teamd_loop_callback_enable(ctx, LW_SOCKET_CB_NAME, psr_ppriv);
+	teamd_loop_callback_enable(ctx, LW_PERIODIC_CB_NAME, psr_ppriv);
 	return 0;
 
 periodic_callback_del:
-	teamd_loop_callback_del(ctx, psr_ppriv->cb_name_periodic);
-free_periodic_cb_name:
-	free(psr_ppriv->cb_name_periodic);
+	teamd_loop_callback_del(ctx, LW_PERIODIC_CB_NAME, psr_ppriv);
 socket_callback_del:
-	teamd_loop_callback_del(ctx, psr_ppriv->cb_name_socket);
-free_cb_name_socket:
-	free(psr_ppriv->cb_name_socket);
+	teamd_loop_callback_del(ctx, LW_SOCKET_CB_NAME, psr_ppriv);
 close_sock:
 	psr_ppriv->ops->sock_close(psr_ppriv);
 	return err;
@@ -417,10 +396,8 @@ static void lw_psr_port_removed(struct teamd_context *ctx,
 {
 	struct lw_psr_port_priv *psr_ppriv = priv;
 
-	teamd_loop_callback_del(ctx, psr_ppriv->cb_name_periodic);
-	free(psr_ppriv->cb_name_periodic);
-	teamd_loop_callback_del(ctx, psr_ppriv->cb_name_socket);
-	free(psr_ppriv->cb_name_socket);
+	teamd_loop_callback_del(ctx, LW_PERIODIC_CB_NAME, psr_ppriv);
+	teamd_loop_callback_del(ctx, LW_SOCKET_CB_NAME, psr_ppriv);
 	psr_ppriv->ops->sock_close(psr_ppriv);
 }
 
