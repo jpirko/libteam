@@ -842,7 +842,7 @@ slow_addr_del:
 	slow_addr_del(lacp_port);
 close_sock:
 	close(lacp_port->sock);
-	return 0;
+	return err;
 }
 
 static void lacp_port_removed(struct teamd_context *ctx,
