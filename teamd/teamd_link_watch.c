@@ -290,12 +290,9 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 	int err;
 	int tmp;
 
-	teamd_log_info("%s: Using link_watch \"%s\":",
-		       tdport->ifname, psr_ppriv->common.link_watch->name);
 	err = json_unpack(link_watch_json, "{s:i}", "interval", &tmp);
 	if (err) {
-		teamd_log_err("%s: Failed to get \"interval\" link-watch "
-			      "option.", tdport->ifname);
+		teamd_log_err("Failed to get \"interval\" link-watch option.");
 		return -ENOENT;
 	}
 	teamd_log_dbg("\tinterval \"%d\".", tmp);
