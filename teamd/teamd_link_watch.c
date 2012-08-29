@@ -132,23 +132,25 @@ static char *str_sockaddr_in6(struct sockaddr_in6 *sin6)
 			      sizeof(*sin6), AF_INET6);
 }
 
+static bool teamd_link_watch_link_up_differs(struct lw_common_port_priv *common_ppriv,
+					     bool new_link_up)
+{
+	return new_link_up != common_ppriv->link_up;
+}
+
 static int teamd_link_watch_check_link_up(struct teamd_context *ctx,
 					  struct teamd_port *tdport,
 					  struct lw_common_port_priv *common_ppriv,
 					  bool new_link_up)
 {
 	const char *lw_name = common_ppriv->link_watch->name;
-	int err;
 
-	if (new_link_up != common_ppriv->link_up) {
-		common_ppriv->link_up = new_link_up;
-		teamd_log_info("%s: %s-link went %s.", tdport->ifname, lw_name,
-			       new_link_up ? "up" : "down");
-		err = teamd_event_port_link_changed(ctx, tdport);
-		if (err)
-			return err;
-	}
-	return 0;
+	if (!teamd_link_watch_link_up_differs(common_ppriv, new_link_up))
+		return 0;
+	common_ppriv->link_up = new_link_up;
+	teamd_log_info("%s: %s-link went %s.", tdport->ifname, lw_name,
+		       new_link_up ? "up" : "down");
+	return teamd_event_port_link_changed(ctx, tdport);
 }
 
 
@@ -158,22 +160,105 @@ static int teamd_link_watch_check_link_up(struct teamd_context *ctx,
 
 struct lw_ethtool_port_priv {
 	struct lw_common_port_priv common; /* must be first */
+	struct timespec delay_up;
+	struct timespec delay_down;
 };
+
+static struct lw_ethtool_port_priv *
+lw_ethtool_ppriv_get(struct lw_common_port_priv *common_ppriv)
+{
+	return (struct lw_ethtool_port_priv *) common_ppriv;
+}
+
+#define LW_ETHTOOL_DELAY_CB_NAME "lw_ethtool_delay"
 
 static int lw_ethtool_event_watch_port_changed(struct teamd_context *ctx,
 					       struct teamd_port *tdport,
 					       void *priv)
 {
 	struct lw_common_port_priv *common_ppriv = priv;
+	struct lw_ethtool_port_priv *ethtool_ppriv = priv;
 	bool link_up;
+	struct timespec *delay;
+	int err;
 
 	if (common_ppriv->tdport != tdport ||
 	    !team_is_port_changed(tdport->team_port))
 		return 0;
 
+	/*
+	 * Link changed for sure, so if there is some delay in progress,
+	 * cancel it before proceeding.
+	 */
+	teamd_loop_callback_disable(ctx, LW_ETHTOOL_DELAY_CB_NAME, priv);
+	link_up = team_is_port_link_up(tdport->team_port);
+	if (!teamd_link_watch_link_up_differs(common_ppriv, link_up))
+		return 0;
+
+	if (link_up) {
+		if (timespec_is_zero(&ethtool_ppriv->delay_up))
+			goto nodelay;
+		delay = &ethtool_ppriv->delay_up;
+	} else {
+		if (timespec_is_zero(&ethtool_ppriv->delay_down))
+			goto nodelay;
+		delay = &ethtool_ppriv->delay_down;
+	}
+
+	err = teamd_loop_callback_timer_set(ctx, LW_ETHTOOL_DELAY_CB_NAME,
+					    priv, NULL, delay);
+	if (err) {
+		teamd_log_err("Failed to set delay timer.");
+		return err;
+	}
+	teamd_loop_callback_enable(ctx, LW_ETHTOOL_DELAY_CB_NAME, priv);
+	return 0;
+
+nodelay:
+	return teamd_link_watch_check_link_up(ctx, tdport, common_ppriv,
+					      link_up);
+}
+
+static int lw_ethtool_callback_delay(struct teamd_context *ctx, int events,
+				     void *priv)
+{
+	struct lw_common_port_priv *common_ppriv = priv;
+	struct teamd_port *tdport;
+	bool link_up;
+
+	tdport = common_ppriv-> tdport;
 	link_up = team_is_port_link_up(tdport->team_port);
 	return teamd_link_watch_check_link_up(ctx, tdport, common_ppriv,
 					      link_up);
+}
+
+static int lw_ethtool_load_options(struct teamd_context *ctx,
+				   struct teamd_port *tdport,
+				   struct lw_ethtool_port_priv *ethtool_ppriv)
+{
+	json_t *link_watch_json = ethtool_ppriv->common.link_watch_json;
+	int err;
+	int tmp;
+
+	err = json_unpack(link_watch_json, "{s:i}", "delay_up", &tmp);
+	if (!err) {
+		if (tmp < 0) {
+			teamd_log_err("\"delay_up\" must not be negative number.");
+			return -EINVAL;
+		}
+		teamd_log_dbg("delay_up \"%d\".", tmp);
+		ms_to_timespec(&ethtool_ppriv->delay_up, tmp);
+	}
+	err = json_unpack(link_watch_json, "{s:i}", "delay_down", &tmp);
+	if (!err) {
+		if (tmp < 0) {
+			teamd_log_err("\"delay_down\" must not be negative number.");
+			return -EINVAL;
+		}
+		teamd_log_dbg("delay_down \"%d\".", tmp);
+		ms_to_timespec(&ethtool_ppriv->delay_down, tmp);
+	}
+	return 0;
 }
 
 static const struct teamd_event_watch_ops lw_ethtool_port_watch_ops = {
@@ -186,12 +271,27 @@ static int lw_ethtool_port_added(struct teamd_context *ctx,
 {
 	int err;
 
+	err = lw_ethtool_load_options(ctx, tdport, priv);
+	if (err) {
+		teamd_log_err("Failed to load options.");
+		return err;
+	}
+	err = teamd_loop_callback_timer_add(ctx, LW_ETHTOOL_DELAY_CB_NAME,
+					    priv, lw_ethtool_callback_delay);
+	if (err) {
+		teamd_log_err("Failed add delay callback timer");
+		return err;
+	}
 	err = teamd_event_watch_register(ctx, &lw_ethtool_port_watch_ops, priv);
 	if (err) {
 		teamd_log_err("Failed to register event watch.");
-		return err;
+		goto delay_callback_del;
 	}
 	return 0;
+
+delay_callback_del:
+	teamd_loop_callback_del(ctx, LW_ETHTOOL_DELAY_CB_NAME, priv);
+	return err;
 }
 
 static void lw_ethtool_port_removed(struct teamd_context *ctx,
@@ -201,8 +301,23 @@ static void lw_ethtool_port_removed(struct teamd_context *ctx,
 	teamd_event_watch_unregister(ctx, &lw_ethtool_port_watch_ops, priv);
 }
 
+static json_t *lw_ethtool_state_json(struct teamd_context *ctx,
+				     struct teamd_port *tdport,
+				     struct lw_common_port_priv *common_ppriv)
+{
+	struct lw_ethtool_port_priv *ethtool_ppriv;
+
+	ethtool_ppriv = lw_ethtool_ppriv_get(common_ppriv);
+	return json_pack("{s:i, s:i}",
+			 "delay_up",
+			 timespec_to_ms(&ethtool_ppriv->delay_up),
+			 "delay_down",
+			 timespec_to_ms(&ethtool_ppriv->delay_up));
+}
+
 static const struct teamd_link_watch teamd_link_watch_ethtool = {
 	.name			= "ethtool",
+	.state_json		= lw_ethtool_state_json,
 	.port_priv = {
 		.init		= lw_ethtool_port_added,
 		.fini		= lw_ethtool_port_removed,

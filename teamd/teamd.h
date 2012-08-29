@@ -292,4 +292,9 @@ static inline int timespec_to_ms(struct timespec *ts)
 	return ts->tv_sec * 1000 + ts->tv_nsec / 1000000;
 }
 
+static inline bool timespec_is_zero(struct timespec *ts)
+{
+	return !ts->tv_sec && !ts->tv_nsec;
+}
+
 #endif /* _TEAMD_H_ */
