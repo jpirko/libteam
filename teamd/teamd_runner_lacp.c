@@ -241,6 +241,9 @@ static int lacp_port_update_enabled(struct lacp_port *lacp_port)
 	bool curr_enabled_state;
 	struct team_option *option;
 
+	if (teamd_port_removed(tdport))
+		return 0;
+
 	option = team_get_option(lacp_port->ctx->th, "np", "enabled",
 				 tdport->ifindex);
 	if (!option) {

@@ -1063,6 +1063,9 @@ static int teamd_link_watch_refresh_user_linkup(struct teamd_context *ctx,
 	bool cur_link;
 	int err;
 
+	if (teamd_port_removed(tdport))
+		return 0;
+
 	link = teamd_link_watch_port_up(ctx, tdport);
 	err = team_get_port_user_linkup(ctx->th, tdport->ifindex,
 					&cur_link);
