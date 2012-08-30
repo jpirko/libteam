@@ -1,8 +1,67 @@
-This is basic howto introduction to team. Used applications are part of this
-project but note that their main purpose is to act as examples.
+This is basic howto introduction to team.
 
 
-1) Using example c applications and ip util
+-------------------------------------------------------------------------------
+1) PREFERRED Using teamd
+
+# cat teamd_test.conf
+{
+        "device":       "team0",
+        "runner":       {"name": "activebackup"},
+        "link_watch":   {"name": "ethtool"},
+        "ports":        {
+                "eth1": {
+                        "prio": -10,
+                        "sticky": true
+                },
+                "eth2": {
+                        "prio": 100
+                }
+        }
+}
+# teamd -f teamd_test.conf -d
+# ip addr add 192.168.252.2/24 dev team0
+
+Finally to remove interface team0:
+# teamd -f teamd_test.conf -k
+
+See "man teamd" for more details.
+
+
+-------------------------------------------------------------------------------
+2) Using teamnl and ip utils
+
+# ip link add team0 type team
+# teamnl team0 getoption mode
+*NOMODE*
+# teamnl team0 setoption mode activebackup
+# teamnl team0 getoption mode
+activebackup
+# ip link set dev eth1 master team0
+# ip link set dev eth2 master team0
+# teamnl team0 ports
+6: eth2: up 100 fullduplex
+5: eth1: up 100 fullduplex
+# ip addr add 192.168.252.2/24 dev team0
+# ip link set team0 up
+# teamnl team0 getoption activeport
+0
+# teamnl team0 setoption activeport 5
+teamnl team0 getoption activeport
+5
+
+You can do link changes on ports and push some traffic through now to see
+what happens. Note you also need to alter mac addresses manualy!
+
+See "man teamnl" for more details.
+
+
+-------------------------------------------------------------------------------
+3) Using example c applications and ip util
+
+Note: Used applications are part of this project but their main purpose
+      is to act as examples. Also they are usually not part of distribution
+      packages
 
 First create team device:
 # ip link add team0 type team
@@ -13,7 +72,6 @@ Then spawn monitor app on second console:
 You will see incoming events there.
 Now do couple of commands:
 
-# ip link add team0 type team
 # team_manual_control team0 get mode
 *NOMODE*
 # team_manual_control team0 set mode activebackup
@@ -33,7 +91,8 @@ You can do link changes on ports and push some traffic through now to see
 what happens. Note you also need to alter mac addresses manualy!
 
 
-2) Using example python daemon
+-------------------------------------------------------------------------------
+4) Using example python daemon
 
 To create and manage active backup team device:
 # ./examples/python/team_daemon.py --port eth1 --port eth2 -m activebackup --active-port eth2 --team-name team0
