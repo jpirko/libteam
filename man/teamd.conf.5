@@ -1,0 +1,172 @@
+.TH teamd.conf 5 "1 September 2012" "libteam"
+.SH DESCRIPTION
+.PP
+teamd uses JSON format configuration. Here comes a list of config options.
+.TP
+.BR "device " (string, " " mandatory)
+Desired name of new team device.
+
+.TP
+.BR "hwaddress " (string)
+Desired hardware address of new team device. Usual MAC address format is accepted.
+
+.TP
+.BR "runner.name " (string, " " mandatory)
+Name of team device. There are following runners available:
+
+.BR "dummy "-
+Dummy runner with no functionality.
+
+.BR "broadcast "-
+Simple runner using which the team device transmits packets via all ports.
+
+.BR "roundrobin "-
+Simple runner using which the team device transmits packets in round-robin fashion.
+
+.BR "activebackup "-
+Watches for link changes and selects active port to be used for data transfers.
+
+.BR "loadbalance "-
+To do passive load balancing, runner only setups BPF hash function which will determine port for packet transmit. To do active load balancing, runner is moving hashes among available ports trying to reach perfect balance.
+
+.BR "lacp "-
+Implements 802.3ad LACP protocol. Can use TX port selection which is used either in hash or loadbalance runner.
+
+.TP
+.BR "link_watch.name "| " ports.PORTIFNAME.link_watch.name " (string)
+Name of link watch to be used. There are following link watches available:
+
+.BR "ethtool "-
+Uses Libteam lib to get port ethtool state changes.
+
+.BR "arp_ping "-
+ARP requests are sent through a port. If an ARP reply is received, the link is considered to be up.
+
+.BR "nsna_ping "-
+Similar to the previous, only it uses IPv6 Neighbour Solicitation / Neighbour Announcement mechanism. This is an alternative to arp_ping and becomes handy in pure-IPv6 environments.
+
+.TP
+.BR "ports " (object)
+List of port NICs to be used in team device.
+
+See examples for more information.
+
+.TP
+.BR "ports.PORTIFNAME.prio " (int)
+Port priority. The higher number means higher priority.
+
+Default:
+.BR "0"
+
+.TP
+.BR "ports.PORTIFNAME.sticky " (bool)
+Flag which tells if the port is sticky. That means it does not get de-selected if another port with better priority or parameters becomes available.
+
+Default:
+.BR "false"
+
+.SH LOADBALANCE RUNNER SPECIFIC OPTIONS
+
+.TP
+.BR "runner.tx_hash " (array)
+List of fragment types (strings) which should be used for packet TX hash computation. Here are following available:
+
+.BR "eth "-
+Uses source and destination MAC addresses.
+
+.BR "ipv4 "-
+Uses source and destination IPv4 addresses.
+
+.BR "ipv6 "-
+Uses source and destination IPv6 addresses.
+
+.TP
+.BR "runner.tx_balancer.name " (string)
+Name of active TX balancer. Active TX balancing is disabled by default. The only value available is
+.BR "basic".
+
+.SH LACP RUNNER SPECIFIC OPTIONS
+.TP
+.BR "runner.active " (bool)
+If active is
+.BR "true"
+LACPDU frames are send along the configured links by itselt periodically. If not, it acts as "speak when spoken to".
+
+Default:
+.BR "true"
+
+.TP
+.BR "runner.fast_rate " (bool)
+Option specifies the rate in which our link partner is asked to transmit LACPDU packets. If this is
+.BR "true"
+then packets will be sent once per second. Otherwise they will be sent every 30 seconds.
+
+Default:
+.BR "false"
+
+.TP
+.BR "runner.sys_prio " (int)
+System priority, value can be 0-65535.
+
+Default:
+.BR "255"
+
+.SH ETHTOOL LINK WATCH SPECIFIC OPTIONS
+.TP
+.BR "link_watch.delay_up "| " ports.PORTIFNAME.link_watch.delay_up " (int)
+Value is positive number in milliseconds. It's a delay between link goes up and runner is actually notified about it.
+
+Default:
+.BR "0"
+
+.TP
+.BR "link_watch.delay_down "| " ports.PORTIFNAME.link_watch.delay_down " (int)
+Value is positive number in milliseconds. It's a delay between link goes down and runner is actually notified about it.
+
+Default:
+.BR "0"
+
+.SH ARP PING LINK WATCH SPECIFIC OPTIONS
+.TP
+.BR "link_watch.interval "| " ports.PORTIFNAME.link_watch.interval " (int)
+Value is positive number in milliseconds. It's an interval in which ARP requests are sent.
+
+.TP
+.BR "link_watch.init_wait "| " ports.PORTIFNAME.link_watch.init_wait " (int)
+Value is positive number in milliseconds. It's an delay between link watch initialization and first ARP request send.
+
+.TP
+.BR "link_watch.missed_max "| " ports.PORTIFNAME.link_watch.missed_max " (int)
+Maximum number of missed ARP replies. If this number is overreached, link is reported as down.
+
+.TP
+.BR "link_watch.source_host "| " ports.PORTIFNAME.link_watch.source_host " (int)
+Hostname to be converted to IP address which will be filled into ARP request as source address.
+
+.TP
+.BR "link_watch.target_host "| " ports.PORTIFNAME.link_watch.target_host " (int)
+Hostname to be converted to IP address which will be filled into ARP request as destination address.
+
+.SH NS/NA PING LINK WATCH SPECIFIC OPTIONS
+.TP
+.BR "link_watch.interval "| " ports.PORTIFNAME.link_watch.interval " (int)
+Value is positive number in milliseconds. It's an interval in which NS packets are sent.
+
+.TP
+.BR "link_watch.init_wait "| " ports.PORTIFNAME.link_watch.init_wait " (int)
+Value is positive number in milliseconds. It's an delay between link watch initialization and first NS packet send.
+
+.TP
+.BR "link_watch.missed_max "| " ports.PORTIFNAME.link_watch.missed_max " (int)
+Maximum number of missed NA reply packets. If this number is overreached, link is reported as down.
+
+.TP
+.BR "link_watch.target_host "| " ports.PORTIFNAME.link_watch.target_host " (int)
+Hostname to be converted to IPv6 address which will be filled into NS packet as target address.
+
+.SH SEE ALSO
+.BR teamd (8)
+
+.SH AUTHOR
+.PP
+Jiri Pirko is the original author and current maintainer of libteam.
