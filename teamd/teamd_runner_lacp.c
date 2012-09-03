@@ -172,7 +172,7 @@ static int lacp_load_config(struct teamd_context *ctx, struct lacp *lacp)
 	int err;
 	int tmp;
 
-	err = json_unpack(ctx->config_json, "{s:{s:i}}", "runner", "active",
+	err = json_unpack(ctx->config_json, "{s:{s:b}}", "runner", "active",
 			  &tmp);
 	lacp->cfg.active = err ? LACP_CFG_DFLT_ACTIVE : !!tmp;
 	teamd_log_dbg("Using active \"%d\".", lacp->cfg.active);
@@ -189,7 +189,7 @@ static int lacp_load_config(struct teamd_context *ctx, struct lacp *lacp)
 	}
 	teamd_log_dbg("Using sys_prio \"%d\".", lacp->cfg.sys_prio);
 
-	err = json_unpack(ctx->config_json, "{s:{s:i}}", "runner", "fast_rate",
+	err = json_unpack(ctx->config_json, "{s:{s:b}}", "runner", "fast_rate",
 			  &tmp);
 	lacp->cfg.fast_rate = err ? LACP_CFG_DFLT_FAST_RATE : !!tmp;
 	teamd_log_dbg("Using fast_rate \"%d\".", lacp->cfg.fast_rate);
