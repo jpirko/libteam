@@ -51,6 +51,7 @@ List of port NICs to be used in team device.
 
 See examples for more information.
 
+.SH ACTIVE-BACKUP RUNNER SPECIFIC OPTIONS
 .TP
 .BR "ports.PORTIFNAME.prio " (int)
 Port priority. The higher number means higher priority.
@@ -65,7 +66,14 @@ Flag which tells if the port is sticky. That means it does not get de-selected i
 Default:
 .BR "false"
 
-.SH LOADBALANCE RUNNER SPECIFIC OPTIONS
+.TP
+.BR "ports.PORTIFNAME.queue_id " (int)
+ID of queue which should this port be mapped on.
+
+Default:
+.BR "None"
+
+.SH LOAD BALANCE RUNNER SPECIFIC OPTIONS
 
 .TP
 .BR "runner.tx_hash " (array)
@@ -100,6 +108,10 @@ Default:
 Option specifies the rate in which our link partner is asked to transmit LACPDU packets. If this is
 .BR "true"
 then packets will be sent once per second. Otherwise they will be sent every 30 seconds.
+
+.TP
+.BR "runner.tx_hash " (array)
+Same as for load balance runner
 
 Default:
 .BR "false"
@@ -163,6 +175,164 @@ Maximum number of missed NA reply packets. If this number is overreached, link i
 .TP
 .BR "link_watch.target_host "| " ports.PORTIFNAME.link_watch.target_host " (int)
 Hostname to be converted to IPv6 address which will be filled into NS packet as target address.
+
+.SH EXAMPLES
+
+.nf
+{
+  "device": "team0",
+  "runner": {"name": "roundrobin"},
+  "ports": {"eth1": {}, "eth2": {}}
+}
+.fi
+
+Very basic config.
+
+.nf
+{
+  "device": "team0",
+  "runner": {"name": "activebackup"},
+  "link_watch": {"name": "ethtool"},
+  "ports": {
+    "eth1": {
+      "prio": -10,
+      "sticky": true
+    },
+    "eth2": {
+      "prio": 100
+    }
+  }
+}
+.fi
+
+This config uses active-backup runner with ethtool linkwatch. Port eth2 has bigger priority. But sticky flag ensures that is eth1 becomes active, it stays active until it has link.
+
+.nf
+{
+  "device": "team0",
+  "runner": {"name": "activebackup"},
+  "link_watch": {
+    "name": "ethtool",
+    "delay_up": 2500,
+    "delay_down": 1000
+  },
+  "ports": {
+    "eth1": {
+      "prio": -10,
+      "sticky": true
+    },
+    "eth2": {
+      "prio": 100
+    }
+  }
+}
+.fi
+
+Similar to the previous one. Ony difference that link changes are not proparated to runner immediately, but there are delays applied.
+
+.nf
+{
+  "device": "team0",
+  "runner": {"name": "activebackup"},
+  "link_watch":	{
+    "name": "arp_ping",
+    "interval": 100,
+    "missed_max": 30,
+    "source_host": "192.168.23.2",
+    "target_host": "192.168.23.1"
+  },
+  "ports": {
+    "eth1": {
+      "prio": -10,
+      "sticky": true
+    },
+    "eth2": {
+      "prio": 100
+    }
+  }
+}
+.fi
+
+This config uses APR ping link watch.
+
+.nf
+{
+"device": "team0",
+"runner": {"name": "activebackup"},
+"link_watch": [
+  {
+    "name": "arp_ping",
+    "interval": 100,
+    "missed_max": 30,
+    "source_host": "192.168.23.2",
+    "target_host": "192.168.23.1"
+  },
+  {
+    "name": "arp_ping",
+    "interval": 50,
+    "missed_max": 20,
+    "source_host": "192.168.24.2",
+    "target_host": "192.168.24.1"
+  }
+],
+"ports": {
+  "eth1": {
+    "prio": -10,
+    "sticky": true
+  },
+  "eth2": {
+    "prio": 100
+    }
+  }
+}
+.fi
+
+Similar to the previous one, only this time two link watches are used at the same time.
+
+.nf
+{
+  "device": "team0",
+  "runner": {
+    "name": "loadbalance",
+    "tx_hash": ["eth", "ipv4", "ipv6"]
+  },
+  "ports": {"eth1": {}, "eth2": {}}
+}
+.fi
+
+Config for hash-based passive TX load balancing.
+
+.nf
+{
+  "device": "team0",
+  "runner": {
+    "name": "loadbalance",
+    "tx_hash": ["eth", "ipv4", "ipv6"],
+    "tx_balancer": {
+      "name": "basic"
+    }
+  },
+  "ports": {"eth1": {}, "eth2": {}}
+}
+.fi
+
+Config for active TX load balancing using basic load balancer.
+
+.nf
+{
+  "device": "team0",
+  "runner": {
+    "name": "lacp",
+    "active": true,
+    "fast_rate": true,
+    "tx_hash": ["eth", "ipv4", "ipv6"]
+  },
+  "link_watch": {"name": "ethtool"},
+  "ports": {"eth1": {}, "eth2": {}}
+}
+.fi
+
+Config for connection to LACP capable counterpart.
 
 .SH SEE ALSO
 .BR teamd (8)
