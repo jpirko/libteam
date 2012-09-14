@@ -563,6 +563,8 @@ static int lacp_port_set_state(struct lacp_port *lacp_port,
 		if (err)
 			return err;
 		lacp_port_timeout_set(lacp_port, true);
+		teamd_loop_callback_enable(lacp_port->ctx,
+					   LACP_TIMEOUT_CB_NAME, lacp_port);
 		break;
 	case PORT_STATE_DEFAULTED:
 		teamd_loop_callback_disable(lacp_port->ctx,
