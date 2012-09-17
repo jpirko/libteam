@@ -101,6 +101,7 @@ resend:
 		case EINTR:
 			goto resend;
 		case ENETDOWN:
+		case ENXIO:
 			return 0;
 		default:
 			teamd_log_err("sendto failed.");
