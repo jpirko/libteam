@@ -141,6 +141,7 @@ struct lacp_port {
 	struct lacpdu_info partner;
 	struct lacpdu_info __partner_last; /* last state before update */
 	bool selected;
+	bool periodic_on;
 	uint32_t aggregator_id;
 	enum lacp_port_state state;
 	struct {
@@ -474,6 +475,34 @@ static int lacp_port_periodic_set(struct lacp_port *lacp_port)
 	return 0;
 }
 
+static bool lacp_port_should_be_active(struct lacp_port *lacp_port)
+{
+	return (lacp_port->partner.state & INFO_STATE_LACP_ACTIVITY) ||
+	       (lacp_port->lacp->cfg.active);
+}
+
+static void lacp_port_periodic_cb_change_enabled(struct lacp_port *lacp_port)
+{
+	if (lacp_port_should_be_active(lacp_port) && lacp_port->periodic_on)
+		teamd_loop_callback_enable(lacp_port->ctx,
+					   LACP_PERIODIC_CB_NAME, lacp_port);
+	else
+		teamd_loop_callback_disable(lacp_port->ctx,
+					    LACP_PERIODIC_CB_NAME, lacp_port);
+}
+
+static void lacp_port_periodic_on(struct lacp_port *lacp_port)
+{
+	lacp_port->periodic_on = true;
+	lacp_port_periodic_cb_change_enabled(lacp_port);
+}
+
+static void lacp_port_periodic_off(struct lacp_port *lacp_port)
+{
+	lacp_port->periodic_on = false;
+	lacp_port_periodic_cb_change_enabled(lacp_port);
+}
+
 static int lacp_port_partner_update(struct lacp_port *lacp_port)
 {
 	uint8_t state_changed;
@@ -487,6 +516,9 @@ static int lacp_port_partner_update(struct lacp_port *lacp_port)
 		if (err)
 			return err;
 	}
+	if (state_changed & INFO_STATE_LACP_ACTIVITY)
+		lacp_port_periodic_cb_change_enabled(lacp_port);
+
 	lacp_port->__partner_last = lacp_port->partner;
 	return lacp_update_selected(lacp_port->lacp);
 }
@@ -540,11 +572,9 @@ static int lacp_port_set_state(struct lacp_port *lacp_port,
 	if (new_state == lacp_port->state)
 		return 0;
 	if (new_state == PORT_STATE_DISABLED)
-		teamd_loop_callback_disable(lacp_port->ctx,
-					    LACP_PERIODIC_CB_NAME, lacp_port);
+		lacp_port_periodic_off(lacp_port);
 	else
-		teamd_loop_callback_enable(lacp_port->ctx,
-					   LACP_PERIODIC_CB_NAME, lacp_port);
+		lacp_port_periodic_on(lacp_port);
 
 	switch(new_state) {
 	case PORT_STATE_CURRENT:
