@@ -847,50 +847,14 @@ int teamd_port_add(struct teamd_context *ctx, const char *port_name)
 {
 	int err;
 	uint32_t ifindex;
-	json_t *port_obj;
-	int tmp;
 
 	ifindex = team_ifname2ifindex(ctx->th, port_name);
 	teamd_log_dbg("%s: Adding port (found ifindex \"%d\").",
 		      port_name, ifindex);
 	err = team_port_add(ctx->th, ifindex);
-	if (err) {
-		teamd_log_err("%s: Failed to add port.", port_name);
-		return err;
-	}
-
-	err = json_unpack(ctx->config_json, "{s:{s:o}}",
-			  "ports", port_name, &port_obj);
 	if (err)
-		return 0; /* no config found */
-
-	err = json_unpack(port_obj, "{s:i}", "queue_id", &tmp);
-	if (!err) {
-		uint32_t queue_id;
-
-		if (tmp < 0) {
-			teamd_log_err("%s: \"queue_id\" must not be negative number.",
-				      port_name);
-			return -EINVAL;
-		}
-		queue_id = tmp;
-		err = team_set_port_queue_id(ctx->th, ifindex, queue_id);
-		if (err) {
-			teamd_log_err("%s: Failed to set \"queue_id\".",
-				      port_name);
-			return err;
-		}
-	}
-	err = json_unpack(port_obj, "{s:i}", "prio", &tmp);
-	if (!err) {
-		err = team_set_port_priority(ctx->th, ifindex, tmp);
-		if (err) {
-			teamd_log_err("%s: Failed to set \"priority\".",
-				      port_name);
-			return err;
-		}
-	}
-	return 0;
+		teamd_log_err("%s: Failed to add port.", port_name);
+	return err;
 }
 
 int teamd_port_remove(struct teamd_context *ctx, const char *port_name)
@@ -927,6 +891,62 @@ static int teamd_add_ports(struct teamd_context *ctx)
 			return err;
 	}
 	return 0;
+}
+
+static int teamd_event_watch_port_added(struct teamd_context *ctx,
+					struct teamd_port *tdport, void *priv)
+{
+	int err;
+	json_t *port_obj;
+	int tmp;
+
+	err = json_unpack(ctx->config_json, "{s:{s:o}}",
+			  "ports", tdport->ifname, &port_obj);
+	if (err)
+		return 0; /* no config found */
+
+	err = json_unpack(port_obj, "{s:i}", "queue_id", &tmp);
+	if (!err) {
+		uint32_t queue_id;
+
+		if (tmp < 0) {
+			teamd_log_err("%s: \"queue_id\" must not be negative number.",
+				      tdport->ifname);
+			return -EINVAL;
+		}
+		queue_id = tmp;
+		err = team_set_port_queue_id(ctx->th, tdport->ifindex,
+					     queue_id);
+		if (err) {
+			teamd_log_err("%s: Failed to set \"queue_id\".",
+				      tdport->ifname);
+			return err;
+		}
+	}
+	err = json_unpack(port_obj, "{s:i}", "prio", &tmp);
+	if (!err) {
+		err = team_set_port_priority(ctx->th, tdport->ifindex, tmp);
+		if (err) {
+			teamd_log_err("%s: Failed to set \"priority\".",
+				      tdport->ifname);
+			return err;
+		}
+	}
+	return 0;
+}
+
+static const struct teamd_event_watch_ops teamd_port_watch_ops = {
+	.port_added = teamd_event_watch_port_added,
+};
+
+static int teamd_port_watch_init(struct teamd_context *ctx)
+{
+	return teamd_event_watch_register(ctx, &teamd_port_watch_ops, NULL);
+}
+
+static void teamd_port_watch_fini(struct teamd_context *ctx)
+{
+	teamd_event_watch_unregister(ctx, &teamd_port_watch_ops, NULL);
 }
 
 static int runner_state_dump(struct teamd_context *ctx,
@@ -1194,10 +1214,16 @@ static int teamd_init(struct teamd_context *ctx)
 		goto events_fini;
 	}
 
+	err = teamd_port_watch_init(ctx);
+	if (err) {
+		teamd_log_err("Failed to init port watch.");
+		goto option_watch_fini;
+	}
+
 	err = teamd_state_json_init(ctx);
 	if (err) {
 		teamd_log_err("Failed to init state json infrastructure.");
-		goto option_watch_fini;
+		goto port_watch_fini;
 	}
 
 	err = teamd_per_port_init(ctx);
@@ -1260,6 +1286,8 @@ per_port_fini:
 	teamd_per_port_fini(ctx);
 state_json_fini:
 	teamd_state_json_fini(ctx);
+port_watch_fini:
+	teamd_port_watch_fini(ctx);
 option_watch_fini:
 	teamd_option_watch_fini(ctx);
 events_fini:
