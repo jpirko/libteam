@@ -120,55 +120,73 @@ static int abl_get_active_tdport(struct teamd_context *ctx,
 	return 0;
 }
 
+struct abl_port_state_info {
+	struct teamd_port *tdport;
+	uint32_t speed;
+	uint8_t duplex;
+	int prio;
+};
+
+static void abl_best_port_check_set(struct teamd_context *ctx,
+				    struct abl_port_state_info *best,
+				    struct teamd_port *tdport)
+{
+	struct team_port *port;
+	uint32_t speed;
+	uint8_t duplex;
+	int prio;
+
+	if (!teamd_link_watch_port_up(ctx, tdport) || best->tdport == tdport)
+		return;
+
+	port = tdport->team_port;
+	speed = team_get_port_speed(port);
+	duplex = team_get_port_duplex(port);
+	prio = get_port_prio(ctx, tdport);
+
+	if (!best->tdport || (prio > best->prio) || (speed > best->speed) ||
+	    (speed == best->speed && duplex > best->duplex)) {
+		best->tdport = tdport;
+		best->prio = prio;
+		best->speed = speed;
+		best->duplex = duplex;
+	}
+}
+
 static int link_watch_handler(struct teamd_context *ctx)
 {
 	struct teamd_port *tdport;
 	struct teamd_port *active_tdport;
-	struct teamd_port *best_tdport = NULL;
-	uint32_t best_speed = 0;
-	uint8_t best_duplex = 0;
-	int best_prio = INT_MIN;
+	struct abl_port_state_info best;
 	int err;
+
+	memset(&best, 0, sizeof(best));
+	best.prio = INT_MIN;
 
 	err = abl_get_active_tdport(ctx, &active_tdport);
 	if (err)
 		return err;
-	if (active_tdport)
+	if (active_tdport) {
 		teamd_log_dbg("Current active port: \"%s\" (ifindex \"%d\", prio \"%d\").",
 			      active_tdport->ifname, active_tdport->ifindex,
 			      get_port_prio(ctx, active_tdport));
-
-	teamd_for_each_tdport(tdport, ctx) {
-		struct team_port *port = tdport->team_port;
-
-		if (teamd_link_watch_port_up(ctx, tdport)) {
-			uint32_t speed = team_get_port_speed(port);
-			uint8_t duplex = team_get_port_duplex(port);
-			int prio = get_port_prio(ctx, tdport);
-
-			if (!best_tdport ||
-			    (prio > best_prio) ||
-			    (speed > best_speed) ||
-			    (speed == best_speed && duplex > best_duplex)) {
-				best_tdport = tdport;
-				best_prio = prio;
-				best_speed = speed;
-				best_duplex = duplex;
-			}
-		}
+		abl_best_port_check_set(ctx, &best, active_tdport);
 	}
 
-	if (!best_tdport || best_tdport == active_tdport)
+	teamd_for_each_tdport(tdport, ctx)
+		abl_best_port_check_set(ctx, &best, tdport);
+
+	if (!best.tdport || best.tdport == active_tdport)
 		return 0;
 
 	teamd_log_dbg("Found best port: \"%s\" (ifindex \"%d\", prio \"%d\").",
-		      best_tdport->ifname, best_tdport->ifindex, best_prio);
+		      best.tdport->ifname, best.tdport->ifindex, best.prio);
 	if (!active_tdport ||
 	    !teamd_link_watch_port_up(ctx, active_tdport) ||
 	    !is_port_sticky(ctx, active_tdport->ifname)) {
 		teamd_log_info("Changing active port to \"%s\".",
-			       best_tdport->ifname);
-		err = change_active_port(ctx, active_tdport, best_tdport);
+			       best.tdport->ifname);
+		err = change_active_port(ctx, active_tdport, best.tdport);
 		if (err)
 			return err;
 	}
