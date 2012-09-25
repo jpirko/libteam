@@ -410,12 +410,12 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 		teamd_log_err("Failed to get \"interval\" link-watch option.");
 		return -ENOENT;
 	}
-	teamd_log_dbg("\tinterval \"%d\".", tmp);
+	teamd_log_dbg("interval \"%d\".", tmp);
 	ms_to_timespec(&psr_ppriv->interval, tmp);
 
 	err = json_unpack(link_watch_json, "{s:i}", "init_wait", &tmp);
 	if (!err) {
-		teamd_log_dbg("\tinit_wait \"%d\".", tmp);
+		teamd_log_dbg("init_wait \"%d\".", tmp);
 		ms_to_timespec(&psr_ppriv->init_wait, tmp);
 	} else {
 		psr_ppriv->init_wait = psr_ppriv->ops->default_init_wait;
@@ -430,7 +430,7 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 		teamd_log_err("\"missed_max\" must not be negative number.");
 		return -EINVAL;
 	}
-	teamd_log_dbg("\tmissed_max \"%d\".", tmp);
+	teamd_log_dbg("missed_max \"%d\".", tmp);
 	psr_ppriv->missed_max = tmp;
 	return 0;
 }
@@ -577,7 +577,7 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 	err = set_in_addr(&ap_ppriv->src, host);
 	if (err)
 		return err;
-	teamd_log_dbg("\tsource address \"%s\".",
+	teamd_log_dbg("source address \"%s\".",
 		      str_in_addr(&ap_ppriv->src));
 
 	err = json_unpack(link_watch_json, "{s:s}", "target_host", &host);
@@ -588,7 +588,7 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 	err = set_in_addr(&ap_ppriv->dst, host);
 	if (err)
 		return err;
-	teamd_log_dbg("\ttarget address \"%s\".", str_in_addr(&ap_ppriv->dst));
+	teamd_log_dbg("target address \"%s\".", str_in_addr(&ap_ppriv->dst));
 
 	return 0;
 }
@@ -877,7 +877,7 @@ static int lw_nsnap_load_options(struct teamd_context *ctx,
 	err = set_sockaddr_in6(&nsnap_ppriv->dst, host);
 	if (err)
 		return err;
-	teamd_log_dbg("\ttarget address \"%s\".",
+	teamd_log_dbg("target address \"%s\".",
 		      str_sockaddr_in6(&nsnap_ppriv->dst));
 
 	return 0;
