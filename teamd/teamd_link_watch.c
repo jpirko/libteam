@@ -340,7 +340,6 @@ struct lw_psr_ops {
 			    struct lw_psr_port_priv *psr_ppriv);
 	int (*send)(struct lw_psr_port_priv *psr_ppriv);
 	int (*receive)(struct lw_psr_port_priv *psr_ppriv);
-	struct timespec default_init_wait;
 };
 
 struct lw_psr_port_priv {
@@ -397,6 +396,8 @@ static int lw_psr_callback_socket(struct teamd_context *ctx, int events,
 	return psr_ppriv->ops->receive(psr_ppriv);
 }
 
+static const struct timespec lw_psr_default_init_wait = { 0, 1 };
+
 static int lw_psr_load_options(struct teamd_context *ctx,
 			       struct teamd_port *tdport,
 			       struct lw_psr_port_priv *psr_ppriv)
@@ -414,12 +415,12 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 	ms_to_timespec(&psr_ppriv->interval, tmp);
 
 	err = json_unpack(link_watch_json, "{s:i}", "init_wait", &tmp);
-	if (!err) {
-		teamd_log_dbg("init_wait \"%d\".", tmp);
+	if (!err)
 		ms_to_timespec(&psr_ppriv->init_wait, tmp);
-	} else {
-		psr_ppriv->init_wait = psr_ppriv->ops->default_init_wait;
-	}
+	/* if init_wait is set to 0, use default_init_wait */
+	if (err || !tmp)
+		psr_ppriv->init_wait = lw_psr_default_init_wait;
+	teamd_log_dbg("init_wait \"%d\".", timespec_to_ms(&psr_ppriv->init_wait));
 
 	err = json_unpack(link_watch_json, "{s:i}", "missed_max", &tmp);
 	if (err) {
@@ -705,7 +706,6 @@ static const struct lw_psr_ops lw_psr_ops_ap = {
 	.load_options		= lw_ap_load_options,
 	.send			= lw_ap_send,
 	.receive		= lw_ap_receive,
-	.default_init_wait	= { 0, 1 },
 };
 
 static int lw_ap_port_added(struct teamd_context *ctx,
@@ -973,7 +973,6 @@ static const struct lw_psr_ops lw_psr_ops_nsnap = {
 	.load_options		= lw_nsnap_load_options,
 	.send			= lw_nsnap_send,
 	.receive		= lw_nsnap_receive,
-	.default_init_wait	= { 2, 0 },
 };
 
 static int lw_nsnap_port_added(struct teamd_context *ctx,
