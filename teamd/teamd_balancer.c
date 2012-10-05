@@ -215,6 +215,11 @@ static int tb_rebalance(struct teamd_balancer *tb, struct team_handle *th)
 			return err;
 		}
 	}
+
+	list_for_each_node_entry(tbpi, &tb->port_info_list, list) {
+		teamd_log_dbg("Rebalanced port %s delta: %" PRIu64,
+			      tbpi->tdport->ifname, tbpi->rebalance.bytes);
+	}
 	return 0;
 }
 
