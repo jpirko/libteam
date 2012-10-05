@@ -204,6 +204,9 @@ static int tb_rebalance(struct teamd_balancer *tb, struct team_handle *th)
 	tb_clear_rebalance_data(tb);
 
 	while ((tbhi = tb_get_biggest_unprocessed_hash(tb))) {
+		/* Do not remap zero delta hashes */
+		if (tbhi->tdport && !tb_stats_get_delta(&tbhi->stats))
+			continue;
 		tbpi = tb_get_least_loaded_port(tb);
 		if (!tbpi)
 			continue;
