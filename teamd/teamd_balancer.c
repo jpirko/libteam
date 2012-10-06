@@ -39,7 +39,6 @@ struct tb_hash_info {
 	struct teamd_port *tdport;
 	struct {
 		bool processed;
-		struct teamd_port *new_tdport;
 	} rebalance;
 };
 
@@ -49,6 +48,7 @@ struct tb_port_info {
 	struct teamd_port *tdport;
 	struct {
 		uint64_t bytes;
+		bool unusable;
 	} rebalance;
 };
 
@@ -134,8 +134,10 @@ static struct tb_port_info *tb_get_least_loaded_port(struct teamd_balancer *tb)
 	struct tb_port_info *best_tbpi = NULL;
 
 	list_for_each_node_entry(tbpi, &tb->port_info_list, list) {
-		if (!best_tbpi || tbpi->rebalance.bytes <
-				  best_tbpi->rebalance.bytes)
+		if (tbpi->rebalance.unusable)
+			continue;
+		if (!best_tbpi ||
+		    tbpi->rebalance.bytes < best_tbpi->rebalance.bytes)
 			best_tbpi = tbpi;
 	}
 	return best_tbpi;
@@ -155,8 +157,6 @@ static struct tb_hash_info *tb_get_biggest_unprocessed_hash(struct teamd_balance
 				  tb_stats_get_delta(&best_tbhi->stats))
 			best_tbhi = tbhi;
 	}
-	if (best_tbhi)
-		best_tbhi->rebalance.processed = true;
 	return best_tbhi;
 }
 
@@ -165,31 +165,37 @@ static void tb_clear_rebalance_data(struct teamd_balancer *tb)
 	struct tb_port_info *tbpi;
 	int i;
 
-	list_for_each_node_entry(tbpi, &tb->port_info_list, list)
+	list_for_each_node_entry(tbpi, &tb->port_info_list, list) {
 		tbpi->rebalance.bytes = 0;
+		tbpi->rebalance.unusable = false;
+	}
 	for (i = 0; i < HASH_COUNT; i++) {
 		tb->hash_info[i].rebalance.processed = false;
-		tb->hash_info[i].rebalance.new_tdport = NULL;
 	}
 }
 
 static int tb_hash_to_port_remap(struct team_handle *th,
-				 struct tb_hash_info *tbhi)
+				 struct tb_hash_info *tbhi,
+				 struct tb_port_info *tbpi)
 {
 	struct team_option *option;
-	struct teamd_port *new_tdport = tbhi->rebalance.new_tdport;
+	struct teamd_port *new_tdport = tbpi->tdport;
 	uint8_t hash = tbhi->hash;
+	int err;
 
 	if (tbhi->tdport == new_tdport)
 		return 0;
 
-	teamd_log_dbg("Remapping hash \"%u\" (delta %" PRIu64 ") to port %s.",
-		      hash, tb_stats_get_delta(&tbhi->stats),
-		      new_tdport->ifname);
 	option = team_get_option(th, "na", "lb_tx_hash_to_port_mapping", hash);
 	if (!option)
 		return -ENOENT;
-	return team_set_option_value_u32(th, option, new_tdport->ifindex);
+	err = team_set_option_value_u32(th, option, new_tdport->ifindex);
+	if (err)
+		return err;
+	teamd_log_dbg("Remapped hash \"%u\" (delta %" PRIu64 ") to port %s.",
+		      hash, tb_stats_get_delta(&tbhi->stats),
+		      new_tdport->ifname);
+	return 0;
 }
 
 static int tb_rebalance(struct teamd_balancer *tb, struct team_handle *th)
@@ -203,24 +209,26 @@ static int tb_rebalance(struct teamd_balancer *tb, struct team_handle *th)
 
 	tb_clear_rebalance_data(tb);
 
-	while ((tbhi = tb_get_biggest_unprocessed_hash(tb))) {
+	while ((tbhi = tb_get_biggest_unprocessed_hash(tb)) &&
+	       (tbpi = tb_get_least_loaded_port(tb))) {
 		/* Do not remap zero delta hashes */
-		if (tbhi->tdport && !tb_stats_get_delta(&tbhi->stats))
+		if (tbhi->tdport && !tb_stats_get_delta(&tbhi->stats)) {
+			tbhi->rebalance.processed = true;
 			continue;
-		tbpi = tb_get_least_loaded_port(tb);
-		if (!tbpi)
-			continue;
-		tbpi->rebalance.bytes += tb_stats_get_delta(&tbhi->stats);
-		tbhi->rebalance.new_tdport = tbpi->tdport;
-		err = tb_hash_to_port_remap(th, tbhi);
-		if (err) {
-			teamd_log_err("Failed to remap hash to port.");
-			return err;
 		}
+		err = tb_hash_to_port_remap(th, tbhi, tbpi);
+		if (err) {
+			tbpi->rebalance.unusable = true;
+			continue;
+		}
+		tbpi->rebalance.bytes += tb_stats_get_delta(&tbhi->stats);
+		tbhi->rebalance.processed = true;
 	}
 
 	list_for_each_node_entry(tbpi, &tb->port_info_list, list) {
-		teamd_log_dbg("Rebalanced port %s delta: %" PRIu64,
+		if (tbpi->rebalance.unusable)
+			continue;
+		teamd_log_dbg("Port %s rebalanced, delta: %" PRIu64,
 			      tbpi->tdport->ifname, tbpi->rebalance.bytes);
 	}
 	return 0;
@@ -265,7 +273,8 @@ static int tb_option_change_handler_func(struct team_handle *th, void *arg,
 		if (!changed)
 			continue;
 		if (!strcmp(name, "lb_hash_stats") ||
-		    !strcmp(name, "lb_port_stats"))
+		    !strcmp(name, "lb_port_stats") ||
+		    !strcmp(name, "enabled"))
 			rebalance_needed = true;
 	}
 
