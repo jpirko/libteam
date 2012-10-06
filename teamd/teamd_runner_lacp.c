@@ -116,6 +116,7 @@ struct lacp {
 		bool fast_rate;
 #define		LACP_CFG_DFLT_FAST_RATE false
 	} cfg;
+	struct teamd_balancer *tb;
 };
 
 enum lacp_port_state {
@@ -907,7 +908,21 @@ static const struct teamd_port_priv lacp_port_priv = {
 static int lacp_event_watch_port_added(struct teamd_context *ctx,
 				       struct teamd_port *tdport, void *priv)
 {
-	return teamd_port_priv_create(tdport, &lacp_port_priv, priv);
+	struct lacp *lacp = priv;
+	int err;
+
+	err = teamd_port_priv_create(tdport, &lacp_port_priv, lacp);
+	if (err)
+		return err;
+	return teamd_balancer_port_added(lacp->tb, tdport);
+}
+
+static void lacp_event_watch_port_removed(struct teamd_context *ctx,
+					  struct teamd_port *tdport, void *priv)
+{
+	struct lacp *lacp = priv;
+
+	teamd_balancer_port_removed(lacp->tb, tdport);
 }
 
 static int lacp_event_watch_port_changed(struct teamd_context *ctx,
@@ -921,6 +936,7 @@ static int lacp_event_watch_port_changed(struct teamd_context *ctx,
 
 static const struct teamd_event_watch_ops lacp_port_watch_ops = {
 	.port_added = lacp_event_watch_port_added,
+	.port_removed = lacp_event_watch_port_removed,
 	.port_changed = lacp_event_watch_port_changed,
 };
 
@@ -948,13 +964,22 @@ static int lacp_init(struct teamd_context *ctx)
 		teamd_log_err("Failed to register event watch.");
 		return err;
 	}
+	err = teamd_balancer_init(ctx, &lacp->tb);
+	if (err) {
+		teamd_log_err("Failed to init balanced.");
+		goto event_watch_unregister;
+	}
 	return 0;
+event_watch_unregister:
+	teamd_event_watch_unregister(ctx, &lacp_port_watch_ops, lacp);
+	return err;
 }
 
 static void lacp_fini(struct teamd_context *ctx)
 {
 	struct lacp *lacp = ctx->runner_priv;
 
+	teamd_balancer_fini(lacp->tb);
 	teamd_event_watch_unregister(ctx, &lacp_port_watch_ops, lacp);
 }
 
