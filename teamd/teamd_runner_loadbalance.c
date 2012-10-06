@@ -76,8 +76,8 @@ static int lb_init(struct teamd_context *ctx)
 	}
 	return 0;
 event_watch_unregister:
-	teamd_balancer_fini(lb_priv->tb);
-	return 0;
+	teamd_event_watch_unregister(ctx, &lb_port_watch_ops, lb_priv);
+	return err;
 }
 
 static void lb_fini(struct teamd_context *ctx)
