@@ -193,6 +193,21 @@ static int link_watch_handler(struct teamd_context *ctx)
 	return 0;
 }
 
+static int abl_event_watch_port_added(struct teamd_context *ctx,
+				      struct teamd_port *tdport, void *priv)
+{
+	int err;
+
+	err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
+			      ctx->hwaddr_len);
+	if (err) {
+		teamd_log_err("Failed to set port \"%s\" hardware address. ",
+			      tdport->ifname);
+		return err;
+	}
+	return 0;
+}
+
 static int abl_port_link_changed(struct teamd_context *ctx,
 				 struct teamd_port *tdport, void *priv)
 {
@@ -206,6 +221,7 @@ static int abl_prio_option_changed(struct teamd_context *ctx,
 }
 
 static const struct teamd_event_watch_ops abl_event_watch_ops = {
+	.port_added = abl_event_watch_port_added,
 	.port_link_changed = abl_port_link_changed,
 	.option_changed = abl_prio_option_changed,
 	.option_changed_match_name = "priority",
