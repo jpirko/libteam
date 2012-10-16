@@ -526,6 +526,7 @@ struct lw_ap_port_priv {
 	} start; /* must be first */
 	struct in_addr src;
 	struct in_addr dst;
+	bool validate;
 };
 
 static struct lw_ap_port_priv *
@@ -568,6 +569,7 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 	struct lw_ap_port_priv *ap_ppriv = lw_ap_ppriv_get(psr_ppriv);
 	json_t *link_watch_json = psr_ppriv->common.link_watch_json;
 	char *host;
+	int tmp;
 	int err;
 
 	err = json_unpack(link_watch_json, "{s:s}", "source_host", &host);
@@ -590,6 +592,10 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 	if (err)
 		return err;
 	teamd_log_dbg("target address \"%s\".", str_in_addr(&ap_ppriv->dst));
+
+	err = json_unpack(ctx->config_json, "{s:b}",  "validate", &tmp);
+	ap_ppriv->validate = err ? false : !!tmp;
+	teamd_log_dbg("valitate \"%d\".", ap_ppriv->validate);
 
 	return 0;
 }
@@ -677,24 +683,26 @@ static int lw_ap_receive(struct lw_psr_port_priv *psr_ppriv)
 	if (ll_from.sll_pkttype != PACKET_HOST)
 		return 0;
 
-	pos = buf;
-	buf_pull(&pos, &ah, sizeof(ah));
-	if (ah.ar_hrd != htons(ll_my.sll_hatype) ||
-	    ah.ar_pro != htons(ETH_P_IP) ||
-	    ah.ar_hln != ll_my.sll_halen ||
-	    ah.ar_pln != 4 ||
-	    ah.ar_op != htons(ARPOP_REPLY))
-		return 0;
+	if (ap_ppriv->validate) {
+		pos = buf;
+		buf_pull(&pos, &ah, sizeof(ah));
+		if (ah.ar_hrd != htons(ll_my.sll_hatype) ||
+		    ah.ar_pro != htons(ETH_P_IP) ||
+		    ah.ar_hln != ll_my.sll_halen ||
+		    ah.ar_pln != 4 ||
+		    ah.ar_op != htons(ARPOP_REPLY))
+			return 0;
 
-	buf_pull(&pos, ll_msg1.sll_addr, ll_my.sll_halen);
-	buf_pull(&pos, &src, sizeof(src));
-	buf_pull(&pos, ll_msg2.sll_addr, ll_my.sll_halen);
-	buf_pull(&pos, &dst, sizeof(dst));
+		buf_pull(&pos, ll_msg1.sll_addr, ll_my.sll_halen);
+		buf_pull(&pos, &src, sizeof(src));
+		buf_pull(&pos, ll_msg2.sll_addr, ll_my.sll_halen);
+		buf_pull(&pos, &dst, sizeof(dst));
 
-	if (ap_ppriv->src.s_addr != dst.s_addr ||
-	    ap_ppriv->dst.s_addr != src.s_addr ||
-	    memcmp(ll_msg2.sll_addr, ll_my.sll_addr, ll_my.sll_halen) != 0)
-		return 0;
+		if (ap_ppriv->src.s_addr != dst.s_addr ||
+		    ap_ppriv->dst.s_addr != src.s_addr ||
+		    memcmp(ll_msg2.sll_addr, ll_my.sll_addr, ll_my.sll_halen))
+			return 0;
+	}
 
 	psr_ppriv->reply_received = true;
 	return 0;

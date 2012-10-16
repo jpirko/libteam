@@ -159,6 +159,10 @@ Hostname to be converted to IP address which will be filled into ARP request as 
 .BR "link_watch.target_host "| " ports.PORTIFNAME.link_watch.target_host " (int)
 Hostname to be converted to IP address which will be filled into ARP request as destination address.
 
+.TP
+.BR "link_watch.validate "| " ports.PORTIFNAME.link_watch.validate " (bool)
+Validate received ARP packets. If this is not set, all incoming ARP packets will be considered as good reply.
+
 .SH NS/NA PING LINK WATCH SPECIFIC OPTIONS
 .TP
 .BR "link_watch.interval "| " ports.PORTIFNAME.link_watch.interval " (int)
