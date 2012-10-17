@@ -550,7 +550,8 @@ lw_ap_ppriv_get(struct lw_psr_port_priv *psr_ppriv)
 
 struct sock_filter arp_rpl_flt[] = {
 	BPF_STMT(BPF_LD + BPF_H + BPF_ABS, OFFSET_ARP_OP_CODE),
-	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARPOP_REPLY, 0, 1),
+	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARPOP_REPLY, 1, 0),
+	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARPOP_REQUEST, 0, 1),
 	BPF_STMT(BPF_RET + BPF_K, (u_int)-1),
 	BPF_STMT(BPF_RET + BPF_K, 0),
 };
@@ -708,10 +709,10 @@ static int lw_ap_receive(struct lw_psr_port_priv *psr_ppriv)
 	if (err <= 0)
 		return err;
 
-	if (ll_from.sll_pkttype != PACKET_HOST)
-		return 0;
-
 	if (ap_ppriv->validate) {
+		if (ll_from.sll_pkttype != PACKET_HOST)
+			return 0;
+
 		err = __get_port_curr_hwaddr(psr_ppriv, &ll_my, 0);
 		if (err)
 			return err;
