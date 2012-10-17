@@ -87,7 +87,8 @@ static int change_active_port(struct teamd_context *ctx,
 				      abl_priv(ctx)->old_active_hwaddr,
 				      ctx->hwaddr_len);
 		if (err) {
-			teamd_log_err("Failed to set old active original hardware address.");
+			teamd_log_err("%s: Failed to set old active original hardware address.",
+				      old_tdport->ifname);
 			return err;
 		}
 	}
@@ -112,7 +113,8 @@ static int change_active_port(struct teamd_context *ctx,
 	err = team_hwaddr_set(ctx->th, new_active_ifindex, ctx->hwaddr,
 			      ctx->hwaddr_len);
 	if (err) {
-		teamd_log_err("Failed to set new active hardware address.");
+		teamd_log_err("%s: Failed to set new active hardware address.",
+			      new_tdport->ifname);
 		return err;
 	}
 	return 0;
@@ -221,7 +223,7 @@ static int abl_event_watch_port_added(struct teamd_context *ctx,
 	err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
 			      ctx->hwaddr_len);
 	if (err) {
-		teamd_log_err("Failed to set port \"%s\" hardware address. ",
+		teamd_log_err("%s: Failed to set port hardware address.",
 			      tdport->ifname);
 		return err;
 	}
