@@ -612,6 +612,28 @@ static void buf_pull(char **pos, void *data, size_t data_len)
 	*pos += data_len;
 }
 
+
+static int __get_port_curr_hwaddr(struct lw_psr_port_priv *psr_ppriv,
+				  struct sockaddr_ll *addr, size_t expected_len)
+{
+	struct team_ifinfo *ifinfo = psr_ppriv->common.tdport->team_ifinfo;
+	size_t port_hwaddr_len = team_get_ifinfo_hwaddr_len(ifinfo);
+	char *port_hwaddr = team_get_ifinfo_hwaddr(ifinfo);
+	int err;
+
+	err = teamd_getsockname_hwaddr(psr_ppriv->sock, addr, expected_len);
+	if (err)
+		return err;
+	if ((addr->sll_halen != port_hwaddr_len) ||
+	    (expected_len && expected_len != port_hwaddr_len)) {
+		teamd_log_err("Unexpected length of hw address.");
+		return -ENOTSUP;
+	}
+	memcpy(addr->sll_addr, port_hwaddr, addr->sll_halen);
+	return 0;
+}
+
+
 static int lw_ap_send(struct lw_psr_port_priv *psr_ppriv)
 {
 	struct lw_ap_port_priv *ap_ppriv = lw_ap_ppriv_get(psr_ppriv);
@@ -623,7 +645,7 @@ static int lw_ap_send(struct lw_psr_port_priv *psr_ppriv)
 	struct sockaddr_ll ll_bcast;
 	struct arphdr ah;
 
-	err = teamd_getsockname_hwaddr(psr_ppriv->sock, &ll_my, 0);
+	err = __get_port_curr_hwaddr(psr_ppriv, &ll_my, 0);
 	if (err)
 		return err;
 	ll_bcast = ll_my;
@@ -671,7 +693,7 @@ static int lw_ap_receive(struct lw_psr_port_priv *psr_ppriv)
 	struct in_addr dst;
 	char *pos;
 
-	err = teamd_getsockname_hwaddr(psr_ppriv->sock, &ll_my, 0);
+	err = __get_port_curr_hwaddr(psr_ppriv, &ll_my, 0);
 	if (err)
 		return err;
 
