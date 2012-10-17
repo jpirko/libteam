@@ -703,10 +703,6 @@ static int lw_ap_receive(struct lw_psr_port_priv *psr_ppriv)
 	struct in_addr dst;
 	char *pos;
 
-	err = __get_port_curr_hwaddr(psr_ppriv, &ll_my, 0);
-	if (err)
-		return err;
-
 	err = teamd_recvfrom(psr_ppriv->sock, buf, sizeof(buf), 0,
 			     (struct sockaddr *) &ll_from, sizeof(ll_from));
 	if (err <= 0)
@@ -716,6 +712,10 @@ static int lw_ap_receive(struct lw_psr_port_priv *psr_ppriv)
 		return 0;
 
 	if (ap_ppriv->validate) {
+		err = __get_port_curr_hwaddr(psr_ppriv, &ll_my, 0);
+		if (err)
+			return err;
+
 		pos = buf;
 		buf_pull(&pos, &ah, sizeof(ah));
 		if (ah.ar_hrd != htons(ll_my.sll_hatype) ||
