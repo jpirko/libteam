@@ -42,6 +42,7 @@ struct lw_common_port_priv {
 	const struct teamd_link_watch *link_watch;
 	struct teamd_port *tdport;
 	bool link_up;
+	bool forced_active;
 	json_t *link_watch_json;
 };
 
@@ -348,6 +349,7 @@ struct lw_psr_port_priv {
 	struct timespec interval;
 	struct timespec init_wait;
 	unsigned int missed_max;
+	bool always_active;
 	int sock;
 	unsigned int missed;
 	bool reply_received;
@@ -385,7 +387,10 @@ static int lw_psr_callback_periodic(struct teamd_context *ctx, int events,
 	if (err)
 		return err;
 	psr_ppriv->reply_received = false;
-	return psr_ppriv->ops->send(psr_ppriv);
+
+	if (common_ppriv->forced_active || psr_ppriv->always_active)
+		return psr_ppriv->ops->send(psr_ppriv);
+	return 0;
 }
 
 static int lw_psr_callback_socket(struct teamd_context *ctx, int events,
@@ -433,6 +438,11 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 	}
 	teamd_log_dbg("missed_max \"%d\".", tmp);
 	psr_ppriv->missed_max = tmp;
+
+	err = json_unpack(ctx->config_json, "{s:b}",  "always_active", &tmp);
+	psr_ppriv->always_active = err ? false : !!tmp;
+	teamd_log_dbg("always_active \"%d\".", psr_ppriv->always_active);
+
 	return 0;
 }
 
@@ -1200,9 +1210,66 @@ static int link_watch_event_watch_port_link_changed(struct teamd_context *ctx,
 	return teamd_link_watch_refresh_user_linkup(ctx, tdport);
 }
 
+static void __set_forced_active_for_port(struct teamd_port *tdport,
+					 bool forced_active)
+{
+	struct lw_common_port_priv *common_ppriv;
+
+	teamd_for_each_port_priv_by_creator(common_ppriv, tdport,
+					    LW_PORT_PRIV_CREATOR_PRIV) {
+		common_ppriv->forced_active = forced_active;
+	}
+}
+
+static int link_watch_refresh_forced_active(struct teamd_context *ctx)
+{
+	struct teamd_port *tdport;
+	struct team_option *option;
+	bool port_enabled;
+	int enabled_port_count = 0;
+
+	teamd_for_each_tdport(tdport, ctx) {
+		option = team_get_option(ctx->th, "np", "enabled",
+					 tdport->ifindex);
+		if (!option) {
+			teamd_log_err("%s: Failed to find \"enabled\" option.",
+				      tdport->ifname);
+			return -ENOENT;
+		}
+		if (team_get_option_type(option) != TEAM_OPTION_TYPE_BOOL) {
+			teamd_log_err("Unexpected type of \"enabled\" option.");
+			return -EINVAL;
+		}
+		port_enabled = team_get_option_value_bool(option);
+		__set_forced_active_for_port(tdport, port_enabled);
+		if (port_enabled)
+			enabled_port_count++;
+	}
+
+	/*
+	 * In case no ports are enabled, set forced_active to true for all
+	 * ports. That enforces active linkwatch approach to regain link
+	 * on some port again.
+	 */
+	if (enabled_port_count == 0) {
+		teamd_for_each_tdport(tdport, ctx)
+			__set_forced_active_for_port(tdport, true);
+	}
+	return 0;
+}
+
+static int link_watch_enabled_option_changed(struct teamd_context *ctx,
+					     struct team_option *option,
+					     void *priv)
+{
+	return link_watch_refresh_forced_active(ctx);
+}
+
 static const struct teamd_event_watch_ops link_watch_port_watch_ops = {
 	.port_added = link_watch_event_watch_port_added,
 	.port_link_changed = link_watch_event_watch_port_link_changed,
+	.option_changed = link_watch_enabled_option_changed,
+	.option_changed_match_name = "enabled",
 };
 
 static json_t *__fill_lw_instance(struct teamd_context *ctx,

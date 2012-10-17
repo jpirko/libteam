@@ -255,6 +255,8 @@ static inline bool teamd_port_removed(struct teamd_port *tdport)
 
 bool teamd_link_watch_port_up(struct teamd_context *ctx,
 			      struct teamd_port *tdport);
+void teamd_link_watches_set_forced_active(struct teamd_context *ctx,
+					  bool forced_active);
 int teamd_link_watch_init(struct teamd_context *ctx);
 void teamd_link_watch_fini(struct teamd_context *ctx);
 

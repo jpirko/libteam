@@ -163,6 +163,10 @@ Hostname to be converted to IP address which will be filled into ARP request as 
 .BR "link_watch.validate "| " ports.PORTIFNAME.link_watch.validate " (bool)
 Validate received ARP packets. If this is not set, all incoming ARP packets will be considered as good reply.
 
+.TP
+.BR "link_watch.always_active "| " ports.PORTIFNAME.link_watch.always_active " (bool)
+By default, ARP requests are send on enabled ports only. This option allows to force sending even on disabled ones.
+
 .SH NS/NA PING LINK WATCH SPECIFIC OPTIONS
 .TP
 .BR "link_watch.interval "| " ports.PORTIFNAME.link_watch.interval " (int)
