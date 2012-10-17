@@ -77,6 +77,12 @@ static int change_active_port(struct teamd_context *ctx,
 
 	if (old_tdport) {
 		old_active_ifindex = old_tdport->ifindex;
+		err = team_set_port_enabled(ctx->th, old_active_ifindex, false);
+		if (err) {
+			teamd_log_err("%s: Failed to disable old active port.",
+				      old_tdport->ifname);
+			return err;
+		}
 		err = team_hwaddr_set(ctx->th, old_active_ifindex,
 				      abl_priv(ctx)->old_active_hwaddr,
 				      ctx->hwaddr_len);
@@ -89,6 +95,13 @@ static int change_active_port(struct teamd_context *ctx,
 	err = team_set_active_port(ctx->th, new_active_ifindex);
 	if (err) {
 		teamd_log_err("Failed to set active port.");
+		return err;
+	}
+
+	err = team_set_port_enabled(ctx->th, new_active_ifindex, true);
+	if (err) {
+		teamd_log_err("%s: Failed to enable new active port.",
+			      new_tdport->ifname);
 		return err;
 	}
 
@@ -197,6 +210,13 @@ static int abl_event_watch_port_added(struct teamd_context *ctx,
 				      struct teamd_port *tdport, void *priv)
 {
 	int err;
+
+	/* Newly added ports are enabled */
+	err = team_set_port_enabled(ctx->th, tdport->ifindex, false);
+	if (err) {
+		teamd_log_err("%s: Failed to disable port.", tdport->ifname);
+		return err;
+	}
 
 	err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
 			      ctx->hwaddr_len);
