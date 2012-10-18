@@ -31,7 +31,8 @@
 #include "teamd.h"
 
 struct abl_priv {
-	char old_active_hwaddr[MAX_ADDR_LEN];
+	char active_orig_hwaddr[MAX_ADDR_LEN];
+	uint32_t active_ifindex;
 };
 
 static struct abl_priv *abl_priv(struct teamd_context *ctx)
@@ -39,7 +40,8 @@ static struct abl_priv *abl_priv(struct teamd_context *ctx)
 	return (struct abl_priv *) ctx->runner_priv;
 }
 
-static int get_port_prio(struct teamd_context *ctx, struct teamd_port *tdport)
+static int abl_get_port_prio(struct teamd_context *ctx,
+			     struct teamd_port *tdport)
 {
 	int prio;
 	int err;
@@ -53,7 +55,7 @@ static int get_port_prio(struct teamd_context *ctx, struct teamd_port *tdport)
 	return prio;
 }
 
-static bool is_port_sticky(struct teamd_context *ctx, const char *port_name)
+static bool abl_is_port_sticky(struct teamd_context *ctx, const char *port_name)
 {
 	int sticky;
 	int err;
@@ -67,71 +69,60 @@ static bool is_port_sticky(struct teamd_context *ctx, const char *port_name)
 	return sticky;
 }
 
-static int change_active_port(struct teamd_context *ctx,
-			      struct teamd_port *old_tdport,
-			      struct teamd_port *new_tdport)
+static int abl_clear_active_port(struct teamd_context *ctx)
 {
-	uint32_t new_active_ifindex = new_tdport->ifindex;
-	uint32_t old_active_ifindex = 0;
+	struct teamd_port *tdport;
 	int err;
 
-	if (old_tdport) {
-		old_active_ifindex = old_tdport->ifindex;
-		err = team_set_port_enabled(ctx->th, old_active_ifindex, false);
-		if (err) {
-			teamd_log_err("%s: Failed to disable old active port.",
-				      old_tdport->ifname);
-			return err;
-		}
-		err = team_hwaddr_set(ctx->th, old_active_ifindex,
-				      abl_priv(ctx)->old_active_hwaddr,
-				      ctx->hwaddr_len);
-		if (err) {
-			teamd_log_err("%s: Failed to set old active original hardware address.",
-				      old_tdport->ifname);
-			return err;
-		}
-	}
+	tdport = teamd_get_port(ctx, abl_priv(ctx)->active_ifindex);
+	if (!tdport)
+		return 0;
+	teamd_log_dbg("Clearing active port \"%s\".", tdport->ifname);
 
-	err = team_set_active_port(ctx->th, new_active_ifindex);
+	err = team_set_port_enabled(ctx->th, tdport->ifindex, false);
 	if (err) {
-		teamd_log_err("Failed to set active port.");
+		teamd_log_err("%s: Failed to disable active port.",
+			      tdport->ifname);
 		return err;
 	}
-
-	err = team_set_port_enabled(ctx->th, new_active_ifindex, true);
-	if (err) {
-		teamd_log_err("%s: Failed to enable new active port.",
-			      new_tdport->ifname);
-		return err;
-	}
-
-	memcpy(abl_priv(ctx)->old_active_hwaddr,
-	       team_get_ifinfo_hwaddr(new_tdport->team_ifinfo),
-	       ctx->hwaddr_len);
-
-	err = team_hwaddr_set(ctx->th, new_active_ifindex, ctx->hwaddr,
+	err = team_hwaddr_set(ctx->th, tdport->ifindex,
+			      abl_priv(ctx)->active_orig_hwaddr,
 			      ctx->hwaddr_len);
 	if (err) {
-		teamd_log_err("%s: Failed to set new active hardware address.",
-			      new_tdport->ifname);
+		teamd_log_err("%s: Failed to set restore active port original hardware address.",
+			      tdport->ifname);
 		return err;
 	}
+	abl_priv(ctx)->active_ifindex = 0;
 	return 0;
 }
 
-static int abl_get_active_tdport(struct teamd_context *ctx,
-				 struct teamd_port **pactive_tdport)
+static int abl_set_active_port(struct teamd_context *ctx,
+			       struct teamd_port *tdport)
 {
 	int err;
-	uint32_t ifindex;
 
-	err = team_get_active_port(ctx->th, &ifindex);
+	teamd_log_info("Changing active port to \"%s\".",
+		       tdport->ifname);
+
+	err = team_set_port_enabled(ctx->th, tdport->ifindex, true);
 	if (err) {
-		teamd_log_err("Failed to get active port.");
+		teamd_log_err("%s: Failed to enable active port.",
+			      tdport->ifname);
 		return err;
 	}
-	*pactive_tdport = teamd_get_port(ctx, ifindex);
+	memcpy(abl_priv(ctx)->active_orig_hwaddr,
+	       team_get_ifinfo_hwaddr(tdport->team_ifinfo),
+	       ctx->hwaddr_len);
+
+	err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
+			      ctx->hwaddr_len);
+	if (err) {
+		teamd_log_err("%s: Failed to set active port hardware address.",
+			      tdport->ifname);
+		return err;
+	}
+	abl_priv(ctx)->active_ifindex = tdport->ifindex;
 	return 0;
 }
 
@@ -157,7 +148,7 @@ static void abl_best_port_check_set(struct teamd_context *ctx,
 	port = tdport->team_port;
 	speed = team_get_port_speed(port);
 	duplex = team_get_port_duplex(port);
-	prio = get_port_prio(ctx, tdport);
+	prio = abl_get_port_prio(ctx, tdport);
 
 	if (!best->tdport || (prio > best->prio) || (speed > best->speed) ||
 	    (speed == best->speed && duplex > best->duplex)) {
@@ -168,7 +159,7 @@ static void abl_best_port_check_set(struct teamd_context *ctx,
 	}
 }
 
-static int link_watch_handler(struct teamd_context *ctx)
+static int abl_link_watch_handler(struct teamd_context *ctx)
 {
 	struct teamd_port *tdport;
 	struct teamd_port *active_tdport;
@@ -178,16 +169,31 @@ static int link_watch_handler(struct teamd_context *ctx)
 	memset(&best, 0, sizeof(best));
 	best.prio = INT_MIN;
 
-	err = abl_get_active_tdport(ctx, &active_tdport);
-	if (err)
-		return err;
+	active_tdport = teamd_get_port(ctx, abl_priv(ctx)->active_ifindex);
 	if (active_tdport) {
 		teamd_log_dbg("Current active port: \"%s\" (ifindex \"%d\", prio \"%d\").",
 			      active_tdport->ifname, active_tdport->ifindex,
-			      get_port_prio(ctx, active_tdport));
-		abl_best_port_check_set(ctx, &best, active_tdport);
+			      abl_get_port_prio(ctx, active_tdport));
+
+		/*
+		 * When active port went down, clear it and proceed as if
+		 * none was set in the first place.
+		 */
+		if (!teamd_link_watch_port_up(ctx, active_tdport)) {
+			err = abl_clear_active_port(ctx);
+			if (err)
+				return err;
+			active_tdport = NULL;
+		}
 	}
 
+	/*
+	 * Find the best port amond all ports. Prefer the currently active
+	 * port, if there's any. This is because other port might have the
+	 * same prio, speed and duplex. We do not want to change in that case
+	 */
+	if (active_tdport)
+		abl_best_port_check_set(ctx, &best, active_tdport);
 	teamd_for_each_tdport(tdport, ctx)
 		abl_best_port_check_set(ctx, &best, tdport);
 
@@ -196,12 +202,12 @@ static int link_watch_handler(struct teamd_context *ctx)
 
 	teamd_log_dbg("Found best port: \"%s\" (ifindex \"%d\", prio \"%d\").",
 		      best.tdport->ifname, best.tdport->ifindex, best.prio);
-	if (!active_tdport ||
-	    !teamd_link_watch_port_up(ctx, active_tdport) ||
-	    !is_port_sticky(ctx, active_tdport->ifname)) {
-		teamd_log_info("Changing active port to \"%s\".",
-			       best.tdport->ifname);
-		err = change_active_port(ctx, active_tdport, best.tdport);
+
+	if (!active_tdport || !abl_is_port_sticky(ctx, active_tdport->ifname)) {
+		err = abl_clear_active_port(ctx);
+		if (err)
+			return err;
+		err = abl_set_active_port(ctx, best.tdport);
 		if (err)
 			return err;
 	}
@@ -233,13 +239,13 @@ static int abl_event_watch_port_added(struct teamd_context *ctx,
 static int abl_port_link_changed(struct teamd_context *ctx,
 				 struct teamd_port *tdport, void *priv)
 {
-	return link_watch_handler(ctx);
+	return abl_link_watch_handler(ctx);
 }
 
 static int abl_prio_option_changed(struct teamd_context *ctx,
 				   struct team_option *option, void *priv)
 {
-	return link_watch_handler(ctx);
+	return abl_link_watch_handler(ctx);
 }
 
 static const struct teamd_event_watch_ops abl_event_watch_ops = {
@@ -269,15 +275,11 @@ static void abl_fini(struct teamd_context *ctx)
 static int abl_state_json_dump(struct teamd_context *ctx,
 			       json_t **pstate_json, void *priv)
 {
-	int err;
 	struct teamd_port *active_tdport;
 	json_t *state_json;
 	char *active_port;
 
-	err = abl_get_active_tdport(ctx, &active_tdport);
-	if (err)
-		return err;
-
+	active_tdport = teamd_get_port(ctx, abl_priv(ctx)->active_ifindex);
 	active_port = active_tdport ? active_tdport->ifname : "";
 	state_json = json_pack("{s:s}", "active_port", active_port);
 	if (!state_json)
@@ -288,7 +290,7 @@ static int abl_state_json_dump(struct teamd_context *ctx,
 
 const struct teamd_runner teamd_runner_activebackup = {
 	.name			= "activebackup",
-	.team_mode_name		= "activebackup",
+	.team_mode_name		= "broadcast",
 	.priv_size		= sizeof(struct abl_priv),
 	.init			= abl_init,
 	.fini			= abl_fini,
