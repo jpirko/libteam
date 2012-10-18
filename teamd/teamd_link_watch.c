@@ -439,7 +439,7 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 	teamd_log_dbg("missed_max \"%d\".", tmp);
 	psr_ppriv->missed_max = tmp;
 
-	err = json_unpack(ctx->config_json, "{s:b}",  "always_active", &tmp);
+	err = json_unpack(link_watch_json, "{s:b}",  "always_active", &tmp);
 	psr_ppriv->always_active = err ? false : !!tmp;
 	teamd_log_dbg("always_active \"%d\".", psr_ppriv->always_active);
 
@@ -604,7 +604,7 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 		return err;
 	teamd_log_dbg("target address \"%s\".", str_in_addr(&ap_ppriv->dst));
 
-	err = json_unpack(ctx->config_json, "{s:b}",  "validate", &tmp);
+	err = json_unpack(link_watch_json, "{s:b}",  "validate", &tmp);
 	ap_ppriv->validate = err ? false : !!tmp;
 	teamd_log_dbg("valitate \"%d\".", ap_ppriv->validate);
 
