@@ -226,13 +226,6 @@ static int ab_event_watch_port_added(struct teamd_context *ctx,
 		return err;
 	}
 
-	err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
-			      ctx->hwaddr_len);
-	if (err) {
-		teamd_log_err("%s: Failed to set port hardware address.",
-			      tdport->ifname);
-		return err;
-	}
 	return 0;
 }
 
