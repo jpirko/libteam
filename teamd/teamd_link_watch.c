@@ -772,11 +772,13 @@ static json_t *lw_ap_state_json(struct teamd_context *ctx,
 
 	strcpy(src, str_in_addr(&ap_ppriv->src));
 	strcpy(dst, str_in_addr(&ap_ppriv->dst));
-	return json_pack("{s:s, s:s, s:i, s:i, s:i, s:i}",
+	return json_pack("{s:s, s:s, s:i, s:i, s:b, s:b, s:i, s:i}",
 			 "source_host", src,
 			 "target_host", dst,
 			 "interval", timespec_to_ms(&psr_ppriv->interval),
 			 "init_wait", timespec_to_ms(&psr_ppriv->init_wait),
+			 "validate", ap_ppriv->validate,
+			 "always_active", ap_ppriv->always_active,
 			 "missed_max", psr_ppriv->missed_max,
 			 "missed", psr_ppriv->missed);
 }
