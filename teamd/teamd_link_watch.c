@@ -349,7 +349,6 @@ struct lw_psr_port_priv {
 	struct timespec interval;
 	struct timespec init_wait;
 	unsigned int missed_max;
-	bool always_active;
 	int sock;
 	unsigned int missed;
 	bool reply_received;
@@ -388,9 +387,7 @@ static int lw_psr_callback_periodic(struct teamd_context *ctx, int events,
 		return err;
 	psr_ppriv->reply_received = false;
 
-	if (common_ppriv->forced_active || psr_ppriv->always_active)
-		return psr_ppriv->ops->send(psr_ppriv);
-	return 0;
+	return psr_ppriv->ops->send(psr_ppriv);
 }
 
 static int lw_psr_callback_socket(struct teamd_context *ctx, int events,
@@ -438,10 +435,6 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 	}
 	teamd_log_dbg("missed_max \"%d\".", tmp);
 	psr_ppriv->missed_max = tmp;
-
-	err = json_unpack(link_watch_json, "{s:b}",  "always_active", &tmp);
-	psr_ppriv->always_active = err ? false : !!tmp;
-	teamd_log_dbg("always_active \"%d\".", psr_ppriv->always_active);
 
 	return 0;
 }
@@ -537,6 +530,7 @@ struct lw_ap_port_priv {
 	struct in_addr src;
 	struct in_addr dst;
 	bool validate;
+	bool always_active;
 };
 
 static struct lw_ap_port_priv *
@@ -608,6 +602,10 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 	ap_ppriv->validate = err ? false : !!tmp;
 	teamd_log_dbg("valitate \"%d\".", ap_ppriv->validate);
 
+	err = json_unpack(link_watch_json, "{s:b}",  "always_active", &tmp);
+	ap_ppriv->always_active = err ? false : !!tmp;
+	teamd_log_dbg("always_active \"%d\".", ap_ppriv->always_active);
+
 	return 0;
 }
 
@@ -655,6 +653,9 @@ static int lw_ap_send(struct lw_psr_port_priv *psr_ppriv)
 	struct sockaddr_ll ll_my;
 	struct sockaddr_ll ll_bcast;
 	struct arphdr ah;
+
+	if (!(psr_ppriv->common.forced_active || ap_ppriv->always_active))
+		return 0;
 
 	err = __get_port_curr_hwaddr(psr_ppriv, &ll_my, 0);
 	if (err)
