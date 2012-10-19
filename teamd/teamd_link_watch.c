@@ -600,7 +600,7 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 
 	err = json_unpack(link_watch_json, "{s:b}",  "validate", &tmp);
 	ap_ppriv->validate = err ? false : !!tmp;
-	teamd_log_dbg("valitate \"%d\".", ap_ppriv->validate);
+	teamd_log_dbg("validate \"%d\".", ap_ppriv->validate);
 
 	err = json_unpack(link_watch_json, "{s:b}",  "always_active", &tmp);
 	ap_ppriv->always_active = err ? false : !!tmp;
