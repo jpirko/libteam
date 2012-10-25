@@ -672,11 +672,19 @@ static void teamd_run_loop_fini(struct teamd_context *ctx)
 	close(ctx->run_loop.ctrl_pipe_w);
 }
 
+#define TEAMD_IMPLICIT_CONFIG "{\"device\": \"team0\", \"runner\": {\"name\": \"roundrobin\"}}"
+
 static int config_load(struct teamd_context *ctx)
 {
 	json_error_t jerror;
 	size_t jflags = JSON_REJECT_DUPLICATES;
 
+	if (!ctx->config_text && !ctx->config_file) {
+		ctx->config_text = strdup(TEAMD_IMPLICIT_CONFIG);
+		if (!ctx->config_text)
+			return -ENOMEM;
+		teamd_log_warn("No config passed, using implicit one.");
+	}
 	if (ctx->config_text) {
 		if (ctx->config_file)
 			teamd_log_warn("Command line config string is present, ignoring given config file.");
@@ -685,9 +693,6 @@ static int config_load(struct teamd_context *ctx)
 	} else if (ctx->config_file) {
 		ctx->config_json = json_load_file(ctx->config_file, jflags,
 						  &jerror);
-	} else {
-		teamd_log_err("Either config file or command line config string must be present.");
-		return -ENOENT;
 	}
 	if (!ctx->config_json) {
 		teamd_log_err("Failed to parse config: %s on line %d, column %d",
