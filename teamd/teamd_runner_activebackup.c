@@ -75,7 +75,7 @@ static int ab_clear_active_port(struct teamd_context *ctx)
 	int err;
 
 	tdport = teamd_get_port(ctx, ab_priv(ctx)->active_ifindex);
-	if (!tdport)
+	if (!tdport || team_is_port_removed(tdport->team_port))
 		return 0;
 	teamd_log_dbg("Clearing active port \"%s\".", tdport->ifname);
 
@@ -137,15 +137,15 @@ static void ab_best_port_check_set(struct teamd_context *ctx,
 				   struct ab_port_state_info *best,
 				   struct teamd_port *tdport)
 {
-	struct team_port *port;
+	struct team_port *port = tdport->team_port;
 	uint32_t speed;
 	uint8_t duplex;
 	int prio;
 
-	if (!teamd_link_watch_port_up(ctx, tdport) || best->tdport == tdport)
+	if (!teamd_link_watch_port_up(ctx, tdport) || best->tdport == tdport ||
+	    team_is_port_removed(port))
 		return;
 
-	port = tdport->team_port;
 	speed = team_get_port_speed(port);
 	duplex = team_get_port_duplex(port);
 	prio = ab_get_port_prio(ctx, tdport);
