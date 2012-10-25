@@ -45,7 +45,6 @@
 #include "teamd.h"
 
 static const struct teamd_runner *teamd_runner_list[] = {
-	&teamd_runner_dummy,
 	&teamd_runner_broadcast,
 	&teamd_runner_roundrobin,
 	&teamd_runner_activebackup,
