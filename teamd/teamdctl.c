@@ -35,6 +35,7 @@ typedef int (*msg_process_t)(char *method_name, DBusMessage *msg);
 
 struct method_type {
 	char *name;
+	char *dbus_method_name; /* If NULL, name is used instead */
 	char *params[METHOD_PARAM_MAX_CNT];
 	msg_prepare_t msg_prepare;
 	msg_process_t msg_process;
@@ -178,9 +179,8 @@ static struct method_type method_types[] = {
 };
 #define METHOD_TYPE_COUNT ARRAY_SIZE(method_types)
 
-static int call_method(char *team_devname, char *method_name,
-		       int argc, char **argv,
-		       msg_prepare_t msg_prepare, msg_process_t msg_process)
+static int call_method(char *team_devname, int argc, char **argv,
+		       struct method_type *method_type)
 {
 	int err;
 	char *service_name;
@@ -189,6 +189,13 @@ static int call_method(char *team_devname, char *method_name,
 	DBusPendingCall *pending;
 	DBusError error;
 	dbus_bool_t dbres;
+	msg_prepare_t msg_prepare = method_type->msg_prepare;
+	msg_process_t msg_process = method_type->msg_process;
+	char *method_name;
+
+	method_name = method_type->dbus_method_name;
+	if (!method_name)
+		method_name = method_type->name;
 
 	err = asprintf(&service_name, TEAMD_DBUS_SERVICE ".%s", team_devname);
 	if (err == -1)
@@ -322,9 +329,7 @@ int main(int argc, char **argv)
 	for (i = 0; i < METHOD_TYPE_COUNT; i++) {
 		if (strcmp(method_types[i].name, method_name))
 			continue;
-		err = call_method(team_devname, method_name, argc, argv,
-				  method_types[i].msg_prepare,
-				  method_types[i].msg_process);
+		err = call_method(team_devname, argc, argv, &method_types[i]);
 		if (err) {
 			return EXIT_FAILURE;
 		}
