@@ -251,6 +251,8 @@ static int port_priv_change_handler_func(struct team_handle *th, void *arg,
 
 		port_obj = get_port_obj(ctx, ifindex);
 		if (!port_obj) {
+			if (team_is_port_removed(port))
+				continue;
 			err = port_obj_create(ctx, &port_obj, ifindex, port);
 			if (err)
 				return err;
