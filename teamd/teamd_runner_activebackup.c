@@ -81,6 +81,8 @@ static int ab_clear_active_port(struct teamd_context *ctx)
 
 	err = team_set_port_enabled(ctx->th, tdport->ifindex, false);
 	if (err) {
+		if (teamd_err_port_disappeared(err, ctx, tdport))
+			goto finish;
 		teamd_log_err("%s: Failed to disable active port.",
 			      tdport->ifname);
 		return err;
@@ -93,6 +95,7 @@ static int ab_clear_active_port(struct teamd_context *ctx)
 			      tdport->ifname);
 		return err;
 	}
+finish:
 	ab_priv(ctx)->active_ifindex = 0;
 	return 0;
 }
