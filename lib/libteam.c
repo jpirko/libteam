@@ -1181,6 +1181,30 @@ int team_port_add(struct team_handle *th, uint32_t port_ifindex)
 }
 
 /**
+ * team_our_port_port:
+ * @th: libteam library context
+ * @port_ifindex: port interface index
+ *
+ * Find out if interface is port of this team.
+ *
+ * Returns: true if interface is port of this team.
+ **/
+TEAM_EXPORT
+bool team_is_our_port(struct team_handle *th, uint32_t port_ifindex)
+{
+	struct rtnl_link *link;
+	int err;
+	bool ret;
+
+	err = rtnl_link_get_kernel(th->nl_cli.sock, port_ifindex, NULL, &link);
+	if (err)
+		return false;
+	ret = rtnl_link_get_master(link) == th->ifindex;
+	rtnl_link_put(link);
+	return ret;
+}
+
+/**
  * team_port_remove:
  * @th: libteam library context
  * @port_ifindex: port interface index
