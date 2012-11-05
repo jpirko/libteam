@@ -268,11 +268,7 @@ static int lacp_port_update_enabled(struct lacp_port *lacp_port)
 		      lacp_port->aggregator_id);
 	err = team_set_option_value_bool(lacp_port->ctx->th, option,
 					 new_enabled_state);
-	/*
-	 * Port might have disappeared but the message might be still in queue.
-	 * So do not fail in case of -ENOENT
-	 */
-	if (err && err != -ENOENT) {
+	if (err && !teamd_err_port_disappeared(err, lacp_port->ctx, tdport)) {
 		teamd_log_err("%s: Failed to %s port.", tdport->ifname,
 			      new_enabled_state ? "enable": "disable");
 		return err;;
