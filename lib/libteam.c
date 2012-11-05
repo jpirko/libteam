@@ -243,7 +243,7 @@ int team_change_handler_register(struct team_handle *th,
 	if (!handler_item)
 		return -ENOMEM;
 	handler_item->handler = handler;
-	list_add(&th->change_handler.list, &handler_item->list);
+	list_add_tail(&th->change_handler.list, &handler_item->list);
 	return 0;
 }
 
