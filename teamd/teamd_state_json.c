@@ -233,12 +233,13 @@ static int setup_state_dump(struct teamd_context *ctx,
 {
 	json_t *state_json;
 
-	state_json = json_pack("{s:s, s:s, s:b, s:i, s:b, s:s}",
+	state_json = json_pack("{s:s, s:s, s:b, s:i, s:b, s:i, s:s}",
 			       "runner_name", ctx->runner->name,
 			       "kernel_team_mode_name", ctx->runner->team_mode_name,
 			       "dbus_enabled", ctx->dbus.enabled,
 			       "debug_level", ctx->debug,
 			       "daemonized", ctx->daemonize,
+			       "pid", getpid(),
 			       "pid_file", ctx->pid_file ? ctx->pid_file : "");
 	if (!state_json) {
 		return -ENOMEM;
