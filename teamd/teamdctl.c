@@ -27,6 +27,25 @@
 
 #include "teamd_dbus.h"
 
+enum verbosity_level {
+	VERB1,
+	VERB2,
+	VERB3,
+	VERB4,
+};
+
+#define DEFAULT_VERB VERB1
+static int g_verbosity = DEFAULT_VERB;
+
+#define pr_err(args...) fprintf(stderr, ##args)
+#define pr_out_v(verb_level, args...) \
+	if (verb_level <= g_verbosity) fprintf(stdout, ##args)
+#define pr_out(args...) pr_out_v(DEFAULT_VERB, ##args)
+#define pr_out_v2(args...) pr_out_v(VERB2, ##args)
+#define pr_out_v3(args...) pr_out_v(VERB3, ##args)
+#define pr_out_v4(args...) pr_out_v(VERB4, ##args)
+
+
 typedef int (*msg_prepare_t)(char *method_name, DBusMessage *msg,
 			     int argc, char **argv);
 typedef int (*msg_process_t)(char *method_name, DBusMessage *msg);
@@ -52,12 +71,12 @@ static int noreply_msg_process(char *method_name, DBusMessage *msg)
 		return 0; /* Success */
 
 	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
-		fprintf(stderr, "%s: Received argument is not string as expected.\n",
-			method_name);
+		pr_err("%s: Received argument is not string as expected.\n",
+		       method_name);
 		return -EINVAL;
 	}
 	dbus_message_iter_get_basic(&args, &param);
-	fprintf(stderr, "%s: Failed: \"%s\"\n", method_name, param);
+	pr_err("%s: Failed: \"%s\"\n", method_name, param);
 	return -EINVAL;
 }
 
@@ -75,17 +94,17 @@ static int stringdump_msg_process(char *method_name, DBusMessage *msg)
 
 	dbres = dbus_message_iter_init(msg, &args);
 	if (dbres == FALSE) {
-		fprintf(stderr, "%s: Failed, no data received.\n", method_name);
+		pr_err("%s: Failed, no data received.\n", method_name);
 		return -EINVAL;
 	}
 
 	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
-		fprintf(stderr, "%s: Received argument is not string as expected.\n",
-			method_name);
+		pr_err("%s: Received argument is not string as expected.\n",
+		       method_name);
 		return -EINVAL;
 	}
 	dbus_message_iter_get_basic(&args, &param);
-	fprintf(stderr, "%s\n", param);
+	pr_out("%s\n", param);
 	return 0;
 }
 
@@ -96,16 +115,15 @@ static int portaddrm_msg_prepare(char *method_name, DBusMessage *msg,
 	dbus_bool_t dbres;
 
 	if (argc < 1) {
-		fprintf(stderr, "%s: Port name as a command line parameter expected.\n",
-			method_name);
+		pr_err("%s: Port name as a command line parameter expected.\n",
+		       method_name);
 		return -EINVAL;
 	}
 	dbus_message_iter_init_append(msg, &args);
 	dbres = dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING,
 					       &argv[0]);
 	if (dbres == FALSE) {
-		fprintf(stderr, "%s: Failed to construct message.\n",
-			method_name);
+		pr_err("%s: Failed to construct message.\n", method_name);
 		return -ENOMEM;
 	}
 	return 0;
@@ -118,28 +136,26 @@ static int portconfigupdate_msg_prepare(char *method_name, DBusMessage *msg,
 	dbus_bool_t dbres;
 
 	if (argc < 1) {
-		fprintf(stderr, "%s: Port name as a command line parameter expected.\n",
-			method_name);
+		pr_err("%s: Port name as a command line parameter expected.\n",
+		       method_name);
 		return -EINVAL;
 	}
 	if (argc < 2) {
-		fprintf(stderr, "%s: Port config as a command line parameter expected.\n",
-			method_name);
+		pr_err("%s: Port config as a command line parameter expected.\n",
+		       method_name);
 		return -EINVAL;
 	}
 	dbus_message_iter_init_append(msg, &args);
 	dbres = dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING,
 					       &argv[0]);
 	if (dbres == FALSE) {
-		fprintf(stderr, "%s: Failed to construct message.\n",
-			method_name);
+		pr_err("%s: Failed to construct message.\n", method_name);
 		return -ENOMEM;
 	}
 	dbres = dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING,
 					       &argv[1]);
 	if (dbres == FALSE) {
-		fprintf(stderr, "%s: Failed to construct message.\n",
-			method_name);
+		pr_err("%s: Failed to construct message.\n", method_name);
 		return -ENOMEM;
 	}
 	return 0;
@@ -204,8 +220,8 @@ static int call_method(char *team_devname, int argc, char **argv,
 	dbus_error_init(&error);
 	conn = dbus_bus_get(DBUS_BUS_SYSTEM, &error);
 	if (!conn) {
-		fprintf(stderr, "Could not acquire the system bus: %s - %s",
-			error.name, error.message);
+		pr_err("Could not acquire the system bus: %s - %s",
+		       error.name, error.message);
 		err = -EINVAL;
 		goto free_err;
 	}
@@ -213,7 +229,7 @@ static int call_method(char *team_devname, int argc, char **argv,
 	msg = dbus_message_new_method_call(service_name, TEAMD_DBUS_PATH,
 					   TEAMD_DBUS_IFACE, method_name);
 	if (!msg) {
-		fprintf(stderr, "Failed to create message.\n");
+		pr_err("Failed to create message.\n");
 		err = -ENOMEM;
 		goto bus_put;
 	}
@@ -225,12 +241,12 @@ static int call_method(char *team_devname, int argc, char **argv,
 
 	dbres = dbus_connection_send_with_reply(conn, msg, &pending, -1);
 	if (dbres== FALSE) {
-		fprintf(stderr, "Send with reply failed.\n");
+		pr_err("Send with reply failed.\n");
 		err = -ENOMEM;
 		goto free_message;
 	}
 	if (!pending) {
-		fprintf(stderr, "Pending call not created.\n");
+		pr_err("Pending call not created.\n");
 		err = -ENOMEM;
 		goto free_message;
 	}
@@ -240,7 +256,7 @@ static int call_method(char *team_devname, int argc, char **argv,
 	dbus_message_unref(msg);
 	msg = dbus_pending_call_steal_reply(pending);
 	if (!msg) {
-		fprintf(stderr, "Failed to get reply.\n");
+		pr_err("Failed to get reply.\n");
 	}
 	dbus_pending_call_unref(pending);
 	if (!msg)
@@ -265,16 +281,17 @@ free_err:
 static void print_help(const char *argv0) {
 	int i, j;
 
-	printf(
+	pr_out(
             "%s [options] teamdevname method [method args]\n"
-            "\t-h --help                Show this help\n",
+            "\t-h --help                Show this help\n"
+            "\t-v --verbose             Increase verbosity\n",
             argv0);
-	printf("Methods:\n");
+	pr_out("Methods:\n");
 	for (i = 0; i < METHOD_TYPE_COUNT; i++) {
-		printf("\t%s", method_types[i].name);
+		pr_out("\t%s", method_types[i].name);
 		for (j = 0; method_types[i].params[j]; j++)
-			printf(" %s", method_types[i].params[j]);
-		printf("\n");
+			pr_out(" %s", method_types[i].params[j]);
+		pr_out("\n");
 	}
 }
 
@@ -285,39 +302,41 @@ int main(int argc, char **argv)
 	char *method_name;
 	static const struct option long_options[] = {
 		{ "help",		no_argument,		NULL, 'h' },
+		{ "verbose",		no_argument,		NULL, 'v' },
 		{ NULL, 0, NULL, 0 }
 	};
 	int opt;
 	int err;
 	int i;
 
-	while ((opt = getopt_long(argc, argv, "h",
+	while ((opt = getopt_long(argc, argv, "hv",
 				  long_options, NULL)) >= 0) {
 
 		switch(opt) {
 		case 'h':
 			print_help(argv0);
 			return EXIT_SUCCESS;
+		case 'v':
+			g_verbosity++;
+			break;
 		case '?':
-			fprintf(stderr, "unknown option.\n");
+			pr_err("unknown option.\n");
 			print_help(argv0);
 			return EXIT_FAILURE;
 		default:
-			fprintf(stderr, "unknown option \"%c\".\n", opt);
+			pr_err("unknown option \"%c\".\n", opt);
 			print_help(argv0);
 			return EXIT_FAILURE;
 		}
 	}
 
 	if (optind >= argc) {
-		fprintf(stderr, "No team device specified.\n");
-		printf("\n");
+		pr_err("No team device specified.\n");
 		print_help(argv0);
 		return EXIT_FAILURE;
 	}
 	if (optind + 1 >= argc) {
-		fprintf(stderr, "No method to call specified.\n");
-		printf("\n");
+		pr_err("No method to call specified.\n");
 		print_help(argv0);
 		return EXIT_FAILURE;
 	}
@@ -336,8 +355,7 @@ int main(int argc, char **argv)
 		break;
 	}
 	if (i == METHOD_TYPE_COUNT) {
-		fprintf(stderr, "Unknown method \"%s\".\n", method_name);
-		printf("\n");
+		pr_err("Unknown method \"%s\".\n", method_name);
 		print_help(argv0);
 		return EXIT_FAILURE;
 	}
