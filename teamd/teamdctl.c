@@ -23,6 +23,7 @@
 #include <getopt.h>
 #include <errno.h>
 #include <dbus/dbus.h>
+#include <jansson.h>
 #include <private/misc.h>
 
 #include "teamd_dbus.h"
@@ -36,14 +37,38 @@ enum verbosity_level {
 
 #define DEFAULT_VERB VERB1
 static int g_verbosity = DEFAULT_VERB;
+static int g_indent_level = 0;
+#define INDENT_STR_STEP 2
+#define INDENT_STR_MAXLEN 32
+static char g_indent_str[INDENT_STR_MAXLEN + 1] = "";
+
+static void pr_out_indent_inc(void)
+{
+	if (g_indent_level + INDENT_STR_STEP > INDENT_STR_MAXLEN)
+		return;
+	g_indent_level += INDENT_STR_STEP;
+	memset(g_indent_str, ' ', sizeof(g_indent_str));
+	g_indent_str[g_indent_level] = '\0';
+}
+
+static void pr_out_indent_dec(void)
+{
+	if (g_indent_level - INDENT_STR_STEP < 0)
+		return;
+	g_indent_level -= INDENT_STR_STEP;
+	g_indent_str[g_indent_level] = '\0';
+}
 
 #define pr_err(args...) fprintf(stderr, ##args)
-#define pr_out_v(verb_level, args...) \
-	if (verb_level <= g_verbosity) fprintf(stdout, ##args)
-#define pr_out(args...) pr_out_v(DEFAULT_VERB, ##args)
-#define pr_out_v2(args...) pr_out_v(VERB2, ##args)
-#define pr_out_v3(args...) pr_out_v(VERB3, ##args)
-#define pr_out_v4(args...) pr_out_v(VERB4, ##args)
+#define pr_outx(verb_level, args...) \
+	if (verb_level <= g_verbosity) { \
+		fprintf(stdout, g_indent_str); \
+		fprintf(stdout, ##args); \
+	}
+#define pr_out(args...) pr_outx(DEFAULT_VERB, ##args)
+#define pr_out2(args...) pr_outx(VERB2, ##args)
+#define pr_out3(args...) pr_outx(VERB3, ##args)
+#define pr_out4(args...) pr_outx(VERB4, ##args)
 
 
 typedef int (*msg_prepare_t)(char *method_name, DBusMessage *msg,
@@ -123,6 +148,443 @@ static int stringdump_msg_process(char *method_name, DBusMessage *msg)
 	return 0;
 }
 
+#define boolyesno(val) (val ? "yes" : "no")
+#define boolupdown(val) (val ? "up" : "down")
+
+static int stateview_json_setup_process(char *method_name, char **prunner_name,
+					json_t *setup_json)
+{
+	int err;
+	char *runner_name;
+	char *kernel_team_mode_name;
+	int dbus_enabled;
+	int debug_level;
+	int daemonized;
+	int pid;
+	char *pid_file;
+
+	pr_out("setup:\n");
+	err = json_unpack(setup_json, "{s:s, s:s, s:b, s:i, s:b, s:i, s:s}",
+			  "runner_name", &runner_name,
+			  "kernel_team_mode_name", &kernel_team_mode_name,
+			  "dbus_enabled", &dbus_enabled,
+			  "debug_level", &debug_level,
+			  "daemonized", &daemonized,
+			  "pid", &pid,
+			  "pid_file", &pid_file);
+	if (err) {
+		pr_err("%s: Failed to parse JSON setup dump.\n",
+		       method_name);
+		return -EINVAL;
+	}
+	pr_out_indent_inc();
+	pr_out("runner: %s\n", runner_name);
+	pr_out2("kernel team mode: %s\n", kernel_team_mode_name);
+	pr_out2("D-BUS enabled: %s\n", boolyesno(dbus_enabled));
+	pr_out2("debug level: %d\n", debug_level);
+	pr_out2("daemonized: %s\n", boolyesno(daemonized));
+	pr_out2("PID: %d\n", pid);
+	pr_out2("PID file: %s\n", pid_file);
+	pr_out_indent_dec();
+
+	*prunner_name = runner_name;
+	return 0;
+}
+
+static int stateview_json_link_watch_info_process(char *method_name,
+						  char *lw_name,
+						  json_t *lw_info_json)
+{
+	int err;
+
+	if (!strcmp(lw_name, "ethtool")) {
+		int delay_up;
+		int delay_down;
+
+		err = json_unpack(lw_info_json, "{s:i, s:i}",
+				  "delay_up", &delay_up,
+				  "delay_down", &delay_down);
+		if (err) {
+			pr_err("%s: Failed to parse JSON ethtool link watch info dump.\n",
+			       method_name);
+			return -EINVAL;
+		}
+		pr_out2("link up delay: %d\n", delay_up);
+		pr_out2("link down delay: %d\n", delay_down);
+	} else if (!strcmp(lw_name, "arp_ping")) {
+		char *source_host;
+		char *target_host;
+		int interval;
+		int init_wait;
+		int validate;
+		int always_active;
+		int missed_max;
+		int missed;
+
+		err = json_unpack(lw_info_json, "{s:s, s:s, s:i, s:i, s:b, s:b, s:i, s:i}",
+				  "source_host", &source_host,
+				  "target_host", &target_host,
+				  "interval", &interval,
+				  "init_wait", &init_wait,
+				  "validate", &validate,
+				  "always_active", &always_active,
+				  "missed_max", &missed_max,
+				  "missed", &missed);
+		if (err) {
+			pr_err("%s: Failed to parse JSON arp_ping link watch info dump.\n",
+			       method_name);
+			return -EINVAL;
+		}
+		pr_out2("source host: %s\n", source_host);
+		pr_out2("target host: %s\n", target_host);
+		pr_out2("interval: %d\n", interval);
+		pr_out2("missed packets: %d/%d\n", missed, missed_max);
+		pr_out2("validate: %s\n", boolyesno(validate));
+		pr_out2("always active: %s\n", boolyesno(always_active));
+		pr_out2("initial wait: %d\n", init_wait);
+	} else if (!strcmp(lw_name, "nsna_ping")) {
+		char *target_host;
+		int interval;
+		int init_wait;
+		int missed_max;
+		int missed;
+
+		err = json_unpack(lw_info_json, "{s:s, s:i, s:i, s:i, s:i}",
+				  "target_host", &target_host,
+				  "interval", &interval,
+				  "init_wait", &init_wait,
+				  "missed_max", &missed_max,
+				  "missed", &missed);
+		if (err) {
+			pr_err("%s: Failed to parse JSON nsna_ping link watch info dump.\n",
+			       method_name);
+			return -EINVAL;
+		}
+		pr_out2("target host: %s\n", target_host);
+		pr_out2("interval: %d\n", interval);
+		pr_out2("missed packets: %d/%d\n", missed, missed_max);
+		pr_out2("initial wait: %d\n", init_wait);
+	} else {
+		pr_err("%s: Failed to parse JSON unknown link watch info dump.\n",
+		       method_name);
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int stateview_json_port_link_watches_process(char *method_name,
+						    json_t *port_link_watches_json)
+{
+	int err;
+	int up;
+	json_t *lw_list_json;
+	json_t *lw_json;
+	json_t *lw_info_json;
+	char *lw_name;
+	int i;
+
+	err = json_unpack(port_link_watches_json, "{s:b, s:o}",
+			  "up", &up, "list", &lw_list_json);
+	if (err) {
+		pr_err("%s: Failed to parse JSON port link watches dump.\n",
+		       method_name);
+		return -EINVAL;
+	}
+	pr_out("link watches:\n");
+	pr_out_indent_inc();
+	pr_out("link summary: %s\n", boolupdown(up));
+	i = 0;
+	while (i < json_array_size(lw_list_json)) {
+		lw_json = json_array_get(lw_list_json, i);
+
+		err = json_unpack(lw_json, "{s:b, s:s, s:o}",
+				  "up", &up,
+				  "name", &lw_name,
+				  "info", &lw_info_json);
+		if (err) {
+			pr_err("%s: Failed to parse JSON port link watch dump.\n",
+			       method_name);
+			return -EINVAL;
+		}
+		pr_out("intance[%d]:\n", i);
+		pr_out_indent_inc();
+		pr_out("name: %s\n", lw_name);
+		pr_out("link: %s\n", boolupdown(up));
+		pr_out2("info:\n");
+		pr_out_indent_inc();
+		err = stateview_json_link_watch_info_process(method_name,
+							     lw_name,
+							     lw_info_json);
+		if (err)
+			return err;
+		pr_out_indent_dec();
+		pr_out_indent_dec();
+		i++;
+	}
+	pr_out_indent_dec();
+	return 0;
+}
+
+static int stateview_json_lacpdu_process(char *method_name,
+					 json_t *lacpdu_json)
+{
+	int err;
+	int system_priority;
+	char *system;
+	int key;
+	int port_priority;
+	int port;
+	int state;
+
+	err = json_unpack(lacpdu_json, "{s:i, s:s, s:i, s:i, s:i, s:i}",
+			 "system_priority", &system_priority,
+			 "system", &system,
+			 "key", &key,
+			 "port_priority", &port_priority,
+			 "port", &port,
+			 "state", &state);
+	if (err) {
+		pr_err("%s: Failed to parse JSON port runner lacpdu dump.\n",
+		       method_name);
+		return -EINVAL;
+	}
+	pr_out2("system priority: %d\n", system_priority);
+	pr_out2("system: %s\n", system);
+	pr_out2("key: %d\n", key);
+	pr_out2("port_priority: %d\n", port_priority);
+	pr_out2("port: %d\n", port);
+	pr_out2("state: 0x%x\n", state);
+	return 0;
+}
+
+static int stateview_json_port_runner_process(char *method_name,
+					      char *runner_name,
+					      json_t *port_json)
+{
+	int err;
+
+	if (!strcmp(runner_name, "lacp")) {
+		int selected;
+		int aggregator_id;
+		char *state;
+		int key;
+		int prio;
+		json_t *actor_json;
+		json_t *partner_json;
+
+		pr_out("runner:\n");
+		err = json_unpack(port_json,
+				  "{s:{s:b, s:i, s:s, s:i, s:i, s:o, s:o}}",
+				  "runner",
+				  "selected", &selected,
+				  "aggregator_id", &aggregator_id,
+				  "state", &state,
+				  "key", &key,
+				  "prio", &prio,
+				  "actor_lacpdu_info", &actor_json,
+				  "partner_lacpdu_info", &partner_json);
+		if (err) {
+			pr_err("%s: Failed to parse JSON port runner dump.\n",
+			       method_name);
+			return -EINVAL;
+		}
+		pr_out_indent_inc();
+		pr_out("aggregator ID: %d\n", aggregator_id);
+		pr_out("selected: %s\n", boolyesno(selected));
+		pr_out("state: %s\n", state);
+		pr_out2("key: %d\n", key);
+		pr_out2("priority: %d\n", prio);
+		pr_out2("actor LACPDU info:\n");
+		pr_out_indent_inc();
+		err = stateview_json_lacpdu_process(method_name, actor_json);
+		if (err)
+			return err;
+		pr_out_indent_dec();
+		pr_out2("partner LACPDU info:\n");
+		pr_out_indent_inc();
+		err = stateview_json_lacpdu_process(method_name, partner_json);
+		if (err)
+			return err;
+		pr_out_indent_dec();
+		pr_out_indent_dec();
+	}
+	return 0;
+}
+
+static int stateview_json_port_process(char *method_name, char *runner_name,
+				       const char *port_name, json_t *port_json)
+{
+	int err;
+	char *dev_addr;
+	int dev_addr_len;
+	int ifindex;
+	char *ifname;
+	char *duplex;
+	int speed;
+	int up;
+	json_t *port_link_watches_json;
+
+	err = json_unpack(port_json,
+			  "{s:{s:s, s:i, s:i, s:s}, s:{s:s, s:i, s:b}, s:o}",
+			  "ifinfo",
+			  "dev_addr", &dev_addr,
+			  "dev_addr_len", &dev_addr_len,
+			  "ifindex", &ifindex,
+			  "ifname", &ifname,
+			  "link",
+			  "duplex", &duplex,
+			  "speed", &speed,
+			  "up", &up,
+			  "link_watches", &port_link_watches_json);
+	if (err) {
+		pr_err("%s: Failed to parse JSON port dump.\n",
+		       method_name);
+		return -EINVAL;
+	}
+	pr_out("%s\n", port_name);
+	pr_out_indent_inc();
+	pr_out2("ifindex: %d\n", ifindex);
+	pr_out2("addr: %s\n", dev_addr);
+	pr_out2("ethtool link: %dmbit/%sduplex/%s\n", speed, duplex,
+						      boolupdown(up));
+	err = stateview_json_port_link_watches_process(method_name,
+						       port_link_watches_json);
+	if (err)
+		goto err_out;
+	err = stateview_json_port_runner_process(method_name, runner_name,
+						 port_json);
+	pr_out_indent_dec();
+err_out:
+	return err;
+}
+
+static int stateview_json_ports_process(char *method_name, char *runner_name,
+					json_t *ports_json)
+{
+	int err;
+	json_t *iter;
+
+	pr_err("ports:\n");
+	for (iter = json_object_iter(ports_json); iter;
+	     iter = json_object_iter_next(ports_json, iter)) {
+		const char *port_name = json_object_iter_key(iter);
+		json_t *port_json = json_object_iter_value(iter);
+
+		pr_out_indent_inc();
+		err = stateview_json_port_process(method_name, runner_name,
+						  port_name, port_json);
+		if (err)
+			return err;
+		pr_out_indent_dec();
+	}
+	return 0;
+}
+
+static int stateview_json_runner_process(char *method_name, char *runner_name,
+					 json_t *json)
+{
+	int err;
+
+	if (!strcmp(runner_name, "activebackup")) {
+		char *active_port;
+
+		pr_out("runner:\n");
+		err = json_unpack(json, "{s:{s:s}}", "runner",
+				  "active_port", &active_port);
+		if (err) {
+			pr_err("%s: Failed to parse JSON runner dump.\n",
+			       method_name);
+			return -EINVAL;
+		}
+		pr_out_indent_inc();
+		pr_out("active port: %s\n", active_port);
+		pr_out_indent_dec();
+	} else if (!strcmp(runner_name, "lacp")) {
+		int selected_aggregator_id;
+		int active;
+		int sys_prio;
+		int fast_rate;
+
+		pr_out("runner:\n");
+		err = json_unpack(json, "{s:{s:i, s:b, s:i, s:b}}", "runner",
+				  "selected_aggregator_id",
+				  &selected_aggregator_id,
+				  "active", &active,
+				  "sys_prio", &sys_prio,
+				  "fast_rate", &fast_rate);
+		if (err) {
+			pr_err("%s: Failed to parse JSON runner dump.\n",
+			       method_name);
+			return -EINVAL;
+		}
+		pr_out_indent_inc();
+		pr_out("selected aggregator ID: %d\n", selected_aggregator_id);
+		pr_out("active: %s\n", boolyesno(active));
+		pr_out("fast rate: %s\n", boolyesno(fast_rate));
+		pr_out2("system priority: %d\n", sys_prio);
+		pr_out_indent_dec();
+	}
+	return 0;
+}
+
+static int stateview_json_process(char *method_name, char *dump)
+{
+	int err;
+	char *runner_name;
+	json_t *json;
+	json_t *setup_json;
+	json_t *ports_json;
+	json_error_t jerror;
+
+	json = json_loads(dump, JSON_REJECT_DUPLICATES, &jerror);
+	if (!json)
+		goto parseerr;
+
+	err = json_unpack(json, "{s:o, s:o}", "setup", &setup_json,
+					      "ports", &ports_json);
+	if (err)
+		goto parseerr;
+	err = stateview_json_setup_process(method_name, &runner_name,
+					   setup_json);
+	if (err)
+		return err;
+	err = stateview_json_ports_process(method_name, runner_name,
+					   ports_json);
+	if (err)
+		return err;
+	err = stateview_json_runner_process(method_name, runner_name,
+					    json);
+	if (err)
+		return err;
+
+	return 0;
+
+parseerr:
+	pr_err("%s: Failed to parse JSON dump.\n", method_name);
+	return -EINVAL;
+}
+
+static int stateview_msg_process(char *method_name, DBusMessage *msg)
+{
+	DBusMessageIter args;
+	dbus_bool_t dbres;
+	char *param = NULL;
+
+	dbres = dbus_message_iter_init(msg, &args);
+	if (dbres == FALSE) {
+		pr_err("%s: Failed, no data received.\n", method_name);
+		return -EINVAL;
+	}
+
+	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
+		pr_err("%s: Received argument is not string as expected.\n",
+		       method_name);
+		return -EINVAL;
+	}
+	dbus_message_iter_get_basic(&args, &param);
+	return stateview_json_process(method_name, param);
+}
+
 static int portaddrm_msg_prepare(char *method_name, DBusMessage *msg,
 				 int argc, char **argv)
 {
@@ -188,6 +650,13 @@ static struct method_type method_types[] = {
 		.params = { NULL },
 		.msg_prepare = norequest_msg_prepare,
 		.msg_process = stringdump_msg_process,
+	},
+	{
+		.name = "StateView",
+		.dbus_method_name = "StateDump",
+		.params = { NULL },
+		.msg_prepare = norequest_msg_prepare,
+		.msg_process = stateview_msg_process,
 	},
 	{
 		.name = "PortAdd",
