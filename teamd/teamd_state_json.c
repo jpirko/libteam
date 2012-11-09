@@ -144,7 +144,7 @@ static json_t *__fill_ifinfo(struct team_ifinfo *ifinfo)
 			 "ifindex", team_get_ifinfo_ifindex(ifinfo),
 			 "ifname", team_get_ifinfo_ifname(ifinfo),
 			 "dev_addr", addr_str,
-			 "add_len", team_get_ifinfo_hwaddr_len(ifinfo));
+			 "dev_addr_len", team_get_ifinfo_hwaddr_len(ifinfo));
 }
 
 static int teamdev_state_dump(struct teamd_context *ctx,
