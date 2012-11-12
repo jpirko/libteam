@@ -1365,7 +1365,7 @@ errout:
 
 static const struct teamd_state_json_ops link_watch_state_ops = {
 	.dump = link_watch_state_dump,
-	.name = "link_watch",
+	.name = "link_watches",
 };
 
 int teamd_link_watch_init(struct teamd_context *ctx)
