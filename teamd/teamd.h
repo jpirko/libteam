@@ -96,14 +96,15 @@ struct teamd_port {
 	struct team_ifinfo *		team_ifinfo;
 };
 
+struct teamd_state_json_ops;
+
 struct teamd_runner {
 	const char *name;
 	const char *team_mode_name;
 	size_t priv_size;
 	int (*init)(struct teamd_context *ctx);
 	void (*fini)(struct teamd_context *ctx);
-	int (*state_json_dump)(struct teamd_context *ctx,
-			       json_t **pstate_json, void *priv);
+	const struct teamd_state_json_ops *state_json_ops;
 };
 
 struct teamd_event_watch_ops {
@@ -138,6 +139,8 @@ int teamd_event_watch_register(struct teamd_context *ctx,
 void teamd_event_watch_unregister(struct teamd_context *ctx,
 				  const struct teamd_event_watch_ops *ops,
 				  void *priv);
+
+#define TEAMD_RUNNER_STATE_JSON_NAME "runner"
 
 struct teamd_state_json_ops {
 	int (*dump)(struct teamd_context *ctx,

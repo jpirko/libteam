@@ -1078,11 +1078,16 @@ static int lacp_state_json_dump(struct teamd_context *ctx,
 	return 0;
 }
 
+static const struct teamd_state_json_ops lacp_state_ops = {
+	.dump			= lacp_state_json_dump,
+	.name			= TEAMD_RUNNER_STATE_JSON_NAME,
+};
+
 const struct teamd_runner teamd_runner_lacp = {
 	.name			= "lacp",
 	.team_mode_name		= "loadbalance",
 	.priv_size		= sizeof(struct lacp),
 	.init			= lacp_init,
 	.fini			= lacp_fini,
-	.state_json_dump	= lacp_state_json_dump,
+	.state_json_ops		= &lacp_state_ops,
 };

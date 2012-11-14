@@ -953,25 +953,6 @@ static void teamd_port_watch_fini(struct teamd_context *ctx)
 	teamd_event_watch_unregister(ctx, &teamd_port_watch_ops, NULL);
 }
 
-static int runner_state_dump(struct teamd_context *ctx,
-			     json_t **pstate_json, void *priv)
-{
-	json_t *state_json;
-
-	if (ctx->runner->state_json_dump)
-		return ctx->runner->state_json_dump(ctx, pstate_json, priv);
-	state_json = json_object();
-	if (!state_json)
-		return -ENOMEM;
-	*pstate_json = state_json;
-	return 0;
-}
-
-static const struct teamd_state_json_ops runner_state_ops = {
-	.dump = runner_state_dump,
-	.name = "runner",
-};
-
 static int teamd_runner_init(struct teamd_context *ctx)
 {
 	int err;
@@ -1008,10 +989,13 @@ static int teamd_runner_init(struct teamd_context *ctx)
 			return -ENOMEM;
 	}
 
-	err = teamd_state_json_register(ctx, &runner_state_ops,
-					ctx->runner_priv);
-	if (err)
-		goto free_runner_priv;
+	if (ctx->runner->state_json_ops) {
+		err = teamd_state_json_register(ctx,
+						ctx->runner->state_json_ops,
+						ctx->runner_priv);
+		if (err)
+			goto free_runner_priv;
+	}
 
 	if (ctx->runner->init) {
 		err = ctx->runner->init(ctx);
@@ -1021,7 +1005,9 @@ static int teamd_runner_init(struct teamd_context *ctx)
 	return 0;
 
 runner_state_unreg:
-	teamd_state_json_unregister(ctx, &runner_state_ops, ctx);
+	if (ctx->runner->state_json_ops)
+		teamd_state_json_unregister(ctx, ctx->runner->state_json_ops,
+					    ctx->runner_priv);
 free_runner_priv:
 	free(ctx->runner_priv);
 	return err;
@@ -1031,6 +1017,9 @@ static void teamd_runner_fini(struct teamd_context *ctx)
 {
 	if (ctx->runner->fini)
 		ctx->runner->fini(ctx);
+	if (ctx->runner->state_json_ops)
+		teamd_state_json_unregister(ctx, ctx->runner->state_json_ops,
+					    ctx->runner_priv);
 	free(ctx->runner_priv);
 	ctx->runner = NULL;
 }
