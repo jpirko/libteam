@@ -60,24 +60,35 @@ struct method_type {
 	msg_process_t msg_process;
 };
 
-static int noreply_msg_process(char *method_name, DBusMessage *msg)
+static int check_error_msg(char *method_name, DBusMessage *msg)
 {
 	DBusMessageIter args;
 	dbus_bool_t dbres;
 	char *param = NULL;
+	const char *err_msg;
+
+	err_msg = dbus_message_get_error_name(msg);
+	if (!err_msg)
+		return 0;
+	pr_err("%s: Error message received: \"%s\"\n", method_name, err_msg);
 
 	dbres = dbus_message_iter_init(msg, &args);
-	if (dbres == FALSE)
-		return 0; /* Success */
-
-	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
-		pr_err("%s: Received argument is not string as expected.\n",
-		       method_name);
-		return -EINVAL;
+	if (dbres == TRUE) {
+		if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
+			pr_err("%s: Received argument is not string as expected.\n",
+			       method_name);
+			return -EINVAL;
+		}
+		dbus_message_iter_get_basic(&args, &param);
+		pr_err("%s: Error message content: \"%s\"\n",
+		       method_name, param);
 	}
-	dbus_message_iter_get_basic(&args, &param);
-	pr_err("%s: Failed: \"%s\"\n", method_name, param);
 	return -EINVAL;
+}
+
+static int noreply_msg_process(char *method_name, DBusMessage *msg)
+{
+	return check_error_msg(method_name, msg);
 }
 
 static int norequest_msg_prepare(char *method_name, DBusMessage *msg,
@@ -91,7 +102,11 @@ static int stringdump_msg_process(char *method_name, DBusMessage *msg)
 	DBusMessageIter args;
 	dbus_bool_t dbres;
 	char *param = NULL;
+	int err;
 
+	err = check_error_msg(method_name, msg);
+	if (err)
+		return err;
 	dbres = dbus_message_iter_init(msg, &args);
 	if (dbres == FALSE) {
 		pr_err("%s: Failed, no data received.\n", method_name);
