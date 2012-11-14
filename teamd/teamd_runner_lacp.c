@@ -1025,32 +1025,18 @@ static json_t *__fill_lacp_port(struct lacp_port *lacp_port)
 	return s_json;
 }
 
-static json_t *__fill_lacp_ports(struct lacp *lacp)
+static int lacp_state_json_per_port_dump(struct teamd_context *ctx,
+					 struct teamd_port *tdport,
+					 json_t **pstate_json, void *priv)
 {
-	struct teamd_port *tdport;
-	json_t *lacp_ports_json;
-	json_t *lacp_port_json;
-	int err;
+	struct lacp *lacp = priv;
+	json_t *state_json;
 
-	lacp_ports_json = json_object();
-	if (!lacp_ports_json)
-		return NULL;
-	teamd_for_each_tdport(tdport, lacp->ctx) {
-		lacp_port_json = __fill_lacp_port(lacp_port_get(lacp, tdport));
-		if (!lacp_port_json)
-			goto errout;
-		err = json_object_set_new(lacp_ports_json, tdport->ifname,
-					  lacp_port_json);
-		if (err) {
-			err = -ENOMEM;
-			goto errout;
-		}
-	}
-	return lacp_ports_json;
-
-errout:
-	json_decref(lacp_ports_json);
-	return NULL;
+	state_json = __fill_lacp_port(lacp_port_get(lacp, tdport));
+	if (!state_json)
+		return -ENOMEM;
+	*pstate_json = state_json;
+	return 0;
 }
 
 static int lacp_state_json_dump(struct teamd_context *ctx,
@@ -1058,28 +1044,22 @@ static int lacp_state_json_dump(struct teamd_context *ctx,
 {
 	struct lacp *lacp = priv;
 	json_t *state_json;
-	json_t *lacp_ports_json;
 
-	lacp_ports_json = __fill_lacp_ports(lacp);
-	if (!lacp_ports_json)
-		return -ENOMEM;
-	state_json = json_pack("{s:i, s:b, s:i, s:b, s:o}",
+	state_json = json_pack("{s:i, s:b, s:i, s:b}",
 			       "selected_aggregator_id",
 			       lacp->selected_aggregator_id,
 			       "active", lacp->cfg.active,
 			       "sys_prio", lacp->cfg.sys_prio,
-			       "fast_rate", lacp->cfg.fast_rate,
-			       "lacp_ports", lacp_ports_json);
-	if (!state_json) {
-		json_decref(lacp_ports_json);
+			       "fast_rate", lacp->cfg.fast_rate);
+	if (!state_json)
 		return -ENOMEM;
-	}
 	*pstate_json = state_json;
 	return 0;
 }
 
 static const struct teamd_state_json_ops lacp_state_ops = {
 	.dump			= lacp_state_json_dump,
+	.per_port_dump		= lacp_state_json_per_port_dump,
 	.name			= TEAMD_RUNNER_STATE_JSON_NAME,
 };
 
