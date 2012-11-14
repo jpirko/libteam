@@ -1298,8 +1298,9 @@ static json_t *__fill_lw_instance(struct teamd_context *ctx,
 	return state_json;
 }
 
-static json_t *__fill_tdport_lw(struct teamd_context *ctx,
-				struct teamd_port *tdport)
+static int link_watch_state_per_port_dump(struct teamd_context *ctx,
+					  struct teamd_port *tdport,
+					  json_t **pstate_json, void *priv)
 {
 	struct lw_common_port_priv *common_ppriv;
 	int err;
@@ -1310,7 +1311,7 @@ static json_t *__fill_tdport_lw(struct teamd_context *ctx,
 
 	array_json = json_array();
 	if (!array_json)
-		return NULL;
+		return -ENOMEM;
 
 	teamd_for_each_port_priv_by_creator(common_ppriv, tdport,
 					    LW_PORT_PRIV_CREATOR_PRIV) {
@@ -1327,44 +1328,16 @@ static json_t *__fill_tdport_lw(struct teamd_context *ctx,
 			       "up", link);
 	if (!state_json)
 		goto errout;
-	return state_json;
-errout:
-	json_decref(array_json);
-	return NULL;
-}
-
-static int link_watch_state_dump(struct teamd_context *ctx,
-				 json_t **pstate_json, void *priv)
-{
-	struct teamd_port *tdport;
-	int err;
-	json_t *state_json;
-	json_t *tdport_lw_json;
-
-	state_json = json_object();
-	if (!state_json)
-		return -ENOMEM;
-
-	teamd_for_each_tdport(tdport, ctx) {
-		tdport_lw_json = __fill_tdport_lw(ctx, tdport);
-		if (!tdport_lw_json)
-			goto errout;
-		err = json_object_set_new(state_json, tdport->ifname,
-					  tdport_lw_json);
-		if (err) {
-			err = -ENOMEM;
-			goto errout;
-		}
-	}
 	*pstate_json = state_json;
 	return 0;
+
 errout:
-	json_decref(state_json);
+	json_decref(array_json);
 	return -ENOMEM;
 }
 
 static const struct teamd_state_json_ops link_watch_state_ops = {
-	.dump = link_watch_state_dump,
+	.per_port_dump = link_watch_state_per_port_dump,
 	.name = "link_watches",
 };
 
