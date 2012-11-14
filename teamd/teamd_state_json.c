@@ -214,8 +214,8 @@ static int __fill_per_port(struct teamd_context *ctx, json_t *tdport_json,
 	return 0;
 }
 
-static int portdevs_state_dump(struct teamd_context *ctx,
-			       json_t **pstate_json, void *priv)
+static int ports_state_dump(struct teamd_context *ctx,
+			    json_t **pstate_json, void *priv)
 {
 	struct teamd_port *tdport;
 	int err;
@@ -248,9 +248,9 @@ errout:
 	return -ENOMEM;
 }
 
-static const struct teamd_state_json_ops portdevs_state_ops = {
-	.dump = portdevs_state_dump,
-	.name = "port_devices",
+static const struct teamd_state_json_ops ports_state_ops = {
+	.dump = ports_state_dump,
+	.name = "ports",
 };
 
 static int setup_state_dump(struct teamd_context *ctx,
@@ -285,16 +285,16 @@ int teamd_state_json_basics_init(struct teamd_context *ctx)
 	err = teamd_state_json_register(ctx, &teamdev_state_ops, ctx);
 	if (err)
 		return err;
-	err = teamd_state_json_register(ctx, &portdevs_state_ops, ctx);
+	err = teamd_state_json_register(ctx, &ports_state_ops, ctx);
 	if (err)
 		goto teamdev_state_unreg;
 	err = teamd_state_json_register(ctx, &setup_state_ops, ctx);
 	if (err)
-		goto portdevs_state_unreg;
+		goto ports_state_unreg;
 	return 0;
 
-portdevs_state_unreg:
-	teamd_state_json_unregister(ctx, &portdevs_state_ops, ctx);
+ports_state_unreg:
+	teamd_state_json_unregister(ctx, &ports_state_ops, ctx);
 teamdev_state_unreg:
 	teamd_state_json_unregister(ctx, &teamdev_state_ops, ctx);
 	return err;
@@ -303,6 +303,6 @@ teamdev_state_unreg:
 void teamd_state_json_basics_fini(struct teamd_context *ctx)
 {
 	teamd_state_json_unregister(ctx, &setup_state_ops, ctx);
-	teamd_state_json_unregister(ctx, &portdevs_state_ops, ctx);
+	teamd_state_json_unregister(ctx, &ports_state_ops, ctx);
 	teamd_state_json_unregister(ctx, &teamdev_state_ops, ctx);
 }
