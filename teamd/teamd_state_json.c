@@ -192,6 +192,28 @@ static json_t *__fill_tdport(struct teamd_port *tdport)
 	return tdport_json;
 }
 
+static int __fill_per_port(struct teamd_context *ctx, json_t *tdport_json,
+			   struct teamd_port *tdport)
+{
+	struct state_json_item *item;
+	json_t *substate_json;
+	int err;
+
+	list_for_each_node_entry(item, &ctx->state_json_list, list) {
+		if (!item->ops->per_port_dump)
+			continue;
+		err = item->ops->per_port_dump(ctx, tdport, &substate_json,
+					       item->priv);
+		if (err)
+			return err;
+		err = json_object_set_new(tdport_json, item->ops->name,
+					  substate_json);
+		if (err)
+			return -ENOMEM;
+	}
+	return 0;
+}
+
 static int portdevs_state_dump(struct teamd_context *ctx,
 			       json_t **pstate_json, void *priv)
 {
@@ -214,6 +236,9 @@ static int portdevs_state_dump(struct teamd_context *ctx,
 			err = -ENOMEM;
 			goto errout;
 		}
+		err = __fill_per_port(ctx, tdport_json, tdport);
+		if (err)
+			goto errout;
 	}
 
 	*pstate_json = state_json;

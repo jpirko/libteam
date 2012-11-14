@@ -142,6 +142,9 @@ void teamd_event_watch_unregister(struct teamd_context *ctx,
 struct teamd_state_json_ops {
 	int (*dump)(struct teamd_context *ctx,
 		    json_t **pstate_json, void *priv);
+	int (*per_port_dump)(struct teamd_context *ctx,
+			     struct teamd_port *tdport,
+			     json_t **pstate_json, void *priv);
 	char *name;
 };
 
