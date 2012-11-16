@@ -71,21 +71,21 @@ static void pr_out_indent_dec(void)
 #define pr_out4(args...) pr_outx(VERB4, ##args)
 
 
-typedef int (*msg_prepare_t)(char *method_name, DBusMessage *msg,
+typedef int (*msg_prepare_t)(char *cmd_name, DBusMessage *msg,
 			     int argc, char **argv);
-typedef int (*msg_process_t)(char *method_name, DBusMessage *msg);
+typedef int (*msg_process_t)(char *cmd_name, DBusMessage *msg);
 
-#define METHOD_PARAM_MAX_CNT 8
+#define COMMAND_PARAM_MAX_CNT 8
 
-struct method_type {
+struct command_type {
 	char *name;
 	char *dbus_method_name;
-	char *params[METHOD_PARAM_MAX_CNT];
+	char *params[COMMAND_PARAM_MAX_CNT];
 	msg_prepare_t msg_prepare;
 	msg_process_t msg_process;
 };
 
-static int check_error_msg(char *method_name, DBusMessage *msg)
+static int check_error_msg(char *cmd_name, DBusMessage *msg)
 {
 	DBusMessageIter args;
 	dbus_bool_t dbres;
@@ -95,52 +95,52 @@ static int check_error_msg(char *method_name, DBusMessage *msg)
 	err_msg = dbus_message_get_error_name(msg);
 	if (!err_msg)
 		return 0;
-	pr_err("%s: Error message received: \"%s\"\n", method_name, err_msg);
+	pr_err("%s: Error message received: \"%s\"\n", cmd_name, err_msg);
 
 	dbres = dbus_message_iter_init(msg, &args);
 	if (dbres == TRUE) {
 		if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
 			pr_err("%s: Received argument is not string as expected.\n",
-			       method_name);
+			       cmd_name);
 			return -EINVAL;
 		}
 		dbus_message_iter_get_basic(&args, &param);
 		pr_err("%s: Error message content: \"%s\"\n",
-		       method_name, param);
+		       cmd_name, param);
 	}
 	return -EINVAL;
 }
 
-static int noreply_msg_process(char *method_name, DBusMessage *msg)
+static int noreply_msg_process(char *cmd_name, DBusMessage *msg)
 {
-	return check_error_msg(method_name, msg);
+	return check_error_msg(cmd_name, msg);
 }
 
-static int norequest_msg_prepare(char *method_name, DBusMessage *msg,
+static int norequest_msg_prepare(char *cmd_name, DBusMessage *msg,
 				 int argc, char **argv)
 {
 	return 0;
 }
 
-static int stringdump_msg_process(char *method_name, DBusMessage *msg)
+static int stringdump_msg_process(char *cmd_name, DBusMessage *msg)
 {
 	DBusMessageIter args;
 	dbus_bool_t dbres;
 	char *param = NULL;
 	int err;
 
-	err = check_error_msg(method_name, msg);
+	err = check_error_msg(cmd_name, msg);
 	if (err)
 		return err;
 	dbres = dbus_message_iter_init(msg, &args);
 	if (dbres == FALSE) {
-		pr_err("%s: Failed, no data received.\n", method_name);
+		pr_err("%s: Failed, no data received.\n", cmd_name);
 		return -EINVAL;
 	}
 
 	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
 		pr_err("%s: Received argument is not string as expected.\n",
-		       method_name);
+		       cmd_name);
 		return -EINVAL;
 	}
 	dbus_message_iter_get_basic(&args, &param);
@@ -151,7 +151,7 @@ static int stringdump_msg_process(char *method_name, DBusMessage *msg)
 #define boolyesno(val) (val ? "yes" : "no")
 #define boolupdown(val) (val ? "up" : "down")
 
-static int stateview_json_setup_process(char *method_name, char **prunner_name,
+static int stateview_json_setup_process(char *cmd_name, char **prunner_name,
 					json_t *setup_json)
 {
 	int err;
@@ -174,7 +174,7 @@ static int stateview_json_setup_process(char *method_name, char **prunner_name,
 			  "pid_file", &pid_file);
 	if (err) {
 		pr_err("%s: Failed to parse JSON setup dump.\n",
-		       method_name);
+		       cmd_name);
 		return -EINVAL;
 	}
 	pr_out_indent_inc();
@@ -191,7 +191,7 @@ static int stateview_json_setup_process(char *method_name, char **prunner_name,
 	return 0;
 }
 
-static int stateview_json_link_watch_info_process(char *method_name,
+static int stateview_json_link_watch_info_process(char *cmd_name,
 						  char *lw_name,
 						  json_t *lw_info_json)
 {
@@ -206,7 +206,7 @@ static int stateview_json_link_watch_info_process(char *method_name,
 				  "delay_down", &delay_down);
 		if (err) {
 			pr_err("%s: Failed to parse JSON ethtool link watch info dump.\n",
-			       method_name);
+			       cmd_name);
 			return -EINVAL;
 		}
 		pr_out2("link up delay: %d\n", delay_up);
@@ -232,7 +232,7 @@ static int stateview_json_link_watch_info_process(char *method_name,
 				  "missed", &missed);
 		if (err) {
 			pr_err("%s: Failed to parse JSON arp_ping link watch info dump.\n",
-			       method_name);
+			       cmd_name);
 			return -EINVAL;
 		}
 		pr_out2("source host: %s\n", source_host);
@@ -257,7 +257,7 @@ static int stateview_json_link_watch_info_process(char *method_name,
 				  "missed", &missed);
 		if (err) {
 			pr_err("%s: Failed to parse JSON nsna_ping link watch info dump.\n",
-			       method_name);
+			       cmd_name);
 			return -EINVAL;
 		}
 		pr_out2("target host: %s\n", target_host);
@@ -266,13 +266,13 @@ static int stateview_json_link_watch_info_process(char *method_name,
 		pr_out2("initial wait: %d\n", init_wait);
 	} else {
 		pr_err("%s: Failed to parse JSON unknown link watch info dump.\n",
-		       method_name);
+		       cmd_name);
 		return -EINVAL;
 	}
 	return 0;
 }
 
-static int stateview_json_port_link_watches_process(char *method_name,
+static int stateview_json_port_link_watches_process(char *cmd_name,
 						    json_t *port_link_watches_json)
 {
 	int err;
@@ -287,7 +287,7 @@ static int stateview_json_port_link_watches_process(char *method_name,
 			  "up", &up, "list", &lw_list_json);
 	if (err) {
 		pr_err("%s: Failed to parse JSON port link watches dump.\n",
-		       method_name);
+		       cmd_name);
 		return -EINVAL;
 	}
 	pr_out("link watches:\n");
@@ -303,7 +303,7 @@ static int stateview_json_port_link_watches_process(char *method_name,
 				  "info", &lw_info_json);
 		if (err) {
 			pr_err("%s: Failed to parse JSON port link watch dump.\n",
-			       method_name);
+			       cmd_name);
 			return -EINVAL;
 		}
 		pr_out("intance[%d]:\n", i);
@@ -312,7 +312,7 @@ static int stateview_json_port_link_watches_process(char *method_name,
 		pr_out("link: %s\n", boolupdown(up));
 		pr_out2("info:\n");
 		pr_out_indent_inc();
-		err = stateview_json_link_watch_info_process(method_name,
+		err = stateview_json_link_watch_info_process(cmd_name,
 							     lw_name,
 							     lw_info_json);
 		if (err)
@@ -325,7 +325,7 @@ static int stateview_json_port_link_watches_process(char *method_name,
 	return 0;
 }
 
-static int stateview_json_lacpdu_process(char *method_name,
+static int stateview_json_lacpdu_process(char *cmd_name,
 					 json_t *lacpdu_json)
 {
 	int err;
@@ -345,7 +345,7 @@ static int stateview_json_lacpdu_process(char *method_name,
 			 "state", &state);
 	if (err) {
 		pr_err("%s: Failed to parse JSON port runner lacpdu dump.\n",
-		       method_name);
+		       cmd_name);
 		return -EINVAL;
 	}
 	pr_out2("system priority: %d\n", system_priority);
@@ -357,7 +357,7 @@ static int stateview_json_lacpdu_process(char *method_name,
 	return 0;
 }
 
-static int stateview_json_port_runner_process(char *method_name,
+static int stateview_json_port_runner_process(char *cmd_name,
 					      char *runner_name,
 					      json_t *port_json)
 {
@@ -385,7 +385,7 @@ static int stateview_json_port_runner_process(char *method_name,
 				  "partner_lacpdu_info", &partner_json);
 		if (err) {
 			pr_err("%s: Failed to parse JSON port runner dump.\n",
-			       method_name);
+			       cmd_name);
 			return -EINVAL;
 		}
 		pr_out_indent_inc();
@@ -396,13 +396,13 @@ static int stateview_json_port_runner_process(char *method_name,
 		pr_out2("priority: %d\n", prio);
 		pr_out2("actor LACPDU info:\n");
 		pr_out_indent_inc();
-		err = stateview_json_lacpdu_process(method_name, actor_json);
+		err = stateview_json_lacpdu_process(cmd_name, actor_json);
 		if (err)
 			return err;
 		pr_out_indent_dec();
 		pr_out2("partner LACPDU info:\n");
 		pr_out_indent_inc();
-		err = stateview_json_lacpdu_process(method_name, partner_json);
+		err = stateview_json_lacpdu_process(cmd_name, partner_json);
 		if (err)
 			return err;
 		pr_out_indent_dec();
@@ -411,7 +411,7 @@ static int stateview_json_port_runner_process(char *method_name,
 	return 0;
 }
 
-static int stateview_json_port_process(char *method_name, char *runner_name,
+static int stateview_json_port_process(char *cmd_name, char *runner_name,
 				       const char *port_name, json_t *port_json)
 {
 	int err;
@@ -438,7 +438,7 @@ static int stateview_json_port_process(char *method_name, char *runner_name,
 			  "link_watches", &port_link_watches_json);
 	if (err) {
 		pr_err("%s: Failed to parse JSON port dump.\n",
-		       method_name);
+		       cmd_name);
 		return -EINVAL;
 	}
 	pr_out("%s\n", port_name);
@@ -447,18 +447,18 @@ static int stateview_json_port_process(char *method_name, char *runner_name,
 	pr_out2("addr: %s\n", dev_addr);
 	pr_out2("ethtool link: %dmbit/%sduplex/%s\n", speed, duplex,
 						      boolupdown(up));
-	err = stateview_json_port_link_watches_process(method_name,
+	err = stateview_json_port_link_watches_process(cmd_name,
 						       port_link_watches_json);
 	if (err)
 		goto err_out;
-	err = stateview_json_port_runner_process(method_name, runner_name,
+	err = stateview_json_port_runner_process(cmd_name, runner_name,
 						 port_json);
 	pr_out_indent_dec();
 err_out:
 	return err;
 }
 
-static int stateview_json_ports_process(char *method_name, char *runner_name,
+static int stateview_json_ports_process(char *cmd_name, char *runner_name,
 					json_t *ports_json)
 {
 	int err;
@@ -471,7 +471,7 @@ static int stateview_json_ports_process(char *method_name, char *runner_name,
 		json_t *port_json = json_object_iter_value(iter);
 
 		pr_out_indent_inc();
-		err = stateview_json_port_process(method_name, runner_name,
+		err = stateview_json_port_process(cmd_name, runner_name,
 						  port_name, port_json);
 		if (err)
 			return err;
@@ -480,7 +480,7 @@ static int stateview_json_ports_process(char *method_name, char *runner_name,
 	return 0;
 }
 
-static int stateview_json_runner_process(char *method_name, char *runner_name,
+static int stateview_json_runner_process(char *cmd_name, char *runner_name,
 					 json_t *json)
 {
 	int err;
@@ -493,7 +493,7 @@ static int stateview_json_runner_process(char *method_name, char *runner_name,
 				  "active_port", &active_port);
 		if (err) {
 			pr_err("%s: Failed to parse JSON runner dump.\n",
-			       method_name);
+			       cmd_name);
 			return -EINVAL;
 		}
 		pr_out_indent_inc();
@@ -514,7 +514,7 @@ static int stateview_json_runner_process(char *method_name, char *runner_name,
 				  "fast_rate", &fast_rate);
 		if (err) {
 			pr_err("%s: Failed to parse JSON runner dump.\n",
-			       method_name);
+			       cmd_name);
 			return -EINVAL;
 		}
 		pr_out_indent_inc();
@@ -527,7 +527,7 @@ static int stateview_json_runner_process(char *method_name, char *runner_name,
 	return 0;
 }
 
-static int stateview_json_process(char *method_name, char *dump)
+static int stateview_json_process(char *cmd_name, char *dump)
 {
 	int err;
 	char *runner_name;
@@ -544,15 +544,15 @@ static int stateview_json_process(char *method_name, char *dump)
 					      "ports", &ports_json);
 	if (err)
 		goto parseerr;
-	err = stateview_json_setup_process(method_name, &runner_name,
+	err = stateview_json_setup_process(cmd_name, &runner_name,
 					   setup_json);
 	if (err)
 		return err;
-	err = stateview_json_ports_process(method_name, runner_name,
+	err = stateview_json_ports_process(cmd_name, runner_name,
 					   ports_json);
 	if (err)
 		return err;
-	err = stateview_json_runner_process(method_name, runner_name,
+	err = stateview_json_runner_process(cmd_name, runner_name,
 					    json);
 	if (err)
 		return err;
@@ -560,11 +560,11 @@ static int stateview_json_process(char *method_name, char *dump)
 	return 0;
 
 parseerr:
-	pr_err("%s: Failed to parse JSON dump.\n", method_name);
+	pr_err("%s: Failed to parse JSON dump.\n", cmd_name);
 	return -EINVAL;
 }
 
-static int stateview_msg_process(char *method_name, DBusMessage *msg)
+static int stateview_msg_process(char *cmd_name, DBusMessage *msg)
 {
 	DBusMessageIter args;
 	dbus_bool_t dbres;
@@ -572,20 +572,20 @@ static int stateview_msg_process(char *method_name, DBusMessage *msg)
 
 	dbres = dbus_message_iter_init(msg, &args);
 	if (dbres == FALSE) {
-		pr_err("%s: Failed, no data received.\n", method_name);
+		pr_err("%s: Failed, no data received.\n", cmd_name);
 		return -EINVAL;
 	}
 
 	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
 		pr_err("%s: Received argument is not string as expected.\n",
-		       method_name);
+		       cmd_name);
 		return -EINVAL;
 	}
 	dbus_message_iter_get_basic(&args, &param);
-	return stateview_json_process(method_name, param);
+	return stateview_json_process(cmd_name, param);
 }
 
-static int portaddrm_msg_prepare(char *method_name, DBusMessage *msg,
+static int portaddrm_msg_prepare(char *cmd_name, DBusMessage *msg,
 				 int argc, char **argv)
 {
 	DBusMessageIter args;
@@ -593,20 +593,20 @@ static int portaddrm_msg_prepare(char *method_name, DBusMessage *msg,
 
 	if (argc < 1) {
 		pr_err("%s: Port name as a command line parameter expected.\n",
-		       method_name);
+		       cmd_name);
 		return -EINVAL;
 	}
 	dbus_message_iter_init_append(msg, &args);
 	dbres = dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING,
 					       &argv[0]);
 	if (dbres == FALSE) {
-		pr_err("%s: Failed to construct message.\n", method_name);
+		pr_err("%s: Failed to construct message.\n", cmd_name);
 		return -ENOMEM;
 	}
 	return 0;
 }
 
-static int portconfigupdate_msg_prepare(char *method_name, DBusMessage *msg,
+static int portconfigupdate_msg_prepare(char *cmd_name, DBusMessage *msg,
 					int argc, char **argv)
 {
 	DBusMessageIter args;
@@ -614,31 +614,31 @@ static int portconfigupdate_msg_prepare(char *method_name, DBusMessage *msg,
 
 	if (argc < 1) {
 		pr_err("%s: Port name as a command line parameter expected.\n",
-		       method_name);
+		       cmd_name);
 		return -EINVAL;
 	}
 	if (argc < 2) {
 		pr_err("%s: Port config as a command line parameter expected.\n",
-		       method_name);
+		       cmd_name);
 		return -EINVAL;
 	}
 	dbus_message_iter_init_append(msg, &args);
 	dbres = dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING,
 					       &argv[0]);
 	if (dbres == FALSE) {
-		pr_err("%s: Failed to construct message.\n", method_name);
+		pr_err("%s: Failed to construct message.\n", cmd_name);
 		return -ENOMEM;
 	}
 	dbres = dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING,
 					       &argv[1]);
 	if (dbres == FALSE) {
-		pr_err("%s: Failed to construct message.\n", method_name);
+		pr_err("%s: Failed to construct message.\n", cmd_name);
 		return -ENOMEM;
 	}
 	return 0;
 }
 
-static struct method_type method_types[] = {
+static struct command_type command_types[] = {
 	{
 		.name = "ConfigDump",
 		.dbus_method_name = "ConfigDump",
@@ -682,10 +682,10 @@ static struct method_type method_types[] = {
 		.msg_process = noreply_msg_process,
 	},
 };
-#define METHOD_TYPE_COUNT ARRAY_SIZE(method_types)
+#define COMMAND_TYPE_COUNT ARRAY_SIZE(command_types)
 
-static int call_method(char *team_devname, int argc, char **argv,
-		       struct method_type *method_type)
+static int call_command(char *team_devname, int argc, char **argv,
+			struct command_type *command_type)
 {
 	int err;
 	char *service_name;
@@ -694,11 +694,8 @@ static int call_method(char *team_devname, int argc, char **argv,
 	DBusPendingCall *pending;
 	DBusError error;
 	dbus_bool_t dbres;
-	msg_prepare_t msg_prepare = method_type->msg_prepare;
-	msg_process_t msg_process = method_type->msg_process;
-	char *method_name;
-
-	method_name = method_type->dbus_method_name;
+	msg_prepare_t msg_prepare = command_type->msg_prepare;
+	msg_process_t msg_process = command_type->msg_process;
 
 	err = asprintf(&service_name, TEAMD_DBUS_SERVICE ".%s", team_devname);
 	if (err == -1)
@@ -714,14 +711,15 @@ static int call_method(char *team_devname, int argc, char **argv,
 	}
 
 	msg = dbus_message_new_method_call(service_name, TEAMD_DBUS_PATH,
-					   TEAMD_DBUS_IFACE, method_name);
+					   TEAMD_DBUS_IFACE,
+					   command_type->dbus_method_name);
 	if (!msg) {
 		pr_err("Failed to create message.\n");
 		err = -ENOMEM;
 		goto bus_put;
 	}
 
-	err = msg_prepare(method_name, msg, argc, argv);
+	err = msg_prepare(command_type->name, msg, argc, argv);
 	if (err) {
 		goto free_message;
 	}
@@ -749,7 +747,7 @@ static int call_method(char *team_devname, int argc, char **argv,
 	if (!msg)
 		goto bus_put;
 
-	err = msg_process(method_name, msg);
+	err = msg_process(command_type->name, msg);
 	if (err) {
 		goto free_message;
 	}
@@ -769,15 +767,15 @@ static void print_help(const char *argv0) {
 	int i, j;
 
 	pr_out(
-            "%s [options] teamdevname method [method args]\n"
+            "%s [options] teamdevname command [command args]\n"
             "\t-h --help                Show this help\n"
             "\t-v --verbose             Increase verbosity\n",
             argv0);
-	pr_out("Methods:\n");
-	for (i = 0; i < METHOD_TYPE_COUNT; i++) {
-		pr_out("\t%s", method_types[i].name);
-		for (j = 0; method_types[i].params[j]; j++)
-			pr_out(" %s", method_types[i].params[j]);
+	pr_out("Commands:\n");
+	for (i = 0; i < COMMAND_TYPE_COUNT; i++) {
+		pr_out("\t%s", command_types[i].name);
+		for (j = 0; command_types[i].params[j]; j++)
+			pr_out(" %s", command_types[i].params[j]);
 		pr_out("\n");
 	}
 }
@@ -786,7 +784,7 @@ int main(int argc, char **argv)
 {
 	char *argv0 = argv[0];
 	char *team_devname;
-	char *method_name;
+	char *cmd_name;
 	static const struct option long_options[] = {
 		{ "help",		no_argument,		NULL, 'h' },
 		{ "verbose",		no_argument,		NULL, 'v' },
@@ -823,27 +821,27 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 	if (optind + 1 >= argc) {
-		pr_err("No method to call specified.\n");
+		pr_err("No command specified.\n");
 		print_help(argv0);
 		return EXIT_FAILURE;
 	}
 
 	argv += optind;
 	team_devname = *argv++;
-	method_name = *argv++;
+	cmd_name = *argv++;
 	argc -= optind + 2;
-	for (i = 0; i < METHOD_TYPE_COUNT; i++) {
-		if (strncasecmp(method_types[i].name, method_name,
-				strlen(method_name)))
+	for (i = 0; i < COMMAND_TYPE_COUNT; i++) {
+		if (strncasecmp(command_types[i].name, cmd_name,
+				strlen(cmd_name)))
 			continue;
-		err = call_method(team_devname, argc, argv, &method_types[i]);
+		err = call_command(team_devname, argc, argv, &command_types[i]);
 		if (err) {
 			return EXIT_FAILURE;
 		}
 		break;
 	}
-	if (i == METHOD_TYPE_COUNT) {
-		pr_err("Unknown method \"%s\".\n", method_name);
+	if (i == COMMAND_TYPE_COUNT) {
+		pr_err("Unknown command \"%s\".\n", cmd_name);
 		print_help(argv0);
 		return EXIT_FAILURE;
 	}
