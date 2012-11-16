@@ -79,7 +79,7 @@ typedef int (*msg_process_t)(char *method_name, DBusMessage *msg);
 
 struct method_type {
 	char *name;
-	char *dbus_method_name; /* If NULL, name is used instead */
+	char *dbus_method_name;
 	char *params[METHOD_PARAM_MAX_CNT];
 	msg_prepare_t msg_prepare;
 	msg_process_t msg_process;
@@ -641,12 +641,14 @@ static int portconfigupdate_msg_prepare(char *method_name, DBusMessage *msg,
 static struct method_type method_types[] = {
 	{
 		.name = "ConfigDump",
+		.dbus_method_name = "ConfigDump",
 		.params = { NULL },
 		.msg_prepare = norequest_msg_prepare,
 		.msg_process = stringdump_msg_process,
 	},
 	{
 		.name = "StateDump",
+		.dbus_method_name = "StateDump",
 		.params = { NULL },
 		.msg_prepare = norequest_msg_prepare,
 		.msg_process = stringdump_msg_process,
@@ -660,18 +662,21 @@ static struct method_type method_types[] = {
 	},
 	{
 		.name = "PortAdd",
+		.dbus_method_name = "PortAdd",
 		.params = { "PORTDEV", NULL },
 		.msg_prepare = portaddrm_msg_prepare,
 		.msg_process = noreply_msg_process,
 	},
 	{
 		.name = "PortRemove",
+		.dbus_method_name = "PortRemove",
 		.params = { "PORTDEV", NULL },
 		.msg_prepare = portaddrm_msg_prepare,
 		.msg_process = noreply_msg_process,
 	},
 	{
 		.name = "PortConfigUpdate",
+		.dbus_method_name = "PortConfigUpdate",
 		.params = { "PORTDEV", "PORTCONFIG", NULL },
 		.msg_prepare = portconfigupdate_msg_prepare,
 		.msg_process = noreply_msg_process,
@@ -694,8 +699,6 @@ static int call_method(char *team_devname, int argc, char **argv,
 	char *method_name;
 
 	method_name = method_type->dbus_method_name;
-	if (!method_name)
-		method_name = method_type->name;
 
 	err = asprintf(&service_name, TEAMD_DBUS_SERVICE ".%s", team_devname);
 	if (err == -1)
@@ -830,7 +833,8 @@ int main(int argc, char **argv)
 	method_name = *argv++;
 	argc -= optind + 2;
 	for (i = 0; i < METHOD_TYPE_COUNT; i++) {
-		if (strcmp(method_types[i].name, method_name))
+		if (strncasecmp(method_types[i].name, method_name,
+				strlen(method_name)))
 			continue;
 		err = call_method(team_devname, argc, argv, &method_types[i]);
 		if (err) {
