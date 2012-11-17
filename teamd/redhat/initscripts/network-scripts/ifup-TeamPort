@@ -42,7 +42,7 @@ if [ "${DEVICETYPE}" = "TeamPort" ]; then
 	fi
 	/sbin/ip link set dev ${DEVICE} down
 	if [ -n "${TEAM_PORT_CONFIG}" ]; then
-		/usr/bin/teamdctl ${TEAM_MASTER} PortConfigUpdate ${DEVICE} "${TEAM_PORT_CONFIG}" || exit 1
+		/usr/bin/teamdctl ${TEAM_MASTER} port config update ${DEVICE} "${TEAM_PORT_CONFIG}" || exit 1
 	fi
-	/usr/bin/teamdctl ${TEAM_MASTER} PortAdd ${DEVICE} || exit 1
+	/usr/bin/teamdctl ${TEAM_MASTER} port add ${DEVICE} || exit 1
 fi

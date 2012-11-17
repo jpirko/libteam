@@ -38,7 +38,7 @@ if [ "${DEVICETYPE}" = "TeamPort" ]; then
 		net_log $"Team master is not specified for port device"
 		exit 1
 	fi
-	/usr/bin/teamdctl ${TEAM_MASTER} PortRemove ${DEVICE} || exit 1
+	/usr/bin/teamdctl ${TEAM_MASTER} port remove ${DEVICE} || exit 1
 fi
 
 exec /etc/sysconfig/network-scripts/ifdown-eth ${CONFIG} $2
