@@ -838,6 +838,7 @@ bus_put:
 	dbus_connection_unref(conn);
 free_err:
 	dbus_error_free(&error);
+	free(service_name);
 	return err;
 }
 
