@@ -96,17 +96,18 @@ static int check_error_msg(DBusMessage *msg)
 	return -EINVAL;
 }
 
-static int noreply_msg_process(DBusMessage *msg)
+static int noreply_msg_process(DBusMessage *msg, void *priv)
 {
 	return check_error_msg(msg);
 }
 
-static int norequest_msg_prepare(DBusMessage *msg, int argc, char **argv)
+static int norequest_msg_prepare(DBusMessage *msg, int argc, char **argv,
+				 void *priv)
 {
 	return 0;
 }
 
-static int stringdump_msg_process(DBusMessage *msg)
+static int stringdump_msg_process(DBusMessage *msg, void *priv)
 {
 	DBusMessageIter args;
 	dbus_bool_t dbres;
@@ -522,7 +523,7 @@ parseerr:
 	return -EINVAL;
 }
 
-static int stateview_msg_process(DBusMessage *msg)
+static int stateview_msg_process(DBusMessage *msg, void *priv)
 {
 	DBusMessageIter args;
 	dbus_bool_t dbres;
@@ -542,7 +543,8 @@ static int stateview_msg_process(DBusMessage *msg)
 	return stateview_json_process(param);
 }
 
-static int portaddrm_msg_prepare(DBusMessage *msg, int argc, char **argv)
+static int portaddrm_msg_prepare(DBusMessage *msg, int argc, char **argv,
+				 void *priv)
 {
 	DBusMessageIter args;
 	dbus_bool_t dbres;
@@ -561,7 +563,8 @@ static int portaddrm_msg_prepare(DBusMessage *msg, int argc, char **argv)
 	return 0;
 }
 
-static int portconfigupdate_msg_prepare(DBusMessage *msg, int argc, char **argv)
+static int portconfigupdate_msg_prepare(DBusMessage *msg, int argc, char **argv,
+					void *priv)
 {
 	DBusMessageIter args;
 	dbus_bool_t dbres;
@@ -604,8 +607,9 @@ enum id_command_type {
 	ID_CMDTYPE_P_C_U,
 };
 
-typedef int (*msg_prepare_t)(DBusMessage *msg, int argc, char **argv);
-typedef int (*msg_process_t)(DBusMessage *msg);
+typedef int (*msg_prepare_t)(DBusMessage *msg, int argc, char **argv,
+			     void *priv);
+typedef int (*msg_process_t)(DBusMessage *msg, void *priv);
 
 #define COMMAND_PARAM_MAX_CNT 8
 
@@ -617,6 +621,7 @@ struct command_type {
 	char *params[COMMAND_PARAM_MAX_CNT];
 	msg_prepare_t msg_prepare;
 	msg_process_t msg_process;
+	size_t priv_size;
 };
 
 static struct command_type command_types[] = {
@@ -774,10 +779,20 @@ static int call_command(char *team_devname, int argc, char **argv,
 	dbus_bool_t dbres;
 	msg_prepare_t msg_prepare = command_type->msg_prepare;
 	msg_process_t msg_process = command_type->msg_process;
+	void *priv = NULL;
 
 	err = asprintf(&service_name, TEAMD_DBUS_SERVICE ".%s", team_devname);
 	if (err == -1)
 		return -errno;
+
+	if (command_type->priv_size) {
+		priv = myzalloc(command_type->priv_size);
+		if (!priv) {
+			pr_err("Failed to allocate priv data.\n");
+			err = ENOMEM;
+			goto free_service_name;
+		}
+	}
 
 	dbus_error_init(&error);
 	conn = dbus_bus_get(DBUS_BUS_SYSTEM, &error);
@@ -797,7 +812,7 @@ static int call_command(char *team_devname, int argc, char **argv,
 		goto bus_put;
 	}
 
-	err = msg_prepare(msg, argc, argv);
+	err = msg_prepare(msg, argc, argv, priv);
 	if (err) {
 		goto free_message;
 	}
@@ -825,7 +840,7 @@ static int call_command(char *team_devname, int argc, char **argv,
 	if (!msg)
 		goto bus_put;
 
-	err = msg_process(msg);
+	err = msg_process(msg, priv);
 	if (err) {
 		goto free_message;
 	}
@@ -838,6 +853,8 @@ bus_put:
 	dbus_connection_unref(conn);
 free_err:
 	dbus_error_free(&error);
+	free(priv);
+free_service_name:
 	free(service_name);
 	return err;
 }
