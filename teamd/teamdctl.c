@@ -107,7 +107,49 @@ static int norequest_msg_prepare(DBusMessage *msg, int argc, char **argv,
 	return 0;
 }
 
-static int stringdump_msg_process(DBusMessage *msg, void *priv)
+static int __jsonload(json_t **pjson, char *inputstrjson)
+{
+	json_t *json;
+	json_error_t jerror;
+
+	json = json_loads(inputstrjson, JSON_REJECT_DUPLICATES, &jerror);
+	if (!json) {
+		pr_err("Failed to parse JSON dump.\n");
+		return -EINVAL;
+	}
+	*pjson = json;
+	return 0;
+}
+
+static int __jsondump(json_t *json)
+{
+	char *dump;
+
+	dump = json_dumps(json, JSON_INDENT(4) | JSON_ENSURE_ASCII |
+				JSON_SORT_KEYS);
+	if (!dump) {
+		pr_err("Failed to get JSON dump.\n");
+		return -ENOMEM;
+	}
+	pr_out("%s\n", dump);
+	free(dump);
+	return 0;
+}
+
+static int __jsonloaddump(char *inputstrjson)
+{
+	int err;
+	json_t *json;
+
+	err = __jsonload(&json, inputstrjson);
+	if (err)
+		return err;
+	err = __jsondump(json);
+	json_decref(json);
+	return err;
+}
+
+static int jsonsimpledump_msg_process(DBusMessage *msg, void *priv)
 {
 	DBusMessageIter args;
 	dbus_bool_t dbres;
@@ -128,8 +170,8 @@ static int stringdump_msg_process(DBusMessage *msg, void *priv)
 		return -EINVAL;
 	}
 	dbus_message_iter_get_basic(&args, &param);
-	pr_out("%s\n", param);
-	return 0;
+
+	return __jsonloaddump(param);
 }
 
 #define boolyesno(val) (val ? "yes" : "no")
@@ -496,12 +538,10 @@ static int stateview_json_process(char *dump)
 	json_t *json;
 	json_t *setup_json;
 	json_t *ports_json;
-	json_error_t jerror;
 
-	json = json_loads(dump, JSON_REJECT_DUPLICATES, &jerror);
-	if (!json)
-		goto parseerr;
-
+	err = __jsonload(&json, dump);
+	if (err)
+		return err;
 	err = json_unpack(json, "{s:o, s:o}", "setup", &setup_json,
 					      "ports", &ports_json);
 	if (err)
@@ -635,7 +675,7 @@ static struct command_type command_types[] = {
 		.name = "dump",
 		.dbus_method_name = "ConfigDump",
 		.msg_prepare = norequest_msg_prepare,
-		.msg_process = stringdump_msg_process,
+		.msg_process = jsonsimpledump_msg_process,
 	},
 	{
 		.id = ID_CMDTYPE_S,
@@ -650,7 +690,7 @@ static struct command_type command_types[] = {
 		.name = "dump",
 		.dbus_method_name = "StateDump",
 		.msg_prepare = norequest_msg_prepare,
-		.msg_process = stringdump_msg_process,
+		.msg_process = jsonsimpledump_msg_process,
 	},
 	{
 		.id = ID_CMDTYPE_S_V,
