@@ -164,6 +164,7 @@ int teamd_state_json_dump(struct teamd_context *ctx, json_t **pstate_json);
 int teamd_state_json_basics_init(struct teamd_context *ctx);
 void teamd_state_json_basics_fini(struct teamd_context *ctx);
 
+int teamd_get_actual_config(struct teamd_context *ctx, json_t **pactual_json);
 int teamd_update_port_config(struct teamd_context *ctx, const char *port_name,
 			     const char *json_port_cfg_str);
 
@@ -236,6 +237,8 @@ void *teamd_get_first_port_priv_by_creator(struct teamd_port *tdport,
 int teamd_per_port_init(struct teamd_context *ctx);
 void teamd_per_port_fini(struct teamd_context *ctx);
 struct teamd_port *teamd_get_port(struct teamd_context *ctx, uint32_t ifindex);
+struct teamd_port *teamd_get_port_by_ifname(struct teamd_context *ctx,
+					    char *ifname);
 struct teamd_port *teamd_get_next_tdport(struct teamd_context *ctx,
 					 struct teamd_port *tdport);
 #define teamd_for_each_tdport(tdport, ctx)				\

@@ -165,18 +165,54 @@ out:
 	return reply;
 }
 
+#define JSON_DUMPS_FLAGS (JSON_INDENT(4) | JSON_ENSURE_ASCII | JSON_SORT_KEYS)
+
 static DBusMessage *dbus_method_config_dump(DBusMessage *message,
 					    struct teamd_context *ctx)
 {
 	DBusMessage *reply = NULL;
 	char *cfg;
 
-	cfg = json_dumps(ctx->config_json, JSON_INDENT(4) | JSON_ENSURE_ASCII | JSON_SORT_KEYS);
+	cfg = json_dumps(ctx->config_json, JSON_DUMPS_FLAGS);
 	if (!cfg) {
-		teamd_log_err("Failed to get config dump.");
+		teamd_log_err("Failed to dump config.");
 		reply = dbus_message_new_error(message,
 					       TEAMD_DBUS_IFACE ".ConfigDumpFail",
 					       "Failed to dump config.");
+		goto out;
+	}
+	reply = dbus_message_new_method_return(message);
+	if (reply)
+		dbus_message_append_args(reply, DBUS_TYPE_STRING, &cfg,
+					 DBUS_TYPE_INVALID);
+	free(cfg);
+out:
+	return reply;
+}
+
+static DBusMessage *dbus_method_config_dump_actual(DBusMessage *message,
+						   struct teamd_context *ctx)
+{
+	DBusMessage *reply = NULL;
+	char *cfg;
+	json_t *actual_json;
+	int err;
+
+	err = teamd_get_actual_config(ctx, &actual_json);
+	if (err) {
+		teamd_log_err("Failed to get actual config.");
+		reply = dbus_message_new_error(message,
+					       TEAMD_DBUS_IFACE ".ConfigDumpActualFail",
+					       "Failed to get actual config.");
+		goto out;
+	}
+	cfg = json_dumps(actual_json, JSON_DUMPS_FLAGS);
+	json_decref(actual_json);
+	if (!cfg) {
+		teamd_log_err("Failed to dump actual config.");
+		reply = dbus_message_new_error(message,
+					       TEAMD_DBUS_IFACE ".ConfigDumpActualFail",
+					       "Failed to dump actual config.");
 		goto out;
 	}
 	reply = dbus_message_new_method_return(message);
@@ -204,8 +240,7 @@ static DBusMessage *dbus_method_state_dump(DBusMessage *message,
 					       "Failed to get state.");
 		goto out;
 	}
-	state = json_dumps(state_json, JSON_INDENT(4) | JSON_ENSURE_ASCII |
-			   JSON_SORT_KEYS);
+	state = json_dumps(state_json, JSON_DUMPS_FLAGS);
 	json_decref(state_json);
 	if (!state) {
 		teamd_log_err("Failed to dump state.");
@@ -237,6 +272,8 @@ static const char *introspection_xml =
 	"      <arg type='s' name='port_devname' direction='in'/>"
 	"    </method>"
 	"    <method name='ConfigDump'>"
+	"    </method>"
+	"    <method name='ConfigDumpActual'>"
 	"    </method>"
 	"    <method name='StateDump'>"
 	"    </method>"
@@ -286,6 +323,8 @@ static DBusHandlerResult message_handler(DBusConnection *con,
 			reply = dbus_method_port_remove(message, ctx);
 		} else if (!strcmp(method, "ConfigDump")) {
 			reply = dbus_method_config_dump(message, ctx);
+		} else if (!strcmp(method, "ConfigDumpActual")) {
+			reply = dbus_method_config_dump_actual(message, ctx);
 		} else if (!strcmp(method, "StateDump")) {
 			reply = dbus_method_state_dump(message, ctx);
 		}

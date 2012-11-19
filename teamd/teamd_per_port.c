@@ -225,6 +225,18 @@ static struct port_obj *get_port_obj(struct teamd_context *ctx,
 	return NULL;
 }
 
+static struct port_obj *get_port_obj_by_ifname(struct teamd_context *ctx,
+					       char *ifname)
+{
+	struct port_obj *port_obj;
+
+	list_for_each_node_entry(port_obj, &ctx->port_obj_list, list) {
+		if (!strcmp(_port(port_obj)->ifname, ifname))
+			return port_obj;
+	}
+	return NULL;
+}
+
 static void check_port_objs_to_be_freed(struct teamd_context *ctx)
 {
 	struct port_obj *port_obj, *tmp;
@@ -295,6 +307,17 @@ struct teamd_port *teamd_get_port(struct teamd_context *ctx, uint32_t ifindex)
 	struct port_obj *port_obj;
 
 	port_obj = get_port_obj(ctx, ifindex);
+	if (!port_obj)
+		return NULL;
+	return _port(port_obj);
+}
+
+struct teamd_port *teamd_get_port_by_ifname(struct teamd_context *ctx,
+					    char *ifname)
+{
+	struct port_obj *port_obj;
+
+	port_obj = get_port_obj_by_ifname(ctx, ifname);
 	if (!port_obj)
 		return NULL;
 	return _port(port_obj);

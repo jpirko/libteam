@@ -780,19 +780,19 @@ static int teamd_check_change_hwaddr(struct teamd_context *ctx)
 	return err;
 }
 
-static int get_port_obj(json_t **pport_obj, struct teamd_context *ctx,
+static int get_port_obj(json_t **pport_obj, json_t *config_json,
 			const char *port_name)
 {
 	int err;
 	json_t *ports_obj;
 	json_t *port_obj;
 
-	err = json_unpack(ctx->config_json, "{s:o}", "ports", &ports_obj);
+	err = json_unpack(config_json, "{s:o}", "ports", &ports_obj);
 	if (err) {
 		ports_obj = json_object();
 		if (!ports_obj)
 			return -ENOMEM;
-		err = json_object_set(ctx->config_json, "ports", ports_obj);
+		err = json_object_set(config_json, "ports", ports_obj);
 		if (err) {
 			json_decref(ports_obj);
 			return -ENOMEM;
@@ -809,8 +809,55 @@ static int get_port_obj(json_t **pport_obj, struct teamd_context *ctx,
 			return -ENOMEM;
 		}
 	}
-	*pport_obj = port_obj;
+	if (pport_obj)
+		*pport_obj = port_obj;
 	return 0;
+}
+
+int teamd_get_actual_config(struct teamd_context *ctx, json_t **pactual_json)
+{
+	json_t *actual_json;
+	struct teamd_port *tdport;
+	json_t *ports_obj;
+	void *iter;
+	int err;
+
+	actual_json = json_deep_copy(ctx->config_json);
+	if (!actual_json)
+		return -ENOMEM;
+
+	/*
+	 * Create json objects for all present ports
+	 */
+	teamd_for_each_tdport(tdport, ctx) {
+		err = get_port_obj(NULL, actual_json, tdport->ifname);
+		if (err)
+			goto errout;
+	}
+
+	/*
+	 * Get rid of json object of ports which are not present
+	 */
+	err = json_unpack(actual_json, "{s:o}", "ports", &ports_obj);
+	if (err) {
+		err = -EINVAL;
+		goto errout;
+	}
+	iter = json_object_iter(ports_obj);
+	while (iter) {
+		const char *port_name = json_object_iter_key(iter);
+
+		iter = json_object_iter_next(ports_obj, iter);
+		if (!teamd_get_port_by_ifname(ctx, (char *) port_name))
+			json_object_del(ports_obj, port_name);
+	}
+
+	*pactual_json = actual_json;
+	return 0;
+
+errout:
+	json_decref(actual_json);
+	return err;
 }
 
 int teamd_update_port_config(struct teamd_context *ctx, const char *port_name,
@@ -829,7 +876,7 @@ int teamd_update_port_config(struct teamd_context *ctx, const char *port_name,
 			      jerror.text, jerror.line, jerror.column);
 		return -EIO;
 	}
-	err = get_port_obj(&port_obj, ctx, port_name);
+	err = get_port_obj(&port_obj, ctx->config_json, port_name);
 	if (err) {
 		teamd_log_err("%s: Failed to obtain port config object",
 			      port_name);
