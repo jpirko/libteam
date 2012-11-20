@@ -300,6 +300,7 @@ static void lw_ethtool_port_removed(struct teamd_context *ctx,
 				    void *priv, void *creator_priv)
 {
 	teamd_event_watch_unregister(ctx, &lw_ethtool_port_watch_ops, priv);
+	teamd_loop_callback_del(ctx, LW_ETHTOOL_DELAY_CB_NAME, priv);
 }
 
 static json_t *lw_ethtool_state_json(struct teamd_context *ctx,
