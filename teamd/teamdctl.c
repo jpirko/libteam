@@ -36,6 +36,7 @@ enum verbosity_level {
 	VERB4,
 };
 
+static bool g_oneline = false;
 #define DEFAULT_VERB VERB1
 static int g_verbosity = DEFAULT_VERB;
 static int g_indent_level = 0;
@@ -124,8 +125,9 @@ static int __jsonload(json_t **pjson, char *inputstrjson)
 static int __jsondump(json_t *json)
 {
 	char *dump;
+	int indent = g_oneline ? 0 : 4;
 
-	dump = json_dumps(json, JSON_INDENT(4) | JSON_ENSURE_ASCII |
+	dump = json_dumps(json, JSON_INDENT(indent) | JSON_ENSURE_ASCII |
 				JSON_SORT_KEYS);
 	if (!dump) {
 		pr_err("Failed to get JSON dump.\n");
@@ -924,7 +926,8 @@ static void print_help(const char *argv0) {
 	pr_out(
             "%s [options] teamdevname command [command args]\n"
             "\t-h --help                Show this help\n"
-            "\t-v --verbose             Increase verbosity\n",
+            "\t-v --verbose             Increase output verbosity\n"
+            "\t-o --oneline             Force output to one line if possible\n",
             argv0);
 	pr_out("Commands:\n");
 	for (i = 0; i < COMMAND_TYPE_COUNT; i++) {
@@ -946,13 +949,14 @@ int main(int argc, char **argv)
 	static const struct option long_options[] = {
 		{ "help",		no_argument,		NULL, 'h' },
 		{ "verbose",		no_argument,		NULL, 'v' },
+		{ "oneline",		no_argument,		NULL, 'o' },
 		{ NULL, 0, NULL, 0 }
 	};
 	int opt;
 	int err;
 	struct command_type *command_type;
 
-	while ((opt = getopt_long(argc, argv, "hv",
+	while ((opt = getopt_long(argc, argv, "hvo",
 				  long_options, NULL)) >= 0) {
 
 		switch(opt) {
@@ -961,6 +965,9 @@ int main(int argc, char **argv)
 			return EXIT_SUCCESS;
 		case 'v':
 			g_verbosity++;
+			break;
+		case 'o':
+			g_oneline = true;
 			break;
 		case '?':
 			pr_err("unknown option.\n");
