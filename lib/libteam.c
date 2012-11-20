@@ -684,6 +684,16 @@ static int get_sock_event_fd(struct team_handle *th)
 static int sock_event_handler(struct team_handle *th)
 {
 	nl_recvmsgs_default(th->nl_sock_event);
+
+	/*
+	 * Port list messages are not multipart and therefore
+	 * finish_handler() is not called. So clear recv started here
+	 * instead.
+	 *
+	 * TODO: remove this once port list messages are multipart as well.
+	 */
+	th->msg_recv_started = false;
+
 	return check_call_change_handlers(th, TEAM_PORT_CHANGE |
 					      TEAM_OPTION_CHANGE);
 }
