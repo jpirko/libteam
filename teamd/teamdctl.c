@@ -635,6 +635,72 @@ static int portconfigupdate_msg_prepare(DBusMessage *msg, int argc, char **argv,
 	return 0;
 }
 
+struct portconfigdump_priv {
+	char *port_name;
+};
+
+static int portconfigdump_msg_prepare(DBusMessage *msg, int argc, char **argv,
+				      void *priv)
+{
+	struct portconfigdump_priv *pcd_priv = priv;
+
+	if (argc < 1) {
+		pr_err("Port name as a command line parameter expected.\n");
+		return -EINVAL;
+	}
+	pcd_priv->port_name = argv[0];
+	return 0;
+}
+
+static int portconfigdump_json_process(char *dump, char *port_name)
+{
+	int err;
+	json_t *json;
+	json_t *port_json;
+	json_t *ports_json;
+
+	err = __jsonload(&json, dump);
+	if (err)
+		return err;
+	err = json_unpack(json, "{s:o}", "ports", &ports_json);
+	if (err) {
+		pr_err("Failed to parse JSON dump.\n");
+		err = -EINVAL;
+		goto free_json;
+	}
+	err = json_unpack(ports_json, "{s:o}", port_name, &port_json);
+	if (err) {
+		pr_err("Port named \"%s\" not found.\n", port_name);
+		err = -EINVAL;
+		goto free_json;
+	}
+	err = __jsondump(port_json);
+free_json:
+	json_decref(json);
+	return err;
+}
+
+static int portconfigdump_msg_process(DBusMessage *msg, void *priv)
+{
+	struct portconfigdump_priv *pcd_priv = priv;
+	DBusMessageIter args;
+	dbus_bool_t dbres;
+	char *param = NULL;
+
+	dbres = dbus_message_iter_init(msg, &args);
+	if (dbres == FALSE) {
+		pr_err("Failed, no data received.\n");
+		return -EINVAL;
+	}
+
+	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
+		pr_err("Received argument is not string as expected.\n");
+		return -EINVAL;
+	}
+	dbus_message_iter_get_basic(&args, &param);
+	return portconfigdump_json_process(param, pcd_priv->port_name);
+}
+
 enum id_command_type {
 	ID_CMDTYPE_NONE = 0,
 	ID_CMDTYPE_C,
@@ -648,6 +714,7 @@ enum id_command_type {
 	ID_CMDTYPE_P_R,
 	ID_CMDTYPE_P_C,
 	ID_CMDTYPE_P_C_U,
+	ID_CMDTYPE_P_C_D,
 };
 
 typedef int (*msg_prepare_t)(DBusMessage *msg, int argc, char **argv,
@@ -746,6 +813,16 @@ static struct command_type command_types[] = {
 		.params = {"PORTDEV", "PORTCONFIG"},
 		.msg_prepare = portconfigupdate_msg_prepare,
 		.msg_process = noreply_msg_process,
+	},
+	{
+		.id = ID_CMDTYPE_P_C_D,
+		.parent_id = ID_CMDTYPE_P_C,
+		.name = "dump",
+		.dbus_method_name = "ConfigDumpActual",
+		.params = {"PORTDEV"},
+		.msg_prepare = portconfigdump_msg_prepare,
+		.msg_process = portconfigdump_msg_process,
+		.priv_size = sizeof(struct portconfigdump_priv),
 	},
 };
 #define COMMAND_TYPE_COUNT ARRAY_SIZE(command_types)
