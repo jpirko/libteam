@@ -543,7 +543,7 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 		return -nl2syserr(err);
 	}
 
-	nl_socket_modify_err_cb(th->nl_sock,NL_CB_CUSTOM,
+	nl_socket_modify_err_cb(th->nl_sock, NL_CB_CUSTOM,
 				error_handler, &th->nl_sock_err);
 	nl_socket_modify_cb(th->nl_sock, NL_CB_FINISH, NL_CB_CUSTOM,
 			    finish_handler, th);
