@@ -149,12 +149,11 @@ int get_port_list_handler(struct nl_msg *msg, void *arg)
 		}
 		port->changed = port_attrs[TEAM_ATTR_PORT_CHANGED] ? true : false;
 		port->linkup = port_attrs[TEAM_ATTR_PORT_LINKUP] ? true : false;
+		port->removed = port_attrs[TEAM_ATTR_PORT_REMOVED] ? true : false;
 		if (port_attrs[TEAM_ATTR_PORT_SPEED])
 			port->speed = nla_get_u32(port_attrs[TEAM_ATTR_PORT_SPEED]);
 		if (port_attrs[TEAM_ATTR_PORT_DUPLEX])
 			port->duplex = nla_get_u8(port_attrs[TEAM_ATTR_PORT_DUPLEX]);
-		if (port_attrs[TEAM_ATTR_PORT_REMOVED])
-			port->removed = true;
 	}
 
 	set_call_change_handlers(th, TEAM_PORT_CHANGE);
