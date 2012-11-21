@@ -546,23 +546,21 @@ static int stateview_json_process(char *dump)
 		return err;
 	err = json_unpack(json, "{s:o, s:o}", "setup", &setup_json,
 					      "ports", &ports_json);
-	if (err)
-		goto parseerr;
+	if (err) {
+		pr_err("Failed to parse JSON dump.\n");
+		err = -EINVAL;
+		goto free_json;
+	}
 	err = stateview_json_setup_process(&runner_name, setup_json);
 	if (err)
-		return err;
+		goto free_json;
 	err = stateview_json_ports_process(runner_name, ports_json);
 	if (err)
-		return err;
+		goto free_json;
 	err = stateview_json_runner_process(runner_name, json);
-	if (err)
-		return err;
-
-	return 0;
-
-parseerr:
-	pr_err("Failed to parse JSON dump.\n");
-	return -EINVAL;
+free_json:
+	json_decref(json);
+	return err;
 }
 
 static int stateview_msg_process(DBusMessage *msg, void *priv)
