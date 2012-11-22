@@ -176,6 +176,45 @@ static int jsonsimpledump_msg_process(DBusMessage *msg, void *priv)
 	return __jsonloaddump(param);
 }
 
+static int noportsdump_json_process(char *dump)
+{
+	int err;
+	json_t *json;
+
+	err = __jsonload(&json, dump);
+	if (err)
+		return err;
+	json_object_del(json, "ports");
+	err = __jsondump(json);
+	json_decref(json);
+	return err;
+}
+
+static int jsonnoportsdump_msg_process(DBusMessage *msg, void *priv)
+{
+	DBusMessageIter args;
+	dbus_bool_t dbres;
+	char *param = NULL;
+	int err;
+
+	err = check_error_msg(msg);
+	if (err)
+		return err;
+	dbres = dbus_message_iter_init(msg, &args);
+	if (dbres == FALSE) {
+		pr_err("Failed, no data received.\n");
+		return -EINVAL;
+	}
+
+	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
+		pr_err("Received argument is not string as expected.\n");
+		return -EINVAL;
+	}
+	dbus_message_iter_get_basic(&args, &param);
+
+	return noportsdump_json_process(param);
+}
+
 #define boolyesno(val) (val ? "yes" : "no")
 #define boolupdown(val) (val ? "up" : "down")
 
@@ -703,6 +742,7 @@ enum id_command_type {
 	ID_CMDTYPE_NONE = 0,
 	ID_CMDTYPE_C,
 	ID_CMDTYPE_C_D,
+	ID_CMDTYPE_C_D_N,
 	ID_CMDTYPE_C_D_A,
 	ID_CMDTYPE_S,
 	ID_CMDTYPE_S_D,
@@ -744,6 +784,14 @@ static struct command_type command_types[] = {
 		.dbus_method_name = "ConfigDump",
 		.msg_prepare = norequest_msg_prepare,
 		.msg_process = jsonsimpledump_msg_process,
+	},
+	{
+		.id = ID_CMDTYPE_C_D_N,
+		.parent_id = ID_CMDTYPE_C_D,
+		.name = "noports",
+		.dbus_method_name = "ConfigDump",
+		.msg_prepare = norequest_msg_prepare,
+		.msg_process = jsonnoportsdump_msg_process,
 	},
 	{
 		.id = ID_CMDTYPE_C_D_A,
