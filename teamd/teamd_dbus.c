@@ -23,240 +23,12 @@
 #include <unistd.h>
 #include <errno.h>
 #include <dbus/dbus.h>
-#include <jansson.h>
 #include <private/misc.h>
 #include <team.h>
 
 #include "teamd.h"
 #include "teamd_dbus.h"
-
-static DBusMessage *dbus_method_port_config_update(DBusMessage *message,
-						   struct teamd_context *ctx)
-{
-	DBusMessage *reply;
-	DBusError error;
-	const char *port_devname;
-	const char *port_config;
-	uint32_t ifindex;
-	int err;
-
-	dbus_error_init(&error);
-	if (dbus_message_get_args(message, &error,
-				  DBUS_TYPE_STRING, &port_devname,
-				  DBUS_TYPE_STRING, &port_config,
-				  DBUS_TYPE_INVALID) == FALSE) {
-		teamd_log_err("Failed to get args: %s: %s",
-			      error.name, error.message);
-		reply = dbus_message_new_error(message,
-					       TEAMD_DBUS_IFACE ".InvalidArgs",
-					       "Did not receive correct "
-					       "message arguments.");
-		goto out;
-	}
-	teamd_log_dbgx(ctx, 2, "port_devname \"%s\", port_config \"%s\"",
-		       port_devname, port_config);
-
-	ifindex = team_ifname2ifindex(ctx->th, port_devname);
-	if (!ifindex) {
-		teamd_log_err("Device \"%s\" does not exist.", port_devname);
-		reply = dbus_message_new_error(message,
-					       TEAMD_DBUS_IFACE ".NoSuchDev",
-					       "No such device.");
-		goto out;
-	}
-	err = teamd_update_port_config(ctx, port_devname, port_config);
-	if (err) {
-		teamd_log_err("Failed to update config for port \"%s\".",
-			      port_devname);
-		reply = dbus_message_new_error(message,
-					       TEAMD_DBUS_IFACE ".ConfigUpdateFail",
-					       "Failed to update config.");
-		goto out;
-	}
-	reply = dbus_message_new_method_return(message);
-out:
-	dbus_error_free(&error);
-	return reply;
-}
-
-static DBusMessage *dbus_method_port_add(DBusMessage *message,
-					 struct teamd_context *ctx)
-{
-	DBusMessage *reply;
-	DBusError error;
-	const char *port_devname;
-	int err;
-
-	dbus_error_init(&error);
-	if (dbus_message_get_args(message, &error,
-				  DBUS_TYPE_STRING, &port_devname,
-				  DBUS_TYPE_INVALID) == FALSE) {
-		teamd_log_err("Failed to get args: %s: %s",
-			      error.name, error.message);
-		reply = dbus_message_new_error(message,
-					       TEAMD_DBUS_IFACE ".InvalidArgs",
-					       "Did not receive correct "
-					       "message arguments.");
-		goto out;
-	}
-	teamd_log_dbgx(ctx, 2, "port_devname \"%s\"", port_devname);
-
-	err = teamd_port_add(ctx, port_devname);
-	switch (err) {
-	case -ENODEV:
-		reply = dbus_message_new_error(message,
-					       TEAMD_DBUS_IFACE ".NoSuchDev",
-					       "No such device.");
-		goto out;
-	case 0:
-		break;
-	default:
-		reply = dbus_message_new_error(message,
-					       TEAMD_DBUS_IFACE ".PortAddFail",
-					       "Failed to add port.");
-		goto out;
-	}
-	reply = dbus_message_new_method_return(message);
-out:
-	dbus_error_free(&error);
-	return reply;
-}
-
-static DBusMessage *dbus_method_port_remove(DBusMessage *message,
-					    struct teamd_context *ctx)
-{
-	DBusMessage *reply;
-	DBusError error;
-	const char *port_devname;
-	int err;
-
-	dbus_error_init(&error);
-	if (dbus_message_get_args(message, &error,
-				  DBUS_TYPE_STRING, &port_devname,
-				  DBUS_TYPE_INVALID) == FALSE) {
-		teamd_log_err("Failed to get args: %s: %s",
-			      error.name, error.message);
-		reply = dbus_message_new_error(message,
-					       TEAMD_DBUS_IFACE ".InvalidArgs",
-					       "Did not receive correct "
-					       "message arguments.");
-		goto out;
-	}
-	teamd_log_dbgx(ctx, 2, "port_devname \"%s\"", port_devname);
-
-	err = teamd_port_remove(ctx, port_devname);
-	switch (err) {
-	case -ENODEV:
-		reply = dbus_message_new_error(message,
-					       TEAMD_DBUS_IFACE ".NoSuchDev",
-					       "No such device.");
-		goto out;
-	case 0:
-		break;
-	default:
-		reply = dbus_message_new_error(message,
-					       TEAMD_DBUS_IFACE ".PortRemoveFail",
-					       "Failed to del port.");
-		goto out;
-	}
-	reply = dbus_message_new_method_return(message);
-out:
-	dbus_error_free(&error);
-	return reply;
-}
-
-#define JSON_DUMPS_FLAGS (JSON_INDENT(4) | JSON_ENSURE_ASCII | JSON_SORT_KEYS)
-
-static DBusMessage *dbus_method_config_dump(DBusMessage *message,
-					    struct teamd_context *ctx)
-{
-	DBusMessage *reply = NULL;
-	char *cfg;
-
-	cfg = json_dumps(ctx->config_json, JSON_DUMPS_FLAGS);
-	if (!cfg) {
-		teamd_log_err("Failed to dump config.");
-		reply = dbus_message_new_error(message,
-					       TEAMD_DBUS_IFACE ".ConfigDumpFail",
-					       "Failed to dump config.");
-		goto out;
-	}
-	reply = dbus_message_new_method_return(message);
-	if (reply)
-		dbus_message_append_args(reply, DBUS_TYPE_STRING, &cfg,
-					 DBUS_TYPE_INVALID);
-	free(cfg);
-out:
-	return reply;
-}
-
-static DBusMessage *dbus_method_config_dump_actual(DBusMessage *message,
-						   struct teamd_context *ctx)
-{
-	DBusMessage *reply = NULL;
-	char *cfg;
-	json_t *actual_json;
-	int err;
-
-	err = teamd_get_actual_config(ctx, &actual_json);
-	if (err) {
-		teamd_log_err("Failed to get actual config.");
-		reply = dbus_message_new_error(message,
-					       TEAMD_DBUS_IFACE ".ConfigDumpActualFail",
-					       "Failed to get actual config.");
-		goto out;
-	}
-	cfg = json_dumps(actual_json, JSON_DUMPS_FLAGS);
-	json_decref(actual_json);
-	if (!cfg) {
-		teamd_log_err("Failed to dump actual config.");
-		reply = dbus_message_new_error(message,
-					       TEAMD_DBUS_IFACE ".ConfigDumpActualFail",
-					       "Failed to dump actual config.");
-		goto out;
-	}
-	reply = dbus_message_new_method_return(message);
-	if (reply)
-		dbus_message_append_args(reply, DBUS_TYPE_STRING, &cfg,
-					 DBUS_TYPE_INVALID);
-	free(cfg);
-out:
-	return reply;
-}
-
-static DBusMessage *dbus_method_state_dump(DBusMessage *message,
-					   struct teamd_context *ctx)
-{
-	DBusMessage *reply = NULL;
-	json_t *state_json;
-	int err;
-	char *state;
-
-	err = teamd_state_json_dump(ctx, &state_json);
-	if (err) {
-		teamd_log_err("Failed to get state.");
-		reply = dbus_message_new_error(message,
-					       TEAMD_DBUS_IFACE ".StateDumpFail",
-					       "Failed to get state.");
-		goto out;
-	}
-	state = json_dumps(state_json, JSON_DUMPS_FLAGS);
-	json_decref(state_json);
-	if (!state) {
-		teamd_log_err("Failed to dump state.");
-		reply = dbus_message_new_error(message,
-					       TEAMD_DBUS_IFACE ".StateDumpFail",
-					       "Failed to dump state.");
-		goto out;
-	}
-	reply = dbus_message_new_method_return(message);
-	if (reply)
-		dbus_message_append_args(reply, DBUS_TYPE_STRING, &state,
-					 DBUS_TYPE_INVALID);
-	free(state);
-out:
-	return reply;
-}
+#include "teamd_ctl_methods.h"
 
 static const char *introspection_xml =
 	"<node name='" TEAMD_DBUS_PATH "'>"
@@ -292,6 +64,85 @@ static DBusMessage *introspect(DBusMessage *message)
 	return reply;
 }
 
+struct dbus_ops_priv {
+	DBusMessage *reply;
+	DBusMessage *message;
+};
+
+static int dbus_op_get_args(void *ops_priv, const char *fmt, ...)
+{
+	va_list ap;
+	struct dbus_ops_priv *dbus_ops_priv = ops_priv;
+	DBusMessage *message = dbus_ops_priv->message;
+	DBusMessageIter iter;
+	int arg_type;
+	char **pstr;
+
+	dbus_message_iter_init(message, &iter);
+	va_start(ap, fmt);
+	while (*fmt) {
+		arg_type = dbus_message_iter_get_arg_type(&iter);
+		if (arg_type == DBUS_TYPE_INVALID) {
+			teamd_log_err("Insufficient number of arguments in message.");
+			return -ENOENT;
+		}
+		switch (*fmt++) {
+		case 's': /* string */
+			if (arg_type != DBUS_TYPE_STRING) {
+				teamd_log_err("Unexpected argument type found in message.");
+				return -EINVAL;
+			}
+			pstr = va_arg(ap, char **);
+			dbus_message_iter_get_basic(&iter, pstr);
+			break;
+		default:
+			teamd_log_err("Unknown argument type requested");
+			return -EINVAL;
+		}
+		dbus_message_iter_next(&iter);
+	}
+	va_end(ap);
+	return 0;
+}
+
+static int dbus_op_reply_err(void *ops_priv, const char *err_code,
+			     const char *err_msg)
+{
+	struct dbus_ops_priv *dbus_ops_priv = ops_priv;
+	int err;
+	char *err_code_buf;
+
+	err = asprintf(&err_code_buf, TEAMD_DBUS_IFACE "%s", err_code);
+	if (err == -1)
+		return -errno;
+	dbus_ops_priv->reply = dbus_message_new_error(dbus_ops_priv->message,
+						      err_code_buf,
+						      err_msg);
+	free(err_code_buf);
+	return 0;
+}
+
+static int dbus_op_reply_succ(void *ops_priv, const char *msg)
+{
+	struct dbus_ops_priv *dbus_ops_priv = ops_priv;
+	DBusMessage *reply;
+
+	if (!msg)
+		return 0;
+	reply = dbus_message_new_method_return(dbus_ops_priv->message);
+	if (reply)
+		dbus_message_append_args(reply, DBUS_TYPE_STRING, &msg,
+					 DBUS_TYPE_INVALID);
+	dbus_ops_priv->reply = reply;
+	return 0;
+}
+
+static const struct teamd_ctl_method_ops teamd_dbus_ctl_method_ops = {
+	.get_args = dbus_op_get_args,
+	.reply_err = dbus_op_reply_err,
+	.reply_succ = dbus_op_reply_succ,
+};
+
 static DBusHandlerResult message_handler(DBusConnection *con,
 					 DBusMessage *message,
 					 void *user_data)
@@ -314,20 +165,15 @@ static DBusHandlerResult message_handler(DBusConnection *con,
 		reply = introspect(message);
 	}
 
-	if (!strcmp(msg_interface, TEAMD_DBUS_IFACE)) {
-		if (!strcmp(method, "PortConfigUpdate")) {
-			reply = dbus_method_port_config_update(message, ctx);
-		} else if (!strcmp(method, "PortAdd")) {
-			reply = dbus_method_port_add(message, ctx);
-		} else if (!strcmp(method, "PortRemove")) {
-			reply = dbus_method_port_remove(message, ctx);
-		} else if (!strcmp(method, "ConfigDump")) {
-			reply = dbus_method_config_dump(message, ctx);
-		} else if (!strcmp(method, "ConfigDumpActual")) {
-			reply = dbus_method_config_dump_actual(message, ctx);
-		} else if (!strcmp(method, "StateDump")) {
-			reply = dbus_method_state_dump(message, ctx);
-		}
+	if (!strcmp(msg_interface, TEAMD_DBUS_IFACE) &&
+	    teamd_ctl_method_exists(method)) {
+		struct dbus_ops_priv dbus_ops_priv;
+
+		dbus_ops_priv.reply = NULL;
+		dbus_ops_priv.message = message;
+		teamd_ctl_method_call(ctx, method, &teamd_dbus_ctl_method_ops,
+				      &dbus_ops_priv);
+		reply = dbus_ops_priv.reply;
 	}
 
 	if (!dbus_message_get_no_reply(message)) {
