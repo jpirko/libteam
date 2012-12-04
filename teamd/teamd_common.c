@@ -22,6 +22,8 @@
 #include <errno.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <pwd.h>
+#include <sys/stat.h>
 #include <linux/if_packet.h>
 #include <linux/filter.h>
 

@@ -92,7 +92,8 @@ static void print_help(const struct teamd_context *ctx) {
             "    -r --force-recreate      Force team device recreation in case it\n"
             "                             already exists\n"
             "    -t --team-dev=DEVNAME    Use the specified team device\n"
-            "    -D --dbus-enable         Enable D-Bus interface\n",
+            "    -D --dbus-enable         Enable D-Bus interface\n"
+            "    -U --usock-enable        Enable UNIX domain socket interface\n",
             ctx->argv0);
 	printf("Available runners: ");
 	for (i = 0; i < TEAMD_RUNNER_LIST_SIZE; i++) {
@@ -119,10 +120,11 @@ static int parse_command_line(struct teamd_context *ctx,
 		{ "force-recreate",	no_argument,		NULL, 'r' },
 		{ "team-dev",		required_argument,	NULL, 't' },
 		{ "dbus-enable",	no_argument,		NULL, 'D' },
+		{ "usock-enable",	no_argument,		NULL, 'U' },
 		{ NULL, 0, NULL, 0 }
 	};
 
-	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:grt:D",
+	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:grt:DU",
 				  long_options, NULL)) >= 0) {
 
 		switch(opt) {
@@ -168,6 +170,9 @@ static int parse_command_line(struct teamd_context *ctx,
 			break;
 		case 'D':
 			ctx->dbus.enabled = true;
+			break;
+		case 'U':
+			ctx->usock.enabled = true;
 			break;
 		default:
 			return -1;
@@ -1290,10 +1295,16 @@ static int teamd_init(struct teamd_context *ctx)
 		goto runner_fini;
 	}
 
+	err = teamd_usock_init(ctx);
+	if (err) {
+		teamd_log_err("Failed to init unix domain socket.");
+		goto state_json_basics_fini;
+	}
+
 	err = teamd_dbus_init(ctx);
 	if (err) {
 		teamd_log_err("Failed to init dbus.");
-		goto state_json_basics_fini;
+		goto usock_fini;
 	}
 
 	err = teamd_add_ports(ctx);
@@ -1316,6 +1327,8 @@ static int teamd_init(struct teamd_context *ctx)
 
 dbus_fini:
 	teamd_dbus_fini(ctx);
+usock_fini:
+	teamd_usock_fini(ctx);
 state_json_basics_fini:
 	teamd_state_json_basics_fini(ctx);
 runner_fini:
@@ -1348,6 +1361,7 @@ config_free:
 static void teamd_fini(struct teamd_context *ctx)
 {
 	teamd_dbus_fini(ctx);
+	teamd_usock_fini(ctx);
 	teamd_runner_fini(ctx);
 	teamd_link_watch_fini(ctx);
 	teamd_per_port_fini(ctx);

@@ -25,6 +25,7 @@
 #include <errno.h>
 #include <libdaemon/dlog.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <jansson.h>
@@ -33,6 +34,8 @@
 #include <dbus/dbus.h>
 #include <team.h>
 #include <private/list.h>
+
+#define TEAMD_RUN_DIR LOCALSTATEDIR "/run/"
 
 #define teamd_log_err(args...) daemon_log(LOG_ERR, ##args)
 #define teamd_log_warn(args...) daemon_log(LOG_WARNING, ##args)
@@ -87,6 +90,11 @@ struct teamd_context {
 		bool			enabled;
 		DBusConnection *	con;
 	} dbus;
+	struct {
+		bool			enabled;
+		int			sock;
+		struct sockaddr_un	addr;
+	} usock;
 };
 
 struct teamd_port {
@@ -286,6 +294,9 @@ void teamd_option_watch_fini(struct teamd_context *ctx);
 int teamd_dbus_init(struct teamd_context *ctx);
 void teamd_dbus_fini(struct teamd_context *ctx);
 int teamd_dbus_expose_name(struct teamd_context *ctx);
+
+int teamd_usock_init(struct teamd_context *ctx);
+void teamd_usock_fini(struct teamd_context *ctx);
 
 struct teamd_balancer;
 int teamd_balancer_init(struct teamd_context *ctx, struct teamd_balancer **ptb);
