@@ -73,33 +73,9 @@ static void pr_out_indent_dec(void)
 #define pr_out4(args...) pr_outx(VERB4, ##args)
 
 
-static int check_error_msg(DBusMessage *msg)
-{
-	DBusMessageIter args;
-	dbus_bool_t dbres;
-	char *param = NULL;
-	const char *err_msg;
-
-	err_msg = dbus_message_get_error_name(msg);
-	if (!err_msg)
-		return 0;
-	pr_err("Error message received: \"%s\"\n", err_msg);
-
-	dbres = dbus_message_iter_init(msg, &args);
-	if (dbres == TRUE) {
-		if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
-			pr_err("Received argument is not string as expected.\n");
-			return -EINVAL;
-		}
-		dbus_message_iter_get_basic(&args, &param);
-		pr_err("Error message content: \"%s\"\n", param);
-	}
-	return -EINVAL;
-}
-
 static int noreply_msg_process(DBusMessage *msg, void *priv)
 {
-	return check_error_msg(msg);
+	return 0;
 }
 
 static int norequest_msg_prepare(DBusMessage *msg, int argc, char **argv,
@@ -156,11 +132,7 @@ static int jsonsimpledump_msg_process(DBusMessage *msg, void *priv)
 	DBusMessageIter args;
 	dbus_bool_t dbres;
 	char *param = NULL;
-	int err;
 
-	err = check_error_msg(msg);
-	if (err)
-		return err;
 	dbres = dbus_message_iter_init(msg, &args);
 	if (dbres == FALSE) {
 		pr_err("Failed, no data received.\n");
@@ -195,11 +167,7 @@ static int jsonnoportsdump_msg_process(DBusMessage *msg, void *priv)
 	DBusMessageIter args;
 	dbus_bool_t dbres;
 	char *param = NULL;
-	int err;
 
-	err = check_error_msg(msg);
-	if (err)
-		return err;
 	dbres = dbus_message_iter_init(msg, &args);
 	if (dbres == FALSE) {
 		pr_err("Failed, no data received.\n");
@@ -941,6 +909,30 @@ static int find_command(struct command_type **pcommand_type,
 	}
 }
 
+static int check_error_msg(DBusMessage *msg)
+{
+	DBusMessageIter args;
+	dbus_bool_t dbres;
+	char *param = NULL;
+	const char *err_msg;
+
+	err_msg = dbus_message_get_error_name(msg);
+	if (!err_msg)
+		return 0;
+	pr_err("Error message received: \"%s\"\n", err_msg);
+
+	dbres = dbus_message_iter_init(msg, &args);
+	if (dbres == TRUE) {
+		if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
+			pr_err("Received argument is not string as expected.\n");
+			return -EINVAL;
+		}
+		dbus_message_iter_get_basic(&args, &param);
+		pr_err("Error message content: \"%s\"\n", param);
+	}
+	return -EINVAL;
+}
+
 static int call_command(char *team_devname, int argc, char **argv,
 			struct command_type *command_type)
 {
@@ -1014,6 +1006,9 @@ static int call_command(char *team_devname, int argc, char **argv,
 	if (!msg)
 		goto bus_put;
 
+	err = check_error_msg(msg);
+	if (err)
+		goto free_message;
 	err = msg_process(msg, priv);
 	if (err) {
 		goto free_message;
