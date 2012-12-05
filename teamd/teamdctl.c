@@ -115,25 +115,9 @@ static int __jsonloaddump(char *inputstrjson)
 	return err;
 }
 
-static int jsonsimpledump_msg_process(DBusMessage *msg, void *priv)
+static int jsonsimpledump_msg_process(char *reply, void *priv)
 {
-	DBusMessageIter args;
-	dbus_bool_t dbres;
-	char *param = NULL;
-
-	dbres = dbus_message_iter_init(msg, &args);
-	if (dbres == FALSE) {
-		pr_err("Failed, no data received.\n");
-		return -EINVAL;
-	}
-
-	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
-		pr_err("Received argument is not string as expected.\n");
-		return -EINVAL;
-	}
-	dbus_message_iter_get_basic(&args, &param);
-
-	return __jsonloaddump(param);
+	return __jsonloaddump(reply);
 }
 
 static int noportsdump_json_process(char *dump)
@@ -150,25 +134,9 @@ static int noportsdump_json_process(char *dump)
 	return err;
 }
 
-static int jsonnoportsdump_msg_process(DBusMessage *msg, void *priv)
+static int jsonnoportsdump_msg_process(char *reply, void *priv)
 {
-	DBusMessageIter args;
-	dbus_bool_t dbres;
-	char *param = NULL;
-
-	dbres = dbus_message_iter_init(msg, &args);
-	if (dbres == FALSE) {
-		pr_err("Failed, no data received.\n");
-		return -EINVAL;
-	}
-
-	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
-		pr_err("Received argument is not string as expected.\n");
-		return -EINVAL;
-	}
-	dbus_message_iter_get_basic(&args, &param);
-
-	return noportsdump_json_process(param);
+	return noportsdump_json_process(reply);
 }
 
 #define boolyesno(val) (val ? "yes" : "no")
@@ -558,24 +526,9 @@ free_json:
 	return err;
 }
 
-static int stateview_msg_process(DBusMessage *msg, void *priv)
+static int stateview_msg_process(char *reply, void *priv)
 {
-	DBusMessageIter args;
-	dbus_bool_t dbres;
-	char *param = NULL;
-
-	dbres = dbus_message_iter_init(msg, &args);
-	if (dbres == FALSE) {
-		pr_err("Failed, no data received.\n");
-		return -EINVAL;
-	}
-
-	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
-		pr_err("Received argument is not string as expected.\n");
-		return -EINVAL;
-	}
-	dbus_message_iter_get_basic(&args, &param);
-	return stateview_json_process(param);
+	return stateview_json_process(reply);
 }
 
 static int portaddrm_msg_prepare(DBusMessage *msg, int argc, char **argv,
@@ -673,25 +626,11 @@ free_json:
 	return err;
 }
 
-static int portconfigdump_msg_process(DBusMessage *msg, void *priv)
+static int portconfigdump_msg_process(char *reply, void *priv)
 {
 	struct portconfigdump_priv *pcd_priv = priv;
-	DBusMessageIter args;
-	dbus_bool_t dbres;
-	char *param = NULL;
 
-	dbres = dbus_message_iter_init(msg, &args);
-	if (dbres == FALSE) {
-		pr_err("Failed, no data received.\n");
-		return -EINVAL;
-	}
-
-	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
-		pr_err("Received argument is not string as expected.\n");
-		return -EINVAL;
-	}
-	dbus_message_iter_get_basic(&args, &param);
-	return portconfigdump_json_process(param, pcd_priv->port_name);
+	return portconfigdump_json_process(reply, pcd_priv->port_name);
 }
 
 enum id_command_type {
@@ -713,7 +652,7 @@ enum id_command_type {
 
 typedef int (*msg_prepare_t)(DBusMessage *msg, int argc, char **argv,
 			     void *priv);
-typedef int (*msg_process_t)(DBusMessage *msg, void *priv);
+typedef int (*msg_process_t)(char *reply, void *priv);
 
 #define COMMAND_PARAM_MAX_CNT 8
 
@@ -912,6 +851,27 @@ static int check_error_msg(DBusMessage *msg)
 	return -EINVAL;
 }
 
+static int get_reply_str(char **preply, DBusMessage *msg)
+{
+	DBusMessageIter args;
+	dbus_bool_t dbres;
+	char *param = NULL;
+
+	dbres = dbus_message_iter_init(msg, &args);
+	if (dbres == FALSE) {
+		pr_err("Failed, no data received.\n");
+		return -EINVAL;
+	}
+
+	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
+		pr_err("Received argument is not string as expected.\n");
+		return -EINVAL;
+	}
+	dbus_message_iter_get_basic(&args, &param);
+	*preply = param;
+	return 0;
+}
+
 static int call_command(char *team_devname, int argc, char **argv,
 			struct command_type *command_type)
 {
@@ -991,7 +951,12 @@ static int call_command(char *team_devname, int argc, char **argv,
 		goto free_message;
 
 	if (msg_process) {
-		err = msg_process(msg, priv);
+		char *reply;
+
+		err = get_reply_str(&reply, msg);
+		if (err)
+			goto free_message;
+		err = msg_process(reply, priv);
 		if (err)
 			goto free_message;
 	}
