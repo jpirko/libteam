@@ -72,18 +72,6 @@ static void pr_out_indent_dec(void)
 #define pr_out3(args...) pr_outx(VERB3, ##args)
 #define pr_out4(args...) pr_outx(VERB4, ##args)
 
-
-static int noreply_msg_process(DBusMessage *msg, void *priv)
-{
-	return 0;
-}
-
-static int norequest_msg_prepare(DBusMessage *msg, int argc, char **argv,
-				 void *priv)
-{
-	return 0;
-}
-
 static int __jsonload(json_t **pjson, char *inputstrjson)
 {
 	json_t *json;
@@ -750,7 +738,6 @@ static struct command_type command_types[] = {
 		.parent_id = ID_CMDTYPE_C,
 		.name = "dump",
 		.dbus_method_name = "ConfigDump",
-		.msg_prepare = norequest_msg_prepare,
 		.msg_process = jsonsimpledump_msg_process,
 	},
 	{
@@ -758,7 +745,6 @@ static struct command_type command_types[] = {
 		.parent_id = ID_CMDTYPE_C_D,
 		.name = "noports",
 		.dbus_method_name = "ConfigDump",
-		.msg_prepare = norequest_msg_prepare,
 		.msg_process = jsonnoportsdump_msg_process,
 	},
 	{
@@ -766,14 +752,12 @@ static struct command_type command_types[] = {
 		.parent_id = ID_CMDTYPE_C_D,
 		.name = "actual",
 		.dbus_method_name = "ConfigDumpActual",
-		.msg_prepare = norequest_msg_prepare,
 		.msg_process = jsonsimpledump_msg_process,
 	},
 	{
 		.id = ID_CMDTYPE_S,
 		.name = "state",
 		.dbus_method_name = "StateDump",
-		.msg_prepare = norequest_msg_prepare,
 		.msg_process = stateview_msg_process,
 	},
 	{
@@ -781,7 +765,6 @@ static struct command_type command_types[] = {
 		.parent_id = ID_CMDTYPE_S,
 		.name = "dump",
 		.dbus_method_name = "StateDump",
-		.msg_prepare = norequest_msg_prepare,
 		.msg_process = jsonsimpledump_msg_process,
 	},
 	{
@@ -789,7 +772,6 @@ static struct command_type command_types[] = {
 		.parent_id = ID_CMDTYPE_S,
 		.name = "view",
 		.dbus_method_name = "StateDump",
-		.msg_prepare = norequest_msg_prepare,
 		.msg_process = stateview_msg_process,
 	},
 	{
@@ -803,7 +785,6 @@ static struct command_type command_types[] = {
 		.dbus_method_name = "PortAdd",
 		.params = {"PORTDEV"},
 		.msg_prepare = portaddrm_msg_prepare,
-		.msg_process = noreply_msg_process,
 	},
 	{
 		.id = ID_CMDTYPE_P_R,
@@ -812,7 +793,6 @@ static struct command_type command_types[] = {
 		.dbus_method_name = "PortRemove",
 		.params = {"PORTDEV"},
 		.msg_prepare = portaddrm_msg_prepare,
-		.msg_process = noreply_msg_process,
 	},
 	{
 		.id = ID_CMDTYPE_P_C,
@@ -826,7 +806,6 @@ static struct command_type command_types[] = {
 		.dbus_method_name = "PortConfigUpdate",
 		.params = {"PORTDEV", "PORTCONFIG"},
 		.msg_prepare = portconfigupdate_msg_prepare,
-		.msg_process = noreply_msg_process,
 	},
 	{
 		.id = ID_CMDTYPE_P_C_D,
@@ -978,9 +957,10 @@ static int call_command(char *team_devname, int argc, char **argv,
 		goto bus_put;
 	}
 
-	err = msg_prepare(msg, argc, argv, priv);
-	if (err) {
-		goto free_message;
+	if (msg_prepare) {
+		err = msg_prepare(msg, argc, argv, priv);
+		if (err)
+			goto free_message;
 	}
 
 	dbres = dbus_connection_send_with_reply(conn, msg, &pending, -1);
@@ -1009,12 +989,12 @@ static int call_command(char *team_devname, int argc, char **argv,
 	err = check_error_msg(msg);
 	if (err)
 		goto free_message;
-	err = msg_process(msg, priv);
-	if (err) {
-		goto free_message;
-	}
 
-	err = 0;
+	if (msg_process) {
+		err = msg_process(msg, priv);
+		if (err)
+			goto free_message;
+	}
 
 free_message:
 	dbus_message_unref(msg);
