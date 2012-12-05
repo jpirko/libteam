@@ -537,10 +537,6 @@ static int portaddrm_msg_prepare(DBusMessage *msg, int argc, char **argv,
 	DBusMessageIter args;
 	dbus_bool_t dbres;
 
-	if (argc < 1) {
-		pr_err("Port name as a command line parameter expected.\n");
-		return -EINVAL;
-	}
 	dbus_message_iter_init_append(msg, &args);
 	dbres = dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING,
 					       &argv[0]);
@@ -557,14 +553,6 @@ static int portconfigupdate_msg_prepare(DBusMessage *msg, int argc, char **argv,
 	DBusMessageIter args;
 	dbus_bool_t dbres;
 
-	if (argc < 1) {
-		pr_err("Port name as a command line parameter expected.\n");
-		return -EINVAL;
-	}
-	if (argc < 2) {
-		pr_err("Port config as a command line parameter expected.\n");
-		return -EINVAL;
-	}
 	dbus_message_iter_init_append(msg, &args);
 	dbres = dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING,
 					       &argv[0]);
@@ -590,10 +578,6 @@ static int portconfigdump_msg_prepare(DBusMessage *msg, int argc, char **argv,
 {
 	struct portconfigdump_priv *pcd_priv = priv;
 
-	if (argc < 1) {
-		pr_err("Port name as a command line parameter expected.\n");
-		return -EINVAL;
-	}
 	pcd_priv->port_name = argv[0];
 	return 0;
 }
@@ -768,7 +752,7 @@ static int __cmd_param_cnt(struct command_type *command_type)
 {
 	int i = 0;
 
-	while(command_type->params[i])
+	while (command_type->params[i])
 		i++;
 	return i;
 }
@@ -825,6 +809,22 @@ static int find_command(struct command_type **pcommand_type,
 		}
 		parent_id = command_type->id;
 	}
+}
+
+static int check_command_params(struct command_type *command_type,
+				int argc, char **argv)
+{
+	int i = 0;
+
+	while (command_type->params[i]) {
+		if (i == argc) {
+			pr_err("Command line parameter \"%s\" expected.\n",
+			       command_type->params[i]);
+			return -EINVAL;
+		}
+		i++;
+	}
+	return 0;
 }
 
 static int check_error_msg(DBusMessage *msg)
@@ -1053,6 +1053,11 @@ int main(int argc, char **argv)
 	argc -= optind + 1;
 
 	err = find_command(&command_type, &argc, &argv);
+	if (err) {
+		print_help(argv0);
+		return EXIT_FAILURE;
+	}
+	err = check_command_params(command_type, argc, argv);
 	if (err) {
 		print_help(argv0);
 		return EXIT_FAILURE;
