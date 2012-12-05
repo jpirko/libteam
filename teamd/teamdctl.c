@@ -808,7 +808,12 @@ static int check_command_params(struct command_type *command_type,
 	return 0;
 }
 
-static int check_error_msg(DBusMessage *msg)
+
+/*
+ * DBus client implementation
+ */
+
+static int cli_dbus_check_error_msg(DBusMessage *msg)
 {
 	DBusMessageIter args;
 	dbus_bool_t dbres;
@@ -832,7 +837,7 @@ static int check_error_msg(DBusMessage *msg)
 	return -EINVAL;
 }
 
-static int get_reply_str(char **preply, DBusMessage *msg)
+static int cli_dbus_get_reply_str(char **preply, DBusMessage *msg)
 {
 	DBusMessageIter args;
 	dbus_bool_t dbres;
@@ -893,8 +898,8 @@ static const struct msg_ops cli_dbus_msg_ops = {
 	.set_args = cli_dbus_set_args,
 };
 
-static int call_command(char *team_devname, int argc, char **argv,
-			struct command_type *command_type)
+static int cli_dbus_call_command(char *team_devname, int argc, char **argv,
+				 struct command_type *command_type)
 {
 	int err;
 	char *service_name;
@@ -971,14 +976,14 @@ static int call_command(char *team_devname, int argc, char **argv,
 	if (!msg)
 		goto bus_put;
 
-	err = check_error_msg(msg);
+	err = cli_dbus_check_error_msg(msg);
 	if (err)
 		goto free_message;
 
 	if (msg_process) {
 		char *reply;
 
-		err = get_reply_str(&reply, msg);
+		err = cli_dbus_get_reply_str(&reply, msg);
 		if (err)
 			goto free_message;
 		err = msg_process(reply, priv);
@@ -997,6 +1002,7 @@ free_service_name:
 	free(service_name);
 	return err;
 }
+
 
 static void print_cmd(struct command_type *command_type)
 {
@@ -1087,7 +1093,7 @@ int main(int argc, char **argv)
 		print_help(argv0);
 		return EXIT_FAILURE;
 	}
-	err = call_command(team_devname, argc, argv, command_type);
+	err = cli_dbus_call_command(team_devname, argc, argv, command_type);
 	if (err)
 		return EXIT_FAILURE;
 	return EXIT_SUCCESS;
