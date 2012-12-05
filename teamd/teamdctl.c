@@ -72,6 +72,10 @@ static void pr_out_indent_dec(void)
 #define pr_out3(args...) pr_outx(VERB3, ##args)
 #define pr_out4(args...) pr_outx(VERB4, ##args)
 
+struct msg_ops {
+	int (*set_args)(void *ops_priv, const char *fmt, ...);
+};
+
 static int __jsonload(json_t **pjson, char *inputstrjson)
 {
 	json_t *json;
@@ -531,50 +535,27 @@ static int stateview_msg_process(char *reply, void *priv)
 	return stateview_json_process(reply);
 }
 
-static int portaddrm_msg_prepare(DBusMessage *msg, int argc, char **argv,
-				 void *priv)
+static int portaddrm_msg_prepare(const struct msg_ops *msg_ops,
+				 void *msg_ops_priv,
+				 int argc, char **argv, void *priv)
 {
-	DBusMessageIter args;
-	dbus_bool_t dbres;
-
-	dbus_message_iter_init_append(msg, &args);
-	dbres = dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING,
-					       &argv[0]);
-	if (dbres == FALSE) {
-		pr_err("Failed to construct message.\n");
-		return -ENOMEM;
-	}
-	return 0;
+	return msg_ops->set_args(msg_ops_priv, "s", argv[0]);
 }
 
-static int portconfigupdate_msg_prepare(DBusMessage *msg, int argc, char **argv,
-					void *priv)
+static int portconfigupdate_msg_prepare(const struct msg_ops *msg_ops,
+					void *msg_ops_priv,
+					int argc, char **argv, void *priv)
 {
-	DBusMessageIter args;
-	dbus_bool_t dbres;
-
-	dbus_message_iter_init_append(msg, &args);
-	dbres = dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING,
-					       &argv[0]);
-	if (dbres == FALSE) {
-		pr_err("Failed to construct message.\n");
-		return -ENOMEM;
-	}
-	dbres = dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING,
-					       &argv[1]);
-	if (dbres == FALSE) {
-		pr_err("Failed to construct message.\n");
-		return -ENOMEM;
-	}
-	return 0;
+	return msg_ops->set_args(msg_ops_priv, "ss", argv[0], argv[1]);
 }
 
 struct portconfigdump_priv {
 	char *port_name;
 };
 
-static int portconfigdump_msg_prepare(DBusMessage *msg, int argc, char **argv,
-				      void *priv)
+static int portconfigdump_msg_prepare(const struct msg_ops *msg_ops,
+				      void *msg_ops_priv,
+				      int argc, char **argv, void *priv)
 {
 	struct portconfigdump_priv *pcd_priv = priv;
 
@@ -634,8 +615,8 @@ enum id_command_type {
 	ID_CMDTYPE_P_C_D,
 };
 
-typedef int (*msg_prepare_t)(DBusMessage *msg, int argc, char **argv,
-			     void *priv);
+typedef int (*msg_prepare_t)(const struct msg_ops *ops, void *ops_priv,
+			     int argc, char **argv, void *priv);
 typedef int (*msg_process_t)(char *reply, void *priv);
 
 #define COMMAND_PARAM_MAX_CNT 8
@@ -872,6 +853,46 @@ static int get_reply_str(char **preply, DBusMessage *msg)
 	return 0;
 }
 
+struct cli_dbus_msg_ops_priv {
+	DBusMessage *msg;
+};
+
+static int cli_dbus_set_args(void *ops_priv, const char *fmt, ...)
+{
+	va_list ap;
+	struct cli_dbus_msg_ops_priv *cli_dbus_msg_ops_priv = ops_priv;
+	DBusMessage *msg = cli_dbus_msg_ops_priv->msg;
+	DBusMessageIter iter;
+	dbus_bool_t dbres;
+	char *str;
+
+	dbus_message_iter_init_append(msg, &iter);
+	va_start(ap, fmt);
+	while (*fmt) {
+		switch (*fmt++) {
+		case 's': /* string */
+			str = va_arg(ap, char *);
+			dbres = dbus_message_iter_append_basic(&iter,
+							       DBUS_TYPE_STRING,
+							       &str);
+			if (dbres == FALSE) {
+				pr_err("Failed to construct message.\n");
+				return -ENOMEM;
+			}
+			break;
+		default:
+			pr_err("Unknown argument type requested.\n");
+			return -EINVAL;
+		}
+	}
+	va_end(ap);
+	return 0;
+}
+
+static const struct msg_ops cli_dbus_msg_ops = {
+	.set_args = cli_dbus_set_args,
+};
+
 static int call_command(char *team_devname, int argc, char **argv,
 			struct command_type *command_type)
 {
@@ -918,7 +939,11 @@ static int call_command(char *team_devname, int argc, char **argv,
 	}
 
 	if (msg_prepare) {
-		err = msg_prepare(msg, argc, argv, priv);
+		struct cli_dbus_msg_ops_priv cli_dbus_msg_ops_priv;
+
+		cli_dbus_msg_ops_priv.msg = msg;
+		err = msg_prepare(&cli_dbus_msg_ops, &cli_dbus_msg_ops_priv,
+				  argc, argv, priv);
 		if (err)
 			goto free_message;
 	}
