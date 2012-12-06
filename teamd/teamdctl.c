@@ -1266,7 +1266,7 @@ static void print_help(const char *argv0) {
             "%s [options] teamdevname command [command args]\n"
             "\t-h --help                Show this help\n"
             "\t-v --verbose             Increase output verbosity\n"
-            "\t-o --oneline             Force output to one line if possible\n",
+            "\t-o --oneline             Force output to one line if possible\n"
             "\t-D --use-dbus            Use D-Bus interface\n",
             argv0);
 	pr_out("Commands:\n");
