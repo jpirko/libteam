@@ -625,7 +625,7 @@ struct command_type {
 	enum id_command_type id;
 	enum id_command_type parent_id;
 	char *name;
-	char *dbus_method_name;
+	char *method_name;
 	char *params[COMMAND_PARAM_MAX_CNT];
 	msg_prepare_t msg_prepare;
 	msg_process_t msg_process;
@@ -641,41 +641,41 @@ static struct command_type command_types[] = {
 		.id = ID_CMDTYPE_C_D,
 		.parent_id = ID_CMDTYPE_C,
 		.name = "dump",
-		.dbus_method_name = "ConfigDump",
+		.method_name = "ConfigDump",
 		.msg_process = jsonsimpledump_msg_process,
 	},
 	{
 		.id = ID_CMDTYPE_C_D_N,
 		.parent_id = ID_CMDTYPE_C_D,
 		.name = "noports",
-		.dbus_method_name = "ConfigDump",
+		.method_name = "ConfigDump",
 		.msg_process = jsonnoportsdump_msg_process,
 	},
 	{
 		.id = ID_CMDTYPE_C_D_A,
 		.parent_id = ID_CMDTYPE_C_D,
 		.name = "actual",
-		.dbus_method_name = "ConfigDumpActual",
+		.method_name = "ConfigDumpActual",
 		.msg_process = jsonsimpledump_msg_process,
 	},
 	{
 		.id = ID_CMDTYPE_S,
 		.name = "state",
-		.dbus_method_name = "StateDump",
+		.method_name = "StateDump",
 		.msg_process = stateview_msg_process,
 	},
 	{
 		.id = ID_CMDTYPE_S_D,
 		.parent_id = ID_CMDTYPE_S,
 		.name = "dump",
-		.dbus_method_name = "StateDump",
+		.method_name = "StateDump",
 		.msg_process = jsonsimpledump_msg_process,
 	},
 	{
 		.id = ID_CMDTYPE_S_V,
 		.parent_id = ID_CMDTYPE_S,
 		.name = "view",
-		.dbus_method_name = "StateDump",
+		.method_name = "StateDump",
 		.msg_process = stateview_msg_process,
 	},
 	{
@@ -686,7 +686,7 @@ static struct command_type command_types[] = {
 		.id = ID_CMDTYPE_P_A,
 		.parent_id = ID_CMDTYPE_P,
 		.name = "add",
-		.dbus_method_name = "PortAdd",
+		.method_name = "PortAdd",
 		.params = {"PORTDEV"},
 		.msg_prepare = portaddrm_msg_prepare,
 	},
@@ -694,7 +694,7 @@ static struct command_type command_types[] = {
 		.id = ID_CMDTYPE_P_R,
 		.parent_id = ID_CMDTYPE_P,
 		.name = "remove",
-		.dbus_method_name = "PortRemove",
+		.method_name = "PortRemove",
 		.params = {"PORTDEV"},
 		.msg_prepare = portaddrm_msg_prepare,
 	},
@@ -707,7 +707,7 @@ static struct command_type command_types[] = {
 		.id = ID_CMDTYPE_P_C_U,
 		.parent_id = ID_CMDTYPE_P_C,
 		.name = "update",
-		.dbus_method_name = "PortConfigUpdate",
+		.method_name = "PortConfigUpdate",
 		.params = {"PORTDEV", "PORTCONFIG"},
 		.msg_prepare = portconfigupdate_msg_prepare,
 	},
@@ -715,7 +715,7 @@ static struct command_type command_types[] = {
 		.id = ID_CMDTYPE_P_C_D,
 		.parent_id = ID_CMDTYPE_P_C,
 		.name = "dump",
-		.dbus_method_name = "ConfigDumpActual",
+		.method_name = "ConfigDumpActual",
 		.params = {"PORTDEV"},
 		.msg_prepare = portconfigdump_msg_prepare,
 		.msg_process = portconfigdump_msg_process,
@@ -726,7 +726,7 @@ static struct command_type command_types[] = {
 
 static bool __cmd_executable(struct command_type *command_type)
 {
-	return command_type->dbus_method_name;
+	return command_type->method_name;
 }
 
 static int __cmd_param_cnt(struct command_type *command_type)
@@ -936,7 +936,7 @@ static int cli_dbus_call_command(char *team_devname, int argc, char **argv,
 
 	msg = dbus_message_new_method_call(service_name, TEAMD_DBUS_PATH,
 					   TEAMD_DBUS_IFACE,
-					   command_type->dbus_method_name);
+					   command_type->method_name);
 	if (!msg) {
 		pr_err("Failed to create message.\n");
 		err = -ENOMEM;
