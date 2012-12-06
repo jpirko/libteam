@@ -920,7 +920,7 @@ static int cli_dbus_call_command(char *team_devname, int argc, char **argv,
 		priv = myzalloc(command_type->priv_size);
 		if (!priv) {
 			pr_err("Failed to allocate priv data.\n");
-			err = ENOMEM;
+			err = -ENOMEM;
 			goto free_service_name;
 		}
 	}
