@@ -24,10 +24,15 @@
 #include <getopt.h>
 #include <errno.h>
 #include <dbus/dbus.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
 #include <jansson.h>
 #include <private/misc.h>
 
 #include "teamd_dbus.h"
+#include "teamd_usock.h"
 
 enum verbosity_level {
 	VERB1,
@@ -1004,6 +1009,246 @@ free_service_name:
 }
 
 
+/*
+ * Unix domain socket client implementation
+ */
+
+static int cli_usock_check_error_msg(char *msg)
+{
+	char *str;
+	char *str2;
+
+	if (!strncmp(TEAMD_USOCK_SUCC_PREFIX, msg,
+		     strlen(TEAMD_USOCK_SUCC_PREFIX)))
+		return 0;
+	if (strncmp(TEAMD_USOCK_ERR_PREFIX, msg,
+		    strlen(TEAMD_USOCK_ERR_PREFIX)))
+		goto corrupted;
+
+	str = strchr(msg, '\n');
+	if (!str || str[1] == '\0')
+		goto corrupted;
+	str++;
+
+	str2 = strchr(str, '\n');
+	if (!str2 || str2[1] == '\0')
+		goto corrupted;
+	str2[0] = '\0';
+	str2++;
+
+	pr_err("Error message received: \"%s\"\n", str);
+
+	str = strchr(str2, '\n');
+	if (!str)
+		goto corrupted;
+	str[0] = '\0';
+
+	pr_err("Error message content: \"%s\"\n", str2);
+
+	return 0;
+corrupted:
+	pr_err("Corrupted message received.\n");
+	return -EINVAL;
+}
+
+static int cli_usock_get_reply_str(char **preply, char *msg)
+{
+	char *str;
+
+	str = strchr(msg, '\n');
+	if (!str)
+		goto corrupted;
+	str++;
+	*preply = str;
+	return 0;
+corrupted:
+	pr_err("Corrupted message received.\n");
+	return -EINVAL;
+}
+
+struct cli_usock_msg_ops_priv {
+	char *msg;
+};
+
+static int cli_usock_set_args(void *ops_priv, const char *fmt, ...)
+{
+	va_list ap;
+	struct cli_usock_msg_ops_priv *cli_usock_msg_ops_priv = ops_priv;
+	char **pmsg = &cli_usock_msg_ops_priv->msg;
+	char *str;
+	int err;
+
+	va_start(ap, fmt);
+	while (*fmt) {
+		switch (*fmt++) {
+		case 's': /* string */
+			str = va_arg(ap, char *);
+			err = asprintf(pmsg, "%s%s\n", *pmsg, str);
+			if (err == -1)
+				return -errno;
+			break;
+		default:
+			pr_err("Unknown argument type requested.\n");
+			return -EINVAL;
+		}
+	}
+	va_end(ap);
+	return 0;
+}
+
+static const struct msg_ops cli_usock_msg_ops = {
+	.set_args = cli_usock_set_args,
+};
+
+static int cli_usock_connect(int *psock, char *team_devname)
+{
+	int sock;
+	struct sockaddr_un addr;
+	int err;
+
+	sock = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (sock == -1) {
+		pr_err("Failed to create socket.\n");
+		return -errno;
+	}
+
+	addr.sun_family = AF_UNIX;
+	teamd_usock_get_sockpath(addr.sun_path, sizeof(addr.sun_path),
+				 team_devname);
+
+	err = connect(sock, (struct sockaddr *) &addr,
+		      strlen(addr.sun_path) + sizeof(addr.sun_family));
+	if (err == -1) {
+		pr_err("Failed to connect socket.\n");
+		close(sock);
+		return -errno;
+	}
+
+	*psock = sock;
+	return 0;
+}
+
+static int cli_usock_send(int sock, char *msg)
+{
+	int err;
+
+	err = send(sock, msg, strlen(msg), 0);
+	if (err == -1)
+		return -errno;
+	return 0;
+}
+
+#define BUFLEN_STEP 1000
+
+static int cli_usock_recv(int sock, char **pmsg)
+{
+	ssize_t len;
+	char *buf = NULL;
+	char *ptr = NULL;
+	size_t buflen = 0;
+
+another:
+	buflen += BUFLEN_STEP;
+	buf = realloc(buf, buflen);
+	if (!buf) {
+		free(buf);
+		return -ENOMEM;
+	}
+	ptr = ptr ? ptr + BUFLEN_STEP : buf;
+	len = recv(sock, ptr, BUFLEN_STEP, 0);
+	switch (len) {
+	case -1:
+		free(buf);
+		return -errno;
+	case BUFLEN_STEP:
+		goto another;
+	case 0:
+	default:
+		break;
+	}
+	ptr[len] = '\0';
+	*pmsg = buf;
+	return 0;
+}
+
+static int cli_usock_call_command(char *team_devname, int argc, char **argv,
+				  struct command_type *command_type)
+{
+	int err;
+	int sock = sock;
+	char *msg;
+	char *recvmsg = recvmsg;
+	msg_prepare_t msg_prepare = command_type->msg_prepare;
+	msg_process_t msg_process = command_type->msg_process;
+	void *priv = NULL;
+
+	if (command_type->priv_size) {
+		priv = myzalloc(command_type->priv_size);
+		if (!priv) {
+			pr_err("Failed to allocate priv data.\n");
+			return -ENOMEM;
+		}
+	}
+
+	err = cli_usock_connect(&sock, team_devname);
+	if (err)
+		goto free_priv;
+
+	err = asprintf(&msg, "%s\n", command_type->method_name);
+	if (err == -1) {
+		err = -ENOMEM;
+		goto close_sock;
+	}
+	if (msg_prepare) {
+		struct cli_usock_msg_ops_priv cli_usock_msg_ops_priv;
+
+		cli_usock_msg_ops_priv.msg = msg;
+		err = msg_prepare(&cli_usock_msg_ops, &cli_usock_msg_ops_priv,
+				  argc, argv, priv);
+		msg = cli_usock_msg_ops_priv.msg;
+		if (err)
+			goto free_msg;
+	}
+	err = asprintf(&msg, "%s\n", msg);
+	if (err == -1) {
+		err = -ENOMEM;
+		goto free_msg;
+	}
+
+	err = cli_usock_send(sock, msg);
+	if (err)
+		goto free_msg;
+
+	err = cli_usock_recv(sock, &recvmsg);
+	if (err)
+		goto free_msg;
+
+	err = cli_usock_check_error_msg(recvmsg);
+	if (err)
+		goto free_recvmsg;
+
+	if (msg_process) {
+		char *reply;
+
+		err = cli_usock_get_reply_str(&reply, recvmsg);
+		if (err)
+			goto free_recvmsg;
+		err = msg_process(reply, priv);
+		if (err)
+			goto free_recvmsg;
+	}
+
+free_recvmsg:
+	free(recvmsg);
+free_msg:
+	free(msg);
+close_sock:
+	close(sock);
+free_priv:
+	free(priv);
+	return err;
+}
+
 static void print_cmd(struct command_type *command_type)
 {
 	if (command_type->parent_id != ID_CMDTYPE_NONE) {
@@ -1022,6 +1267,7 @@ static void print_help(const char *argv0) {
             "\t-h --help                Show this help\n"
             "\t-v --verbose             Increase output verbosity\n"
             "\t-o --oneline             Force output to one line if possible\n",
+            "\t-D --use-dbus            Use D-Bus interface\n",
             argv0);
 	pr_out("Commands:\n");
 	for (i = 0; i < COMMAND_TYPE_COUNT; i++) {
@@ -1044,13 +1290,15 @@ int main(int argc, char **argv)
 		{ "help",		no_argument,		NULL, 'h' },
 		{ "verbose",		no_argument,		NULL, 'v' },
 		{ "oneline",		no_argument,		NULL, 'o' },
+		{ "use-dbus",		no_argument,		NULL, 'D' },
 		{ NULL, 0, NULL, 0 }
 	};
 	int opt;
 	int err;
 	struct command_type *command_type;
+	bool use_dbus = false;
 
-	while ((opt = getopt_long(argc, argv, "hvo",
+	while ((opt = getopt_long(argc, argv, "hvoD",
 				  long_options, NULL)) >= 0) {
 
 		switch(opt) {
@@ -1062,6 +1310,9 @@ int main(int argc, char **argv)
 			break;
 		case 'o':
 			g_oneline = true;
+			break;
+		case 'D':
+			use_dbus = true;
 			break;
 		case '?':
 			pr_err("unknown option.\n");
@@ -1093,8 +1344,14 @@ int main(int argc, char **argv)
 		print_help(argv0);
 		return EXIT_FAILURE;
 	}
-	err = cli_dbus_call_command(team_devname, argc, argv, command_type);
-	if (err)
-		return EXIT_FAILURE;
+	if (use_dbus) {
+		err = cli_dbus_call_command(team_devname, argc, argv, command_type);
+		if (err)
+			return EXIT_FAILURE;
+	} else {
+		err = cli_usock_call_command(team_devname, argc, argv, command_type);
+		if (err)
+			return EXIT_FAILURE;
+	}
 	return EXIT_SUCCESS;
 }

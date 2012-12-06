@@ -48,9 +48,9 @@ static void __getarg(char *str, char **pstart, char **prest)
 	while (1) {
 		if (*str == '\0')
 			break;
-		if (!isblank(*str) && !start)
+		if ((*str != '\n') && !start)
 			start = str;
-		if (isblank(*str) && start) {
+		if ((*str == '\n') && start) {
 			*str = '\0';
 			rest = str + 1;
 			break;
@@ -137,7 +137,7 @@ static int process_rcv_msg(struct teamd_context *ctx, int sock, char *rcv_msg)
 	char *rcv_msg_args;
 	char *str;
 
-	str = strchr(rcv_msg, '\n');
+	str = strstr(rcv_msg, "\n\n");
 	if (!str || strchr(rcv_msg, '\0') < str) {
 		teamd_log_dbg("usock: Incomplete command.");
 		return 0;
@@ -164,13 +164,36 @@ static int process_rcv_msg(struct teamd_context *ctx, int sock, char *rcv_msg)
 				     &usock_ops_priv);
 }
 
+#define BUFLEN 2048
+
+static int teamd_usock_recv(int sock, char **pmsg)
+{
+	ssize_t len;
+	char *buf;
+
+	buf = malloc(BUFLEN);
+	if (!buf)
+		return -ENOMEM;
+	len = recv(sock, buf, BUFLEN - 1, 0);
+	switch (len) {
+	case -1:
+		free(buf);
+		return -errno;
+	case 0:
+	default:
+		break;
+	}
+	buf[len] = '\0';
+	*pmsg = buf;
+	return 0;
+}
+
 static int callback_usock(struct teamd_context *ctx, int events, void *priv)
 {
 	int sock;
 	struct sockaddr_un addr;
 	socklen_t alen;
-	ssize_t len;
-	char buf[128];
+	char *msg = msg;
 	int err;
 
 	alen = sizeof(addr);
@@ -180,14 +203,13 @@ static int callback_usock(struct teamd_context *ctx, int events, void *priv)
 		return -errno;
 	}
 
-	len = recv(sock, buf, sizeof(buf) - 1, 0);
-	if (len == -1) {
+	err = teamd_usock_recv(sock, &msg);
+	if (err) {
 		teamd_log_err("usock: Failed to receive data from connection.");
-		err = -errno;
 		goto cleanup;
 	}
-	buf[len] = '\0';
-	err = process_rcv_msg(ctx, sock, buf);
+	err = process_rcv_msg(ctx, sock, msg);
+	free(msg);
 
 cleanup:
 	close(sock);
@@ -220,7 +242,7 @@ static int teamd_usock_sock_open(struct teamd_context *ctx)
 	}
 
 	err = bind(sock, (struct sockaddr *) &addr,
-	      strlen(addr.sun_path) + sizeof(addr.sun_family));
+	           strlen(addr.sun_path) + sizeof(addr.sun_family));
 	if (err == -1) {
 		teamd_log_err("usock: Failed to bind socket.");
 		err = -errno;
