@@ -3,4 +3,4 @@ Description=Team Daemon for device %I
 
 [Service]
 BusName=org.libteam.teamd.%i
-ExecStart=/usr/bin/teamd -D -t %i -f /run/teamd/%i.conf
+ExecStart=/usr/bin/teamd -U -D -t %i -f /run/teamd/%i.conf
