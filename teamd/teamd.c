@@ -92,6 +92,7 @@ static void print_help(const struct teamd_context *ctx) {
             "    -r --force-recreate      Force team device recreation in case it\n"
             "                             already exists\n"
             "    -t --team-dev=DEVNAME    Use the specified team device\n"
+            "    -n --no-ports            Start without ports\n"
             "    -D --dbus-enable         Enable D-Bus interface\n"
             "    -U --usock-enable        Enable UNIX domain socket interface\n",
             ctx->argv0);
@@ -119,12 +120,13 @@ static int parse_command_line(struct teamd_context *ctx,
 		{ "debug",		no_argument,		NULL, 'g' },
 		{ "force-recreate",	no_argument,		NULL, 'r' },
 		{ "team-dev",		required_argument,	NULL, 't' },
+		{ "no-ports",		no_argument,		NULL, 'n' },
 		{ "dbus-enable",	no_argument,		NULL, 'D' },
 		{ "usock-enable",	no_argument,		NULL, 'U' },
 		{ NULL, 0, NULL, 0 }
 	};
 
-	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:grt:DU",
+	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:grt:nDU",
 				  long_options, NULL)) >= 0) {
 
 		switch(opt) {
@@ -167,6 +169,9 @@ static int parse_command_line(struct teamd_context *ctx,
 		case 't':
 			free(ctx->team_devname);
 			ctx->team_devname = strdup(optarg);
+			break;
+		case 'n':
+			ctx->init_no_ports = true;
 			break;
 		case 'D':
 			ctx->dbus.enabled = true;
@@ -932,6 +937,9 @@ static int teamd_add_ports(struct teamd_context *ctx)
 	int err;
 	json_t *ports_obj;
 	void *iter;
+
+	if (ctx->init_no_ports)
+		return 0;
 
 	err = json_unpack(ctx->config_json, "{s:o}", "ports", &ports_obj);
 	if (err) {
