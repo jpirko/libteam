@@ -68,6 +68,7 @@ struct teamd_context {
 	json_t *			config_json;
 	char *				pid_file;
 	char *				team_devname;
+	char *				ident;
 	char *				argv0;
 	struct team_handle *		th;
 	const struct teamd_runner *	runner;

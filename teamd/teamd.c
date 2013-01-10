@@ -1173,37 +1173,11 @@ static void teamd_unregister_default_handlers(struct teamd_context *ctx)
 static int teamd_init(struct teamd_context *ctx)
 {
 	int err;
-	const char *team_name;
-
-	err = config_load(ctx);
-	if (err) {
-		teamd_log_err("Failed to load config.");
-		return err;
-	}
-
-	if (!ctx->team_devname) {
-		err = json_unpack(ctx->config_json, "{s:s}", "device", &team_name);
-		if (err) {
-			teamd_log_err("Failed to get team device name.");
-			err = -ENOENT;
-			goto config_free;
-		}
-		ctx->team_devname = strdup(team_name);
-		if (!ctx->team_devname) {
-			teamd_log_err("Failed allocate memory for device name.");
-			err = -ENOMEM;
-			goto config_free;
-		}
-	} else {
-		team_name = ctx->team_devname;
-	}
-	teamd_log_dbg("Using team device \"%s\".", team_name);
 
 	ctx->th = team_alloc();
 	if (!ctx->th) {
 		teamd_log_err("Team alloc failed.");
-		err = -ENOMEM;
-		goto config_free;
+		return -ENOMEM;
 	}
 	if (ctx->debug)
 		team_set_log_priority(ctx->th, LOG_DEBUG);
@@ -1211,17 +1185,17 @@ static int teamd_init(struct teamd_context *ctx)
 	team_set_log_fn(ctx->th, libteam_log_daemon);
 
 	if (ctx->force_recreate)
-		err = team_recreate(ctx->th, team_name);
+		err = team_recreate(ctx->th, ctx->team_devname);
 	else
-		err = team_create(ctx->th, team_name);
+		err = team_create(ctx->th, ctx->team_devname);
 	if (err) {
 		teamd_log_err("Failed to create team device.");
 		goto team_free;
 	}
 
-	ctx->ifindex = team_ifname2ifindex(ctx->th, team_name);
+	ctx->ifindex = team_ifname2ifindex(ctx->th, ctx->team_devname);
 	if (!ctx->ifindex) {
-		teamd_log_err("Netdevice \"%s\" not found.", team_name);
+		teamd_log_err("Netdevice \"%s\" not found.", ctx->team_devname);
 		err = -ENOENT;
 		goto team_destroy;
 	}
@@ -1361,8 +1335,6 @@ team_destroy:
 	team_destroy(ctx->th);
 team_free:
 	team_free(ctx->th);
-config_free:
-	config_free(ctx);
 	return err;
 }
 
@@ -1380,7 +1352,6 @@ static void teamd_fini(struct teamd_context *ctx)
 	teamd_run_loop_fini(ctx);
 	team_destroy(ctx->th);
 	team_free(ctx->th);
-	config_free(ctx);
 }
 
 static int teamd_start(struct teamd_context *ctx)
@@ -1480,6 +1451,34 @@ pid_file_remove:
 	return err;
 }
 
+static int teamd_get_devname(struct teamd_context *ctx)
+{
+	int err;
+
+	if (!ctx->team_devname) {
+		const char *team_name;
+
+		err = json_unpack(ctx->config_json, "{s:s}", "device", &team_name);
+		if (err) {
+			teamd_log_err("Failed to get team device name.");
+			return -ENOENT;
+		}
+		ctx->team_devname = strdup(team_name);
+		if (!ctx->team_devname) {
+			teamd_log_err("Failed allocate memory for device name.");
+			return -ENOMEM;
+		}
+	}
+	teamd_log_dbg("Using team device \"%s\".", ctx->team_devname);
+
+	err = asprintf(&ctx->ident, "%s_%s", ctx->argv0, ctx->team_devname);
+	if (err == -1) {
+		teamd_log_err("Failed allocate memory for identification string.");
+		return -ENOMEM;
+	}
+	return 0;
+}
+
 static int teamd_context_init(struct teamd_context **pctx)
 {
 	struct teamd_context *ctx;
@@ -1488,14 +1487,13 @@ static int teamd_context_init(struct teamd_context **pctx)
 	if (!ctx)
 		return -ENOMEM;
 	*pctx = ctx;
-
 	__g_pid_file = &ctx->pid_file;
-
 	return 0;
 }
 
 static void teamd_context_fini(struct teamd_context *ctx)
 {
+	free(ctx->ident);
 	free(ctx->team_devname);
 	free(ctx->config_text);
 	free(ctx->config_file);
@@ -1517,14 +1515,25 @@ int main(int argc, char **argv)
 
 	err = parse_command_line(ctx, argc, argv);
 	if (err)
-		goto finish;
+		goto context_fini;
 
 	if (ctx->debug)
 		daemon_set_verbosity(LOG_DEBUG);
 
 	ctx->argv0 = daemon_ident_from_argv0(argv[0]);
 	daemon_log_ident = ctx->argv0;
-	daemon_pid_file_ident = ctx->argv0;
+
+	err = config_load(ctx);
+	if (err) {
+		teamd_log_err("Failed to load config.");
+		goto context_fini;
+	}
+	err = teamd_get_devname(ctx);
+	if (err)
+		goto config_free;
+
+	daemon_log_ident = ctx->ident;
+	daemon_pid_file_ident = ctx->ident;
 
 	if (ctx->pid_file)
 		daemon_pid_file_proc = pid_file_proc;
@@ -1561,8 +1570,9 @@ int main(int argc, char **argv)
 		break;
 	}
 
-finish:
-
+config_free:
+	config_free(ctx);
+context_fini:
 	teamd_context_fini(ctx);
 	return ret;
 }
