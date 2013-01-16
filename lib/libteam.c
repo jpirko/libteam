@@ -1233,6 +1233,61 @@ int team_port_remove(struct team_handle *th, uint32_t port_ifindex)
 }
 
 /**
+ * team_carrier_set:
+ * @th: libteam library context
+ * @ifindex: interface index
+ * @status: carrier status
+ *
+ * Sets carrier status for the master network interface
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_carrier_set(struct team_handle *th, bool carrier_up)
+{
+	struct rtnl_link *link;
+	int err;
+
+	link = rtnl_link_alloc();
+	if (!link)
+		return -ENOMEM;
+
+	rtnl_link_set_ifindex(link, th->ifindex);
+	rtnl_link_set_carrier(link, carrier_up ? 1 : 0);
+
+	err = rtnl_link_change(th->nl_cli.sock, link, link, 0);
+	err = -nl2syserr(err);
+
+	rtnl_link_put(link);
+	return err;
+}
+
+/**
+ * team_carrier_get:
+ * @th: libteam library context
+ *
+ * Gets carrier status of the master network interface
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+bool team_carrier_get(struct team_handle *th)
+{
+	struct rtnl_link *link;
+	int carrier;
+	int err;
+
+	err = rtnl_link_get_kernel(th->nl_cli.sock, th->ifindex, NULL, &link);
+	if (err)
+		return -nl2syserr(err);
+
+	carrier = rtnl_link_get_carrier(link);
+
+	rtnl_link_put(link);
+	return carrier ? true : false;
+}
+
+/**
  * team_hwaddr_set:
  * @th: libteam library context
  * @ifindex: interface index
