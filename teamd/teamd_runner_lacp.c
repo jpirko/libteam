@@ -108,6 +108,7 @@ static bool lacpdu_check(struct lacpdu *lacpdu)
 struct lacp {
 	struct teamd_context *ctx;
 	uint32_t selected_aggregator_id;
+	bool carrier_up;
 	struct {
 		bool active;
 #define		LACP_CFG_DFLT_ACTIVE true
@@ -339,6 +340,49 @@ static struct lacp_port *lacp_get_best_port(struct lacp *lacp)
 	return best_lacp_port;
 }
 
+static int lacp_set_carrier(struct lacp *lacp, bool carrier_up)
+{
+	struct teamd_context *ctx = lacp->ctx;
+	int err;
+
+	if (lacp->carrier_up != carrier_up) {
+		err = team_carrier_set(ctx->th, carrier_up);
+		if (err)
+			return err;
+
+		teamd_log_info("%s: carrier changed to %s\n", ctx->team_devname,
+			       carrier_up ? "UP" : "DOWN" );
+		lacp->carrier_up = carrier_up;
+	}
+
+	return 0;
+}
+
+static int lacp_update_carrier(struct lacp *lacp)
+{
+	struct teamd_port *tdport;
+	struct lacp_port *lacp_port;
+	struct team_option *option;
+	bool state;
+
+	teamd_for_each_tdport(tdport, lacp->ctx) {
+		lacp_port = lacp_port_get(lacp, tdport);
+		option = team_get_option(lacp_port->ctx->th, "np", "enabled",
+					 tdport->ifindex);
+		if (!option) {
+			teamd_log_err("%s: Failed to find \"enabled\" option.",
+				      tdport->ifname);
+			return -ENOENT;
+		}
+
+		state = team_get_option_value_bool(option);
+		if (state)
+			return lacp_set_carrier(lacp, true);
+	}
+
+	return lacp_set_carrier(lacp, false);
+}
+
 static int lacp_update_selected(struct lacp *lacp)
 {
 	struct lacp_port *best_lacp_port;
@@ -383,6 +427,11 @@ static int lacp_update_selected(struct lacp *lacp)
 		if (err)
 			return err;
 	}
+
+	err = lacp_update_carrier(lacp);
+	if (err)
+		return err;
+
 	return 0;
 }
 
@@ -936,6 +985,37 @@ static const struct teamd_event_watch_ops lacp_port_watch_ops = {
 	.port_changed = lacp_event_watch_port_changed,
 };
 
+static int lacp_carrier_init(struct teamd_context *ctx, struct lacp *lacp)
+{
+	int err;
+
+	/* initialize carrier control */
+	err = team_carrier_set(ctx->th, false);
+	if (err) {
+		teamd_log_err("Failed to set carrier down.");
+		return err;
+	}
+
+	lacp->carrier_up = false;
+
+	return 0;
+}
+
+static int lacp_carrier_fini(struct teamd_context *ctx, struct lacp *lacp)
+{
+	int err;
+
+	err = team_carrier_set(ctx->th, false);
+	if (err) {
+		teamd_log_err("Failed to set carrier down.");
+		return err;
+	}
+
+	lacp->carrier_up = false;
+
+	return 0;
+}
+
 static int lacp_init(struct teamd_context *ctx)
 {
 	struct lacp *lacp = ctx->runner_priv;
@@ -953,6 +1033,11 @@ static int lacp_init(struct teamd_context *ctx)
 	err = lacp_load_config(ctx, lacp);
 	if (err) {
 		teamd_log_err("Failed to load config values.");
+		return err;
+	}
+	err = lacp_carrier_init(ctx, lacp);
+	if (err) {
+		teamd_log_err("Failed to initialize carrier.");
 		return err;
 	}
 	err = teamd_event_watch_register(ctx, &lacp_port_watch_ops, lacp);
@@ -977,6 +1062,7 @@ static void lacp_fini(struct teamd_context *ctx)
 
 	teamd_balancer_fini(lacp->tb);
 	teamd_event_watch_unregister(ctx, &lacp_port_watch_ops, lacp);
+	lacp_carrier_fini(ctx, lacp);
 }
 
 static json_t *__fill_lacpdu_info(struct lacpdu_info *lacpdu_info)
