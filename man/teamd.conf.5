@@ -120,6 +120,13 @@ System priority, value can be 0-65535.
 Default:
 .BR "255"
 
+.TP
+.BR "runner.min_ports " (int)
+Specifies the minimum number of ports that must be active before asserting carrier in the master interface, value can be 1-255.
+
+Default:
+.BR "0"
+
 .SH ETHTOOL LINK WATCH SPECIFIC OPTIONS
 .TP
 .BR "link_watch.delay_up "| " ports.PORTIFNAME.link_watch.delay_up " (int)

@@ -116,6 +116,8 @@ struct lacp {
 #define		LACP_CFG_DFLT_SYS_PRIO 0xffff
 		bool fast_rate;
 #define		LACP_CFG_DFLT_FAST_RATE false
+		int min_ports;
+#define		LACP_CFG_DFLT_MIN_PORTS 1
 	} cfg;
 	struct teamd_balancer *tb;
 };
@@ -196,6 +198,19 @@ static int lacp_load_config(struct teamd_context *ctx, struct lacp *lacp)
 			  &tmp);
 	lacp->cfg.fast_rate = err ? LACP_CFG_DFLT_FAST_RATE : !!tmp;
 	teamd_log_dbg("Using fast_rate \"%d\".", lacp->cfg.fast_rate);
+
+	err = json_unpack(ctx->config_json, "{s:{s:i}}", "runner", "min_ports",
+			  &tmp);
+	if (err) {
+		lacp->cfg.min_ports = LACP_CFG_DFLT_MIN_PORTS;
+	} else if (tmp < 1 || tmp > UCHAR_MAX) {
+		teamd_log_err("\"min_ports\" value is out of its limits.");
+		return -EINVAL;
+	} else {
+		lacp->cfg.min_ports = tmp;
+	}
+	teamd_log_dbg("Using min_ports \"%d\".", lacp->cfg.min_ports);
+
 	return 0;
 }
 
@@ -363,8 +378,10 @@ static int lacp_update_carrier(struct lacp *lacp)
 	struct teamd_port *tdport;
 	struct lacp_port *lacp_port;
 	struct team_option *option;
+	int ports_enabled;
 	bool state;
 
+	ports_enabled = 0;
 	teamd_for_each_tdport(tdport, lacp->ctx) {
 		lacp_port = lacp_port_get(lacp, tdport);
 		option = team_get_option(lacp_port->ctx->th, "np", "enabled",
@@ -376,8 +393,9 @@ static int lacp_update_carrier(struct lacp *lacp)
 		}
 
 		state = team_get_option_value_bool(option);
-		if (state)
+		if (state && ++ports_enabled >= lacp->cfg.min_ports)
 			return lacp_set_carrier(lacp, true);
+
 	}
 
 	return lacp_set_carrier(lacp, false);
