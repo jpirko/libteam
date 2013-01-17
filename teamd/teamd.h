@@ -280,7 +280,7 @@ static inline bool teamd_err_port_disappeared(int err,
 	 * Port might have disappeared but the message might be still in queue.
 	 * So do not fail in case like this
 	 */
-	return err == -ENOENT && !team_is_our_port(ctx->th, tdport->ifindex);
+	return err == -EINVAL && !team_is_our_port(ctx->th, tdport->ifindex);
 }
 
 bool teamd_link_watch_port_up(struct teamd_context *ctx,

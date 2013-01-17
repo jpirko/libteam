@@ -778,7 +778,7 @@ static int find_command(struct command_type **pcommand_type,
 	while (1) {
 		if (!*argc) {
 			pr_err("None or incomplete command\n");
-			return -ENOENT;
+			return -EINVAL;
 		}
 		cmd_name = *argv[0];
 		(*argc)--;
@@ -786,7 +786,7 @@ static int find_command(struct command_type **pcommand_type,
 		command_type = __get_cmd_by_parent(cmd_name, parent_id);
 		if (!command_type) {
 			pr_err("Unknown command \"%s\".\n", cmd_name);
-			return -ENOENT;
+			return -EINVAL;
 		}
 		if (__cmd_executable(command_type) &&
 		    __cmd_param_cnt(command_type) >= *argc) {

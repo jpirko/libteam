@@ -529,7 +529,7 @@ int teamd_loop_callback_timer_set(struct teamd_context *ctx,
 	lcb = get_lcb(ctx, cb_name, priv);
 	if (!lcb) {
 		teamd_log_err("Callback named \"%s\" not found.", cb_name);
-		return -ENOENT;
+		return -EINVAL;
 	}
 	if (!lcb->is_period) {
 		teamd_log_err("Can't reset non-periodic callback.");
@@ -569,7 +569,7 @@ int teamd_loop_callback_enable(struct teamd_context *ctx, const char *cb_name,
 		found = true;
 	}
 	if (!found)
-		return -ENOENT;
+		return -EINVAL;
 	teamd_run_loop_restart(ctx);
 	return 0;
 }
@@ -585,7 +585,7 @@ int teamd_loop_callback_disable(struct teamd_context *ctx, const char *cb_name,
 		found = true;
 	}
 	if (!found)
-		return -ENOENT;
+		return -EINVAL;
 	teamd_run_loop_restart(ctx);
 	return 0;
 }
@@ -1022,13 +1022,13 @@ static int teamd_runner_init(struct teamd_context *ctx)
 							 &runner_name);
 	if (err) {
 		teamd_log_err("Failed to get team runner name from config.");
-		return -ENOENT;
+		return -EINVAL;
 	}
 	teamd_log_dbg("Using team runner \"%s\".", runner_name);
 	ctx->runner = teamd_find_runner(runner_name);
 	if (!ctx->runner) {
 		teamd_log_err("No runner named \"%s\" available.", runner_name);
-		return -ENOENT;
+		return -EINVAL;
 	}
 
 	if (ctx->runner->team_mode_name) {
@@ -1196,7 +1196,7 @@ static int teamd_init(struct teamd_context *ctx)
 	ctx->ifindex = team_ifname2ifindex(ctx->th, ctx->team_devname);
 	if (!ctx->ifindex) {
 		teamd_log_err("Netdevice \"%s\" not found.", ctx->team_devname);
-		err = -ENOENT;
+		err = -ENODEV;
 		goto team_destroy;
 	}
 
@@ -1461,7 +1461,7 @@ static int teamd_get_devname(struct teamd_context *ctx)
 		err = json_unpack(ctx->config_json, "{s:s}", "device", &team_name);
 		if (err) {
 			teamd_log_err("Failed to get team device name.");
-			return -ENOENT;
+			return -EINVAL;
 		}
 		ctx->team_devname = strdup(team_name);
 		if (!ctx->team_devname) {

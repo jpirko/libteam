@@ -77,7 +77,7 @@ static int usock_op_get_args(void *ops_priv, const char *fmt, ...)
 			__getarg(rest, &str, &rest);
 			if (!str) {
 				teamd_log_err("Insufficient number of arguments in message.");
-				return -ENOENT;
+				return -EINVAL;
 			}
 			*pstr = str;
 			break;

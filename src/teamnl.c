@@ -111,7 +111,7 @@ static int run_cmd_getoption(char *cmd_name, struct team_handle *th,
 	}
 	option = __find_option(th, cmd_ctx->argv[0], cmd_ctx);
 	if (!option)
-		return -ENOENT;
+		return -EINVAL;
 
 	do {
 		bufsiz += BUFSIZSTEP;
@@ -142,7 +142,7 @@ static int run_cmd_setoption(char *cmd_name, struct team_handle *th,
 	}
 	option = __find_option(th, cmd_ctx->argv[0], cmd_ctx);
 	if (!option)
-		return -ENOENT;
+		return -EINVAL;
 
 	return team_set_option_value_from_string(th, option, cmd_ctx->argv[1]);
 }
@@ -183,7 +183,7 @@ static int process_port_devname_arg(struct team_handle *th,
 	if (!port_ifindex) {
 		fprintf(stderr, "Netdevice \"%s\" not found.\n",
 			cmd_ctx->port_devname_arg);
-		return -ENOENT;
+		return -ENODEV;
 	}
 	team_for_each_port(port, th) {
 		if (port_ifindex == team_get_port_ifindex(port)) {
@@ -194,7 +194,7 @@ static int process_port_devname_arg(struct team_handle *th,
 	}
 	fprintf(stderr, "Netdevice \"%s\" is not port of this team.\n",
 			cmd_ctx->port_devname_arg);
-	return -ENOENT;
+	return -ENODEV;
 }
 
 static int process_array_index_arg(struct team_handle *th,
@@ -252,7 +252,7 @@ static int call_cmd(char *team_devname, char *cmd_name,
 	ifindex = team_ifname2ifindex(th, team_devname);
 	if (!ifindex) {
 		fprintf(stderr, "Netdevice \"%s\" not found.\n", team_devname);
-		err = -ENOENT;
+		err = -ENODEV;
 		goto team_free;
 	}
 

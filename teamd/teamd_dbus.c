@@ -84,7 +84,7 @@ static int dbus_op_get_args(void *ops_priv, const char *fmt, ...)
 		arg_type = dbus_message_iter_get_arg_type(&iter);
 		if (arg_type == DBUS_TYPE_INVALID) {
 			teamd_log_err("Insufficient number of arguments in message.");
-			return -ENOENT;
+			return -EINVAL;
 		}
 		switch (*fmt++) {
 		case 's': /* string */

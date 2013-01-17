@@ -245,7 +245,7 @@ int teamd_ctl_method_call(struct teamd_context *ctx, const char *method_name,
 	if (!func) {
 		teamd_log_err("Failed call non-existent method named \"%s\".",
 			      method_name);
-		return -ENOENT;
+		return -EINVAL;
 	}
 	return func(ctx, ops, ops_priv);
 }

@@ -66,7 +66,7 @@ static int __set_sockaddr(struct sockaddr *sa, socklen_t sa_len,
 	err = getaddrinfo(hostname, NULL, &hints, &result);
 	if (err) {
 		teamd_log_err("getaddrinfo failed: %s", gai_strerror(err));
-		return -ENOENT;
+		return -EINVAL;
 	}
 	if (sa_len != result->ai_addrlen) {
 		/* This should not happen, so just to be safe */
@@ -412,7 +412,7 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 	err = json_unpack(link_watch_json, "{s:i}", "interval", &tmp);
 	if (err) {
 		teamd_log_err("Failed to get \"interval\" link-watch option.");
-		return -ENOENT;
+		return -EINVAL;
 	}
 	teamd_log_dbg("interval \"%d\".", tmp);
 	ms_to_timespec(&psr_ppriv->interval, tmp);
@@ -428,7 +428,7 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 	err = json_unpack(link_watch_json, "{s:i}", "missed_max", &tmp);
 	if (err) {
 		teamd_log_err("Failed to get \"missed_max\" link-watch option.");
-		return -ENOENT;
+		return -EINVAL;
 	}
 	if (tmp < 0) {
 		teamd_log_err("\"missed_max\" must not be negative number.");
@@ -581,7 +581,7 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 	err = json_unpack(link_watch_json, "{s:s}", "source_host", &host);
 	if (err) {
 		teamd_log_err("Failed to get \"source_host\" link-watch option.");
-		return -ENOENT;
+		return -EINVAL;
 	}
 	err = set_in_addr(&ap_ppriv->src, host);
 	if (err)
@@ -592,7 +592,7 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 	err = json_unpack(link_watch_json, "{s:s}", "target_host", &host);
 	if (err) {
 		teamd_log_err("Failed to get \"target_host\" link-watch option.");
-		return -ENOENT;
+		return -EINVAL;
 	}
 	err = set_in_addr(&ap_ppriv->dst, host);
 	if (err)
@@ -917,7 +917,7 @@ static int lw_nsnap_load_options(struct teamd_context *ctx,
 	err = json_unpack(link_watch_json, "{s:s}", "target_host", &host);
 	if (err) {
 		teamd_log_err("Failed to get \"target_host\" link-watch option.");
-		return -ENOENT;
+		return -EINVAL;
 	}
 	err = set_sockaddr_in6(&nsnap_ppriv->dst, host);
 	if (err)
@@ -1142,7 +1142,7 @@ static int link_watch_load_one_json_obj(struct teamd_context *ctx,
 	if (!link_watch) {
 		teamd_log_err("No link_watch named \"%s\" available.",
 			      link_watch_name);
-		return -ENOENT;
+		return -EINVAL;
 	}
 	err = teamd_port_priv_create_and_get((void **) &common_ppriv, tdport,
 					     &link_watch->port_priv,
@@ -1239,7 +1239,7 @@ static int link_watch_refresh_forced_active(struct teamd_context *ctx)
 		if (!option) {
 			teamd_log_err("%s: Failed to find \"enabled\" option.",
 				      tdport->ifname);
-			return -ENOENT;
+			return -EINVAL;
 		}
 		if (team_get_option_type(option) != TEAM_OPTION_TYPE_BOOL) {
 			teamd_log_err("Unexpected type of \"enabled\" option.");

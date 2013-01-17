@@ -713,7 +713,7 @@ static int set_option_value(struct team_handle *th, struct team_option *option,
 		nla_type = NLA_S32;
 		break;
 	default:
-		return -ENOENT;
+		return -EINVAL;
 	}
 
 	msg = nlmsg_alloc();
