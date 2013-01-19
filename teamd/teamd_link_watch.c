@@ -544,6 +544,8 @@ lw_ap_ppriv_get(struct lw_psr_port_priv *psr_ppriv)
 	in_struct_offset(struct arphdr, ar_op)
 
 struct sock_filter arp_rpl_flt[] = {
+	BPF_STMT(BPF_LD + BPF_B + BPF_ABS, SKF_AD_OFF + SKF_AD_VLAN_TAG_PRESENT),
+	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, 0, 0, 4),
 	BPF_STMT(BPF_LD + BPF_H + BPF_ABS, OFFSET_ARP_OP_CODE),
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARPOP_REPLY, 1, 0),
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARPOP_REQUEST, 0, 1),
