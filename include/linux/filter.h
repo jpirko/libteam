@@ -2,9 +2,8 @@
  * Linux Socket Filter Data Structures
  */
 
-#ifndef __LINUX_FILTER_H__
-#define __LINUX_FILTER_H__
-
+#ifndef _UAPI__LINUX_FILTER_H__
+#define _UAPI__LINUX_FILTER_H__
 
 #include <linux/types.h>
 
@@ -70,6 +69,9 @@ struct sock_fprog {	/* Required for SO_ATTACH_FILTER. */
 #define         BPF_LSH         0x60
 #define         BPF_RSH         0x70
 #define         BPF_NEG         0x80
+#define		BPF_MOD		0x90
+#define		BPF_XOR		0xa0
+
 #define         BPF_JA          0x00
 #define         BPF_JEQ         0x10
 #define         BPF_JGT         0x20
@@ -124,9 +126,11 @@ struct sock_fprog {	/* Required for SO_ATTACH_FILTER. */
 #define SKF_AD_RXHASH	32
 #define SKF_AD_CPU	36
 #define SKF_AD_ALU_XOR_X	40
-#define SKF_AD_MAX	44
+#define SKF_AD_VLAN_TAG	44
+#define SKF_AD_VLAN_TAG_PRESENT 48
+#define SKF_AD_MAX	52
 #define SKF_NET_OFF   (-0x100000)
 #define SKF_LL_OFF    (-0x200000)
 
 
-#endif /* __LINUX_FILTER_H__ */
+#endif /* _UAPI__LINUX_FILTER_H__ */
