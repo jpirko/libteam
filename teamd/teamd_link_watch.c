@@ -612,19 +612,6 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 	return 0;
 }
 
-static void buf_push(char **pos, void *data, size_t data_len)
-{
-	memcpy(*pos, data, data_len);
-	*pos += data_len;
-}
-
-static void buf_pull(char **pos, void *data, size_t data_len)
-{
-	memcpy(data, *pos, data_len);
-	*pos += data_len;
-}
-
-
 static int __get_port_curr_hwaddr(struct lw_psr_port_priv *psr_ppriv,
 				  struct sockaddr_ll *addr, size_t expected_len)
 {
@@ -645,17 +632,21 @@ static int __get_port_curr_hwaddr(struct lw_psr_port_priv *psr_ppriv,
 	return 0;
 }
 
+struct arp_packet {
+	struct arphdr			ah;
+	unsigned char			sender_mac[ETH_ALEN];
+	struct in_addr			sender_ip;
+	unsigned char			target_mac[ETH_ALEN];
+	struct in_addr			target_ip;
+} __attribute__((packed));
 
 static int lw_ap_send(struct lw_psr_port_priv *psr_ppriv)
 {
 	struct lw_ap_port_priv *ap_ppriv = lw_ap_ppriv_get(psr_ppriv);
 	int err;
-	char *buf;
-	size_t buf_len;
-	char *pos;
 	struct sockaddr_ll ll_my;
 	struct sockaddr_ll ll_bcast;
-	struct arphdr ah;
+	struct arp_packet ap;
 
 	if (!(psr_ppriv->common.forced_active || ap_ppriv->always_active))
 		return 0;
@@ -666,31 +657,20 @@ static int lw_ap_send(struct lw_psr_port_priv *psr_ppriv)
 	ll_bcast = ll_my;
 	memset(ll_bcast.sll_addr, 0xFF, ll_bcast.sll_halen);
 
-	buf_len = sizeof(ah) + ll_my.sll_halen + sizeof(ap_ppriv->src) +
-				ll_bcast.sll_halen + sizeof(ap_ppriv->dst);
-	buf = malloc(buf_len);
-	if (!buf) {
-		teamd_log_err("Failed to alloc packet buffer.");
-		return -ENOMEM;
-	}
-	pos = buf;
+	memset(&ap, 0, sizeof(ap));
+	ap.ah.ar_hrd = htons(ll_my.sll_hatype);
+	ap.ah.ar_pro = htons(ETH_P_IP);
+	ap.ah.ar_hln = ll_my.sll_halen;
+	ap.ah.ar_pln = 4;
+	ap.ah.ar_op = htons(ARPOP_REQUEST);
 
-	memset(&ah, 0, sizeof(ah));
-	ah.ar_hrd = htons(ll_my.sll_hatype);
-	ah.ar_pro = htons(ETH_P_IP);
-	ah.ar_hln = ll_my.sll_halen;
-	ah.ar_pln = 4;
-	ah.ar_op = htons(ARPOP_REQUEST);
+	memcpy(ap.sender_mac, ll_my.sll_addr, sizeof(ap.sender_mac));
+	ap.sender_ip = ap_ppriv->src;
+	memcpy(ap.target_mac, ll_bcast.sll_addr, sizeof(ap.target_mac));
+	ap.target_ip = ap_ppriv->dst;
 
-	buf_push(&pos, &ah, sizeof(ah));
-	buf_push(&pos, ll_my.sll_addr, ll_my.sll_halen);
-	buf_push(&pos, &ap_ppriv->src, sizeof(ap_ppriv->src));
-	buf_push(&pos, ll_bcast.sll_addr, ll_bcast.sll_halen);
-	buf_push(&pos, &ap_ppriv->dst, sizeof(ap_ppriv->dst));
-
-	err = teamd_sendto(psr_ppriv->sock, buf, buf_len, 0,
+	err = teamd_sendto(psr_ppriv->sock, &ap, sizeof(ap), 0,
 			   (struct sockaddr *) &ll_bcast, sizeof(ll_bcast));
-	free(buf);
 	return err;
 }
 
@@ -698,17 +678,11 @@ static int lw_ap_receive(struct lw_psr_port_priv *psr_ppriv)
 {
 	struct lw_ap_port_priv *ap_ppriv = lw_ap_ppriv_get(psr_ppriv);
 	int err;
-	char buf[256];
 	struct sockaddr_ll ll_my;
 	struct sockaddr_ll ll_from;
-	struct sockaddr_ll ll_msg1;
-	struct sockaddr_ll ll_msg2;
-	struct arphdr ah;
-	struct in_addr src;
-	struct in_addr dst;
-	char *pos;
+	struct arp_packet ap;
 
-	err = teamd_recvfrom(psr_ppriv->sock, buf, sizeof(buf), 0,
+	err = teamd_recvfrom(psr_ppriv->sock, &ap, sizeof(ap), 0,
 			     (struct sockaddr *) &ll_from, sizeof(ll_from));
 	if (err <= 0)
 		return err;
@@ -721,23 +695,16 @@ static int lw_ap_receive(struct lw_psr_port_priv *psr_ppriv)
 		if (err)
 			return err;
 
-		pos = buf;
-		buf_pull(&pos, &ah, sizeof(ah));
-		if (ah.ar_hrd != htons(ll_my.sll_hatype) ||
-		    ah.ar_pro != htons(ETH_P_IP) ||
-		    ah.ar_hln != ll_my.sll_halen ||
-		    ah.ar_pln != 4 ||
-		    ah.ar_op != htons(ARPOP_REPLY))
+		if (ap.ah.ar_hrd != htons(ll_my.sll_hatype) ||
+		    ap.ah.ar_pro != htons(ETH_P_IP) ||
+		    ap.ah.ar_hln != ll_my.sll_halen ||
+		    ap.ah.ar_pln != 4 ||
+		    ap.ah.ar_op != htons(ARPOP_REPLY))
 			return 0;
 
-		buf_pull(&pos, ll_msg1.sll_addr, ll_my.sll_halen);
-		buf_pull(&pos, &src, sizeof(src));
-		buf_pull(&pos, ll_msg2.sll_addr, ll_my.sll_halen);
-		buf_pull(&pos, &dst, sizeof(dst));
-
-		if (ap_ppriv->src.s_addr != dst.s_addr ||
-		    ap_ppriv->dst.s_addr != src.s_addr ||
-		    memcmp(ll_msg2.sll_addr, ll_my.sll_addr, ll_my.sll_halen))
+		if (ap_ppriv->src.s_addr != ap.target_ip.s_addr ||
+		    ap_ppriv->dst.s_addr != ap.sender_ip.s_addr ||
+		    memcmp(ap.target_mac, ll_my.sll_addr, ll_my.sll_halen))
 			return 0;
 	}
 
