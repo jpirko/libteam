@@ -188,7 +188,7 @@ static int tb_hash_to_port_remap(struct team_handle *th,
 
 	option = team_get_option(th, "na", "lb_tx_hash_to_port_mapping", hash);
 	if (!option)
-		return -EINVAL;
+		return -ENOENT;
 	err = team_set_option_value_u32(th, option, new_tdport->ifindex);
 	if (err)
 		return err;
@@ -362,7 +362,7 @@ static int tb_set_lb_tx_method(struct team_handle *th,
 
 	option = team_get_option(th, "n!", "lb_tx_method");
 	if (!option)
-		return -EINVAL;
+		return -ENOENT;
 	return team_set_option_value_string(th, option,
 					    tb->tx_balancing_enabled ?
 					    "hash_to_port_mapping" : "hash");
@@ -375,7 +375,7 @@ static int tb_set_lb_stats_refresh_interval(struct team_handle *th,
 
 	option = team_get_option(th, "n!", "lb_stats_refresh_interval");
 	if (!option)
-		return -EINVAL;
+		return -ENOENT;
 	return team_set_option_value_u32(th, option, tb->balancing_interval);
 }
 

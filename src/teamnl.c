@@ -111,7 +111,7 @@ static int run_cmd_getoption(char *cmd_name, struct team_handle *th,
 	}
 	option = __find_option(th, cmd_ctx->argv[0], cmd_ctx);
 	if (!option)
-		return -EINVAL;
+		return -ENOENT;
 
 	do {
 		bufsiz += BUFSIZSTEP;
@@ -142,7 +142,7 @@ static int run_cmd_setoption(char *cmd_name, struct team_handle *th,
 	}
 	option = __find_option(th, cmd_ctx->argv[0], cmd_ctx);
 	if (!option)
-		return -EINVAL;
+		return -ENOENT;
 
 	return team_set_option_value_from_string(th, option, cmd_ctx->argv[1]);
 }

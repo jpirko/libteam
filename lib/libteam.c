@@ -842,7 +842,7 @@ int team_get_mode_name(struct team_handle *th, char **mode_name)
 
 	option = team_get_option(th, "n", "mode");
 	if (!option)
-		return -EINVAL;
+		return -ENOENT;
 	*mode_name = team_get_option_value_string(option);
 	return 0;
 }
@@ -863,7 +863,7 @@ int team_set_mode_name(struct team_handle *th, const char *mode_name)
 
 	option = team_get_option(th, "n!", "mode");
 	if (!option)
-		return -EINVAL;
+		return -ENOENT;
 	return team_set_option_value_string(th, option, mode_name);
 }
 
@@ -884,7 +884,7 @@ int team_get_active_port(struct team_handle *th, uint32_t *ifindex)
 
 	option = team_get_option(th, "n", "activeport");
 	if (!option)
-		return -EINVAL;
+		return -ENOENT;
 	*ifindex = team_get_option_value_u32(option);
 	return 0;
 }
@@ -906,7 +906,7 @@ int team_set_active_port(struct team_handle *th, uint32_t ifindex)
 
 	option = team_get_option(th, "n!", "activeport");
 	if (!option)
-		return -EINVAL;
+		return -ENOENT;
 	return team_set_option_value_u32(th, option, ifindex);
 }
 
@@ -928,7 +928,7 @@ int team_get_bpf_hash_func(struct team_handle *th, struct sock_fprog *fp)
 
 	option = team_get_option(th, "n", "bpf_hash_func");
 	if (!option)
-		return -EINVAL;
+		return -ENOENT;
 
 	data_len = team_get_option_value_len(option);
 	if (data_len % sizeof(struct sock_filter))
@@ -958,7 +958,7 @@ int team_set_bpf_hash_func(struct team_handle *th, const struct sock_fprog *fp)
 
 	option = team_get_option(th, "n!", "bpf_hash_func");
 	if (!option)
-		return -EINVAL;
+		return -ENOENT;
 
 	if (fp) {
 		data = fp->filter;
@@ -985,7 +985,7 @@ int team_set_port_enabled(struct team_handle *th,
 
 	option = team_get_option(th, "np!", "enabled", port_ifindex);
 	if (!option)
-		return -EINVAL;
+		return -ENOENT;
 	return team_set_option_value_bool(th, option, val);
 }
 
@@ -1008,7 +1008,7 @@ int team_set_port_user_linkup_enabled(struct team_handle *th,
 	option = team_get_option(th, "np!", "user_linkup_enabled",
 				 port_ifindex);
 	if (!option)
-		return -EINVAL;
+		return -ENOENT;
 	return team_set_option_value_bool(th, option, val);
 }
 
@@ -1030,7 +1030,7 @@ int team_get_port_user_linkup(struct team_handle *th,
 
 	option = team_get_option(th, "np", "user_linkup", port_ifindex);
 	if (!option)
-		return -EINVAL;
+		return -ENOENT;
 	*linkup = team_get_option_value_bool(option);
 	return 0;
 }
@@ -1053,7 +1053,7 @@ int team_set_port_user_linkup(struct team_handle *th,
 
 	option = team_get_option(th, "np!", "user_linkup", port_ifindex);
 	if (!option)
-		return -EINVAL;
+		return -ENOENT;
 
 	return team_set_option_value_bool(th, option, linkup);
 }
@@ -1076,7 +1076,7 @@ int team_set_port_queue_id(struct team_handle *th,
 
 	option = team_get_option(th, "np!", "queue_id", port_ifindex);
 	if (!option)
-		return -EINVAL;
+		return -ENOENT;
 
 	return team_set_option_value_u32(th, option, queue_id);
 }
@@ -1099,7 +1099,7 @@ int team_get_port_priority(struct team_handle *th,
 
 	option = team_get_option(th, "np", "priority", port_ifindex);
 	if (!option)
-		return -EINVAL;
+		return -ENOENT;
 	*priority = team_get_option_value_s32(option);
 	return 0;
 }
@@ -1122,7 +1122,7 @@ int team_set_port_priority(struct team_handle *th,
 
 	option = team_get_option(th, "np!", "priority", port_ifindex);
 	if (!option)
-		return -EINVAL;
+		return -ENOENT;
 
 	return team_set_option_value_s32(th, option, priority);
 }
@@ -1355,7 +1355,7 @@ int team_hwaddr_get(struct team_handle *th, uint32_t ifindex,
 		return -nl2syserr(err);
 	nl_addr = rtnl_link_get_addr(link);
 	if (!nl_addr) {
-		err = -EINVAL;
+		err = -ENOENT;
 		goto errout;
 	}
 
@@ -1393,7 +1393,7 @@ int team_hwaddr_len_get(struct team_handle *th, uint32_t ifindex)
 		return -nl2syserr(err);
 	nl_addr = rtnl_link_get_addr(link);
 	if (!nl_addr) {
-		err = -EINVAL;
+		err = -ENOENT;
 		goto errout;
 	}
 

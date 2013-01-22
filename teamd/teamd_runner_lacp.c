@@ -267,7 +267,7 @@ static int lacp_port_update_enabled(struct lacp_port *lacp_port)
 	if (!option) {
 		teamd_log_err("%s: Failed to find \"enabled\" option.",
 			      tdport->ifname);
-		return -EINVAL;
+		return -ENOENT;
 	}
 
 	curr_enabled_state = team_get_option_value_bool(option);
@@ -389,7 +389,7 @@ static int lacp_update_carrier(struct lacp *lacp)
 		if (!option) {
 			teamd_log_err("%s: Failed to find \"enabled\" option.",
 				      tdport->ifname);
-			return -EINVAL;
+			return -ENOENT;
 		}
 
 		state = team_get_option_value_bool(option);

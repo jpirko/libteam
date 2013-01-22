@@ -529,7 +529,7 @@ int teamd_loop_callback_timer_set(struct teamd_context *ctx,
 	lcb = get_lcb(ctx, cb_name, priv);
 	if (!lcb) {
 		teamd_log_err("Callback named \"%s\" not found.", cb_name);
-		return -EINVAL;
+		return -ENOENT;
 	}
 	if (!lcb->is_period) {
 		teamd_log_err("Can't reset non-periodic callback.");
@@ -569,7 +569,7 @@ int teamd_loop_callback_enable(struct teamd_context *ctx, const char *cb_name,
 		found = true;
 	}
 	if (!found)
-		return -EINVAL;
+		return -ENOENT;
 	teamd_run_loop_restart(ctx);
 	return 0;
 }
@@ -585,7 +585,7 @@ int teamd_loop_callback_disable(struct teamd_context *ctx, const char *cb_name,
 		found = true;
 	}
 	if (!found)
-		return -EINVAL;
+		return -ENOENT;
 	teamd_run_loop_restart(ctx);
 	return 0;
 }
