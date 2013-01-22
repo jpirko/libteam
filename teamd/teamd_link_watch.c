@@ -533,6 +533,8 @@ struct lw_ap_port_priv {
 	struct in_addr dst;
 	bool validate;
 	bool always_active;
+	bool vlanid_in_use;
+	unsigned short vlanid;
 };
 
 static struct lw_ap_port_priv *
@@ -544,26 +546,59 @@ lw_ap_ppriv_get(struct lw_psr_port_priv *psr_ppriv)
 #define OFFSET_ARP_OP_CODE					\
 	in_struct_offset(struct arphdr, ar_op)
 
-struct sock_filter arp_rpl_flt[] = {
+static struct sock_filter arp_novlan_rpl_flt[] = {
 	BPF_STMT(BPF_LD + BPF_B + BPF_ABS, SKF_AD_OFF + SKF_AD_VLAN_TAG_PRESENT),
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, 0, 0, 4),
 	BPF_STMT(BPF_LD + BPF_H + BPF_ABS, OFFSET_ARP_OP_CODE),
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARPOP_REPLY, 1, 0),
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARPOP_REQUEST, 0, 1),
-	BPF_STMT(BPF_RET + BPF_K, (u_int)-1),
+	BPF_STMT(BPF_RET + BPF_K, (u_int) -1),
 	BPF_STMT(BPF_RET + BPF_K, 0),
 };
 
-static const struct sock_fprog arp_rpl_fprog = {
-	.len = ARRAY_SIZE(arp_rpl_flt),
-	.filter = arp_rpl_flt,
+static const struct sock_fprog arp_novlan_rpl_fprog = {
+	.len = ARRAY_SIZE(arp_novlan_rpl_flt),
+	.filter = arp_novlan_rpl_flt,
+};
+
+static struct sock_filter arp_vlan_rpl_flt[] = {
+	BPF_STMT(BPF_LD + BPF_B + BPF_ABS, SKF_AD_OFF + SKF_AD_VLAN_TAG_PRESENT),
+	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, 0, 6, 0),
+	BPF_STMT(BPF_LD + BPF_B + BPF_ABS, SKF_AD_OFF + SKF_AD_VLAN_TAG),
+	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, 0xffff, 0, 4), /* 0xffff will be replaced by vland id */
+	BPF_STMT(BPF_LD + BPF_H + BPF_ABS, OFFSET_ARP_OP_CODE),
+	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARPOP_REPLY, 1, 0),
+	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARPOP_REQUEST, 0, 1),
+	BPF_STMT(BPF_RET + BPF_K, (u_int) -1),
+	BPF_STMT(BPF_RET + BPF_K, 0),
+};
+
+/* this hack replaces vlanid value in filter code */
+#define SET_FILTER_VLANID(fprog, vlanid) (fprog)->filter[3].k = vlanid
+
+static const struct sock_fprog arp_vlan_rpl_fprog = {
+	.len = ARRAY_SIZE(arp_vlan_rpl_flt),
+	.filter = arp_vlan_rpl_flt,
 };
 
 static int lw_ap_sock_open(struct lw_psr_port_priv *psr_ppriv)
 {
+	struct lw_ap_port_priv *ap_ppriv = lw_ap_ppriv_get(psr_ppriv);
+	struct sock_fprog fprog;
+	struct sock_filter arp_vlan_rpl_flt[ARRAY_SIZE(arp_vlan_rpl_flt)];
+
+	if (ap_ppriv->vlanid_in_use) {
+		memcpy(&arp_vlan_rpl_flt, arp_vlan_rpl_fprog.filter,
+		       sizeof(arp_vlan_rpl_flt));
+		fprog = arp_vlan_rpl_fprog;
+		fprog.filter = arp_vlan_rpl_flt;
+		SET_FILTER_VLANID(&fprog, ap_ppriv->vlanid);
+	} else {
+		fprog = arp_novlan_rpl_fprog;
+	}
 	return teamd_packet_sock_open(&psr_ppriv->sock,
 				      psr_ppriv->common.tdport->ifindex,
-				      htons(ETH_P_ARP), &arp_rpl_fprog);
+				      htons(ETH_P_ARP), &fprog);
 }
 
 static void lw_ap_sock_close(struct lw_psr_port_priv *psr_ppriv)
@@ -610,6 +645,21 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 	ap_ppriv->always_active = err ? false : !!tmp;
 	teamd_log_dbg("always_active \"%d\".", ap_ppriv->always_active);
 
+	err = json_unpack(link_watch_json, "{s:i}", "vlanid", &tmp);
+	if (!err) {
+		if (tmp < 0 || tmp >= 4096) {
+			teamd_log_err("Wrong \"vlanid\" option value.");
+			return -EINVAL;
+		}
+		ap_ppriv->vlanid_in_use = true;
+		ap_ppriv->vlanid = tmp;
+		teamd_log_dbg("vlan id \"%u\".", ap_ppriv->vlanid);
+	}
+	err = set_in_addr(&ap_ppriv->dst, host);
+	if (err)
+		return err;
+	teamd_log_dbg("target address \"%s\".", str_in_addr(&ap_ppriv->dst));
+
 	return 0;
 }
 
@@ -641,6 +691,16 @@ struct arp_packet {
 	struct in_addr			target_ip;
 } __attribute__((packed));
 
+struct __vlan_hdr {
+	__be16 h_vlan_TCI;
+	__be16 h_vlan_encapsulated_proto;
+};
+
+struct arp_vlan_packet {
+	struct __vlan_hdr		vlanh;
+	struct arp_packet		ap;
+} __attribute__((packed));
+
 static int lw_ap_send(struct lw_psr_port_priv *psr_ppriv)
 {
 	struct lw_ap_port_priv *ap_ppriv = lw_ap_ppriv_get(psr_ppriv);
@@ -670,9 +730,20 @@ static int lw_ap_send(struct lw_psr_port_priv *psr_ppriv)
 	memcpy(ap.target_mac, ll_bcast.sll_addr, sizeof(ap.target_mac));
 	ap.target_ip = ap_ppriv->dst;
 
-	err = teamd_sendto(psr_ppriv->sock, &ap, sizeof(ap), 0,
-			   (struct sockaddr *) &ll_bcast, sizeof(ll_bcast));
-	return err;
+	if (ap_ppriv->vlanid_in_use) {
+		struct arp_vlan_packet avp;
+		avp.ap = ap;
+		avp.vlanh.h_vlan_encapsulated_proto = htons(ETH_P_ARP);
+		avp.vlanh.h_vlan_TCI = htons(ap_ppriv->vlanid);
+		ll_bcast.sll_protocol = htons(ETH_P_8021Q);
+		return teamd_sendto(psr_ppriv->sock, &avp, sizeof(avp),
+				    0, (struct sockaddr *) &ll_bcast,
+				    sizeof(ll_bcast));
+	} else {
+		return teamd_sendto(psr_ppriv->sock, &ap, sizeof(ap),
+				    0, (struct sockaddr *) &ll_bcast,
+				    sizeof(ll_bcast));
+	}
 }
 
 static int lw_ap_receive(struct lw_psr_port_priv *psr_ppriv)
@@ -833,7 +904,7 @@ static struct sock_filter na_flt[] = {
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, IPPROTO_ICMPV6, 0, 3),
 	BPF_STMT(BPF_LD + BPF_B + BPF_ABS, OFFSET_NA_TYPE),
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ND_NEIGHBOR_ADVERT, 0, 1),
-	BPF_STMT(BPF_RET + BPF_K, (u_int)-1),
+	BPF_STMT(BPF_RET + BPF_K, (u_int) -1),
 	BPF_STMT(BPF_RET + BPF_K, 0),
 };
 
