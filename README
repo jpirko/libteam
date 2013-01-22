@@ -5,7 +5,7 @@ http://www.libteam.org
 https://fedorahosted.org/libteam/wiki/InfrastructureSpecification
 
 How to install:
-1) Install autotools, libtool, >libnl 3.2.0
+1) Install autotools, libtool, >libnl 3.2.19
 2) In main dir start
     a) ./autogen.sh
     b) ./configure
@@ -13,7 +13,7 @@ How to install:
     d) make install
 
 How to build tar package:
-1) Install autotools, libtool, libnl 3.2.0
+1) Install autotools, libtool, libnl 3.2.19
 2) In main dir start
     a) ./autogen.sh
     b) ./configure
