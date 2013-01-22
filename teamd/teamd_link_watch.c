@@ -27,6 +27,7 @@
 #include <arpa/inet.h>
 #include <linux/if_packet.h>
 #include <linux/if_ether.h>
+#include <linux/if_vlan.h>
 #include <netdb.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
@@ -450,22 +451,22 @@ static int lw_psr_port_added(struct teamd_context *ctx,
 	struct lw_psr_port_priv *psr_ppriv = priv;
 	int err;
 
-	err = psr_ppriv->ops->sock_open(psr_ppriv);
-	if (err) {
-		teamd_log_err("Failed to create socket.");
-		return err;
-	}
-
 	err = lw_psr_load_options(ctx, tdport, psr_ppriv);
 	if (err) {
 		teamd_log_err("Failed to load options.");
-		goto close_sock;
+		return err;
 	}
 
 	err = psr_ppriv->ops->load_options(ctx, tdport, psr_ppriv);
 	if (err) {
 		teamd_log_err("Failed to load options.");
-		goto close_sock;
+		return err;
+	}
+
+	err = psr_ppriv->ops->sock_open(psr_ppriv);
+	if (err) {
+		teamd_log_err("Failed to create socket.");
+		return err;
 	}
 
 	err = teamd_loop_callback_fd_add(ctx, LW_SOCKET_CB_NAME, psr_ppriv,
