@@ -52,10 +52,12 @@ static struct team_change_handler tow_option_change_handler = {
 
 int teamd_option_watch_init(struct teamd_context *ctx)
 {
-	return team_change_handler_register(ctx->th, &tow_option_change_handler);
+	return team_change_handler_register(ctx->th,
+					    &tow_option_change_handler, NULL);
 }
 
 void teamd_option_watch_fini(struct teamd_context *ctx)
 {
-	team_change_handler_unregister(ctx->th, &tow_option_change_handler);
+	team_change_handler_unregister(ctx->th,
+				       &tow_option_change_handler, NULL);
 }

@@ -58,7 +58,6 @@ struct teamd_balancer {
 	struct teamd_context *ctx;
 	bool tx_balancing_enabled;
 	uint32_t balancing_interval;
-	struct team_change_handler option_change_handler;
 	struct tb_hash_info hash_info[HASH_COUNT];
 	struct list_item port_info_list;
 };
@@ -379,6 +378,11 @@ static int tb_set_lb_stats_refresh_interval(struct team_handle *th,
 	return team_set_option_value_u32(th, option, tb->balancing_interval);
 }
 
+static const struct team_change_handler tb_option_change_handler = {
+	.func = tb_option_change_handler_func,
+	.type_mask = TEAM_OPTION_CHANGE,
+};
+
 int teamd_balancer_init(struct teamd_context *ctx, struct teamd_balancer **ptb)
 {
 	struct teamd_balancer *tb;
@@ -413,10 +417,8 @@ int teamd_balancer_init(struct teamd_context *ctx, struct teamd_balancer **ptb)
 		teamd_log_info("Balancing interval %u.", tb->balancing_interval);
 	}
 
-	tb->option_change_handler.func = tb_option_change_handler_func;
-	tb->option_change_handler.func_priv = tb;
-	tb->option_change_handler.type_mask = TEAM_OPTION_CHANGE;
-	err = team_change_handler_register(ctx->th, &tb->option_change_handler);
+	err = team_change_handler_register(ctx->th,
+					   &tb_option_change_handler, tb);
 	if (err) {
 		teamd_log_err("Failed to register tb option change handler.");
 		goto err_change_handler_register;
@@ -434,7 +436,8 @@ err_change_handler_register:
 
 void teamd_balancer_fini(struct teamd_balancer *tb)
 {
-	team_change_handler_unregister(tb->ctx->th, &tb->option_change_handler);
+	team_change_handler_unregister(tb->ctx->th,
+				       &tb_option_change_handler, tb);
 	free(tb);
 }
 

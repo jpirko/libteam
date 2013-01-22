@@ -282,7 +282,7 @@ static int port_priv_change_handler_func(struct team_handle *th, void *arg,
 	return 0;
 }
 
-static struct team_change_handler port_priv_change_handler = {
+static const struct team_change_handler port_priv_change_handler = {
 	.func = port_priv_change_handler_func,
 	.type_mask = TEAM_PORT_CHANGE,
 };
@@ -292,13 +292,15 @@ int teamd_per_port_init(struct teamd_context *ctx)
 	int err;
 
 	list_init(&ctx->port_obj_list);
-	err = team_change_handler_register(ctx->th, &port_priv_change_handler);
+	err = team_change_handler_register(ctx->th,
+					   &port_priv_change_handler, NULL);
 	return err;
 }
 
 void teamd_per_port_fini(struct teamd_context *ctx)
 {
-	team_change_handler_unregister(ctx->th, &port_priv_change_handler);
+	team_change_handler_unregister(ctx->th,
+				       &port_priv_change_handler, NULL);
 	check_port_objs_to_be_freed(ctx);
 }
 

@@ -211,14 +211,15 @@ struct team_change_handler {
 					/* type_mask passed to function
 					 * represents types of events which
 					 * really happened. */
-	void *			func_priv;
 	team_change_type_mask_t	type_mask;
 };
 
 int team_change_handler_register(struct team_handle *th,
-				 struct team_change_handler *handler);
+				 const struct team_change_handler *handler,
+				 void *priv);
 void team_change_handler_unregister(struct team_handle *th,
-				    struct team_change_handler *handler);
+				    const struct team_change_handler *handler,
+				    void *priv);
 
 /*
  * stringify helper functions

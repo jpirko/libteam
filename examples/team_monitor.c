@@ -148,14 +148,14 @@ int main(int argc, char *argv[])
 		goto err_team_init;
 	}
 
-	err = team_change_handler_register(th, &port_change_handler);
+	err = team_change_handler_register(th, &port_change_handler, NULL);
 	if (err) {
 		fprintf(stderr, "port change handler register failed\n");
 		err = 1;
 		goto err_port_change_register;
 	}
 
-	err = team_change_handler_register(th, &option_change_handler);
+	err = team_change_handler_register(th, &option_change_handler, NULL);
 	if (err) {
 		fprintf(stderr, "option change handler register failed\n");
 		err = 1;
@@ -166,9 +166,9 @@ int main(int argc, char *argv[])
 
 	do_main_loop(th);
 
-	team_change_handler_unregister(th, &option_change_handler);
+	team_change_handler_unregister(th, &option_change_handler, NULL);
 err_option_change_register:
-	team_change_handler_unregister(th, &port_change_handler);
+	team_change_handler_unregister(th, &port_change_handler, NULL);
 err_port_change_register:
 err_team_init:
 	team_free(th);

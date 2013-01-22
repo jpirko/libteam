@@ -175,8 +175,9 @@ static int cli_cache_refill(struct team_handle *th)
  */
 
 struct change_handler_item {
-	struct list_item		list;
-	struct team_change_handler *	handler;
+	struct list_item			list;
+	const struct team_change_handler *	handler;
+	void *					priv;
 };
 
 void set_call_change_handlers(struct team_handle *th,
@@ -194,12 +195,13 @@ int check_call_change_handlers(struct team_handle *th,
 			th->change_handler.pending_type_mask & call_type_mask;
 
 	list_for_each_node_entry(handler_item, &th->change_handler.list, list) {
-		struct team_change_handler *handler = handler_item->handler;
+		const struct team_change_handler *handler =
+				handler_item->handler;
 		team_change_type_mask_t item_type_mask =
 				handler->type_mask & to_call_type_mask;
 
 		if (item_type_mask) {
-			err = handler->func(th, handler->func_priv,
+			err = handler->func(th, handler_item->priv,
 					    item_type_mask);
 			if (err)
 				break;
@@ -211,12 +213,14 @@ int check_call_change_handlers(struct team_handle *th,
 
 static struct change_handler_item *
 find_change_handler(struct team_handle *th,
-		    struct team_change_handler *handler)
+		    const struct team_change_handler *handler,
+		    void *priv)
 {
 	struct change_handler_item *handler_item;
 
 	list_for_each_node_entry(handler_item, &th->change_handler.list, list)
-		if (handler_item->handler == handler)
+		if (handler_item->handler == handler &&
+		    handler_item->priv == priv)
 			return handler_item;
 	return NULL;
 }
@@ -225,6 +229,7 @@ find_change_handler(struct team_handle *th,
  * team_change_handler_register:
  * @th: libteam library context
  * @handler: event handler structure
+ * @priv: event handler func private data
  *
  * Registers custom @handler structure which defines a function which
  * going to be called on defined events.
@@ -233,16 +238,18 @@ find_change_handler(struct team_handle *th,
  **/
 TEAM_EXPORT
 int team_change_handler_register(struct team_handle *th,
-				 struct team_change_handler *handler)
+				 const struct team_change_handler *handler,
+				 void *priv)
 {
 	struct change_handler_item *handler_item;
 
-	if (find_change_handler(th, handler))
+	if (find_change_handler(th, handler, priv))
 		return -EEXIST;
 	handler_item = malloc(sizeof(struct change_handler_item));
 	if (!handler_item)
 		return -ENOMEM;
 	handler_item->handler = handler;
+	handler_item->priv = priv;
 	list_add_tail(&th->change_handler.list, &handler_item->list);
 	return 0;
 }
@@ -251,17 +258,19 @@ int team_change_handler_register(struct team_handle *th,
  * team_change_handler_unregister:
  * @th: libteam library context
  * @handler: event handler structure
+ * @priv: event handler func private data
  *
  * Unregisters custom @handler structure.
  *
  **/
 TEAM_EXPORT
 void team_change_handler_unregister(struct team_handle *th,
-				    struct team_change_handler *handler)
+				    const struct team_change_handler *handler,
+				    void *priv)
 {
 	struct change_handler_item *handler_item;
 
-	handler_item = find_change_handler(th, handler);
+	handler_item = find_change_handler(th, handler, priv);
 	if (!handler_item)
 		return;
 	list_del(&handler_item->list);

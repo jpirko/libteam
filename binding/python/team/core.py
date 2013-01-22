@@ -427,8 +427,8 @@ class Team(TeamNetDevice):
         self._option_list = TeamOptionList(th)
 
         self._change_handler = capi.team_change_handler(_change_handler_func,
-                                                        self, TEAM_ANY_CHANGE)
-        capi.py_team_change_handler_register(self._th, self._change_handler)
+                                                        TEAM_ANY_CHANGE)
+        capi.py_team_change_handler_register(self._th, self._change_handler, self)
 
     def close(self):
         """
@@ -440,7 +440,7 @@ class Team(TeamNetDevice):
                 raise TeamLibError("Failed to destroy team.", err)
 
         capi.py_team_change_handler_unregister(self._th,
-                                               self._change_handler)
+                                               self._change_handler, self)
         capi.team_free(self._th)
 
     def kill_loop(self):

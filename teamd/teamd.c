@@ -1151,7 +1151,7 @@ static int debug_change_handler_func(struct team_handle *th, void *arg,
 	return 0;
 }
 
-static struct team_change_handler debug_change_handler = {
+static const struct team_change_handler debug_change_handler = {
 	.func = debug_change_handler_func,
 	.type_mask = TEAM_PORT_CHANGE | TEAM_OPTION_CHANGE | TEAM_IFINFO_CHANGE,
 };
@@ -1160,14 +1160,15 @@ static int teamd_register_default_handlers(struct teamd_context *ctx)
 {
 	if (!ctx->debug)
 		return 0;
-	return team_change_handler_register(ctx->th, &debug_change_handler);
+	return team_change_handler_register(ctx->th,
+					    &debug_change_handler, NULL);
 }
 
 static void teamd_unregister_default_handlers(struct teamd_context *ctx)
 {
 	if (!ctx->debug)
 		return;
-	team_change_handler_unregister(ctx->th, &debug_change_handler);
+	team_change_handler_unregister(ctx->th, &debug_change_handler, NULL);
 }
 
 static int teamd_init(struct teamd_context *ctx)
