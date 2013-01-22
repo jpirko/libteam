@@ -105,11 +105,10 @@ static int ab_set_active_port(struct teamd_context *ctx,
 {
 	int err;
 
-	teamd_log_info("Changing active port to \"%s\".",
-		       tdport->ifname);
-
 	err = team_set_port_enabled(ctx->th, tdport->ifindex, true);
 	if (err) {
+		if (teamd_err_port_disappeared(err, ctx, tdport))
+			return 0;
 		teamd_log_err("%s: Failed to enable active port.",
 			      tdport->ifname);
 		return err;
@@ -126,6 +125,8 @@ static int ab_set_active_port(struct teamd_context *ctx,
 		return err;
 	}
 	ab_priv(ctx)->active_ifindex = tdport->ifindex;
+	teamd_log_info("Changed active port to \"%s\".",
+		       tdport->ifname);
 	return 0;
 }
 
