@@ -546,6 +546,19 @@ lw_ap_ppriv_get(struct lw_psr_port_priv *psr_ppriv)
 #define OFFSET_ARP_OP_CODE					\
 	in_struct_offset(struct arphdr, ar_op)
 
+static struct sock_filter arp_rpl_flt[] = {
+	BPF_STMT(BPF_LD + BPF_H + BPF_ABS, OFFSET_ARP_OP_CODE),
+	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARPOP_REPLY, 1, 0),
+	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARPOP_REQUEST, 0, 1),
+	BPF_STMT(BPF_RET + BPF_K, (u_int) -1),
+	BPF_STMT(BPF_RET + BPF_K, 0),
+};
+
+static const struct sock_fprog arp_rpl_fprog = {
+	.len = ARRAY_SIZE(arp_rpl_flt),
+	.filter = arp_rpl_flt,
+};
+
 static struct sock_filter arp_novlan_rpl_flt[] = {
 	BPF_STMT(BPF_LD + BPF_B + BPF_ABS, SKF_AD_OFF + SKF_AD_VLAN_TAG_PRESENT),
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, 0, 0, 4),
@@ -598,7 +611,7 @@ static int lw_ap_sock_open(struct lw_psr_port_priv *psr_ppriv)
 	}
 	return teamd_packet_sock_open(&psr_ppriv->sock,
 				      psr_ppriv->common.tdport->ifindex,
-				      htons(ETH_P_ARP), &fprog);
+				      htons(ETH_P_ARP), &fprog, &arp_rpl_fprog);
 }
 
 static void lw_ap_sock_close(struct lw_psr_port_priv *psr_ppriv)
@@ -926,7 +939,7 @@ static int lw_nsnap_sock_open(struct lw_psr_port_priv *psr_ppriv)
 	 */
 	err = teamd_packet_sock_open(&psr_ppriv->sock,
 				     psr_ppriv->common.tdport->ifindex,
-				     htons(ETH_P_IPV6), &na_fprog);
+				     htons(ETH_P_IPV6), &na_fprog, NULL);
 	if (err)
 		return err;
 	err = icmp6_sock_open(&nsnap_ppriv->tx_sock);

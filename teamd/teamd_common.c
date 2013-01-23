@@ -26,12 +26,65 @@
 #include <sys/stat.h>
 #include <linux/if_packet.h>
 #include <linux/filter.h>
+#include <private/misc.h>
 
 #include "teamd.h"
 
+static struct sock_filter bad_flt[] = {
+	BPF_STMT(BPF_LD + BPF_B + BPF_ABS, -1),
+	BPF_STMT(BPF_RET + BPF_K, 0),
+};
+
+static const struct sock_fprog bad_fprog = {
+	.len = ARRAY_SIZE(bad_flt),
+	.filter = bad_flt,
+};
+
+static int attach_filter(int sock, const struct sock_fprog *pref_fprog,
+			 const struct sock_fprog *alt_fprog)
+{
+	int ret;
+	const struct sock_fprog *fprog;
+
+	if (!pref_fprog)
+		return 0;
+
+	/* Now we are in tough situation. Older kernels (<3.8) does not
+	 * support SKF_AD_VLAN_TAG_PRESENT and SKF_AD_VLAN_TAG. But the kernel
+	 * check if these are supported was added after that:
+	 * aa1113d9f85da59dcbdd32aeb5d71da566e46def
+	 * But it was added close enough. So try to attach obviously bad
+	 * filter and assume that is it does not fail, kernel does not support
+	 * accessing skb->vlan_tci getting and use alternative filter instead.
+	 */
+
+	ret = setsockopt(sock, SOL_SOCKET, SO_ATTACH_FILTER,
+			 &bad_fprog, sizeof(bad_fprog));
+	if (ret == -1) {
+		if (errno != EINVAL)
+			return -errno;
+		fprog = pref_fprog;
+	}
+	else if (alt_fprog) {
+		teamd_log_warn("Kernel does not support accessing skb->vlan_tci from BPF,\n"
+			       "falling back to alternative filter. Expect vlan-tagged ARPs\n"
+			       "to be accounted on non-tagged link monitor and vice versa.");
+		fprog = alt_fprog;
+	} else {
+		return 0;
+	}
+
+	ret = setsockopt(sock, SOL_SOCKET, SO_ATTACH_FILTER,
+			 fprog, sizeof(*fprog));
+	if (ret == -1)
+		return -errno;
+	return 0;
+}
+
 int teamd_packet_sock_open(int *sock_p, const uint32_t ifindex,
 			   const unsigned short family,
-			   const struct sock_fprog *fprog)
+			   const struct sock_fprog *fprog,
+			   const struct sock_fprog *alt_fprog)
 {
 	struct sockaddr_ll ll_my;
 	int sock;
@@ -44,14 +97,10 @@ int teamd_packet_sock_open(int *sock_p, const uint32_t ifindex,
 		return -errno;
 	}
 
-	if (fprog) {
-		ret = setsockopt(sock, SOL_SOCKET, SO_ATTACH_FILTER,
-				 fprog, sizeof(*fprog));
-		if (ret == -1) {
-			teamd_log_err("Failed to attach filter.");
-			err = -errno;
-			goto close_sock;
-		}
+	err = attach_filter(sock, fprog, alt_fprog);
+	if (err) {
+		teamd_log_err("Failed to attach filter.");
+		goto close_sock;
 	}
 
 	memset(&ll_my, 0, sizeof(ll_my));

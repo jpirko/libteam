@@ -884,7 +884,7 @@ static int lacp_port_added(struct teamd_context *ctx,
 
 	err = teamd_packet_sock_open(&lacp_port->sock,
 				     tdport->ifindex,
-				     htons(ETH_P_SLOW), NULL);
+				     htons(ETH_P_SLOW), NULL, NULL);
 	if (err)
 		return err;
 
