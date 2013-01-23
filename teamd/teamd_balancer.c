@@ -237,11 +237,11 @@ struct lb_stats {
 	uint64_t tx_bytes;
 };
 
-static int tb_option_change_handler_func(struct team_handle *th, void *arg,
+static int tb_option_change_handler_func(struct team_handle *th, void *priv,
 					 team_change_type_mask_t type_mask)
 {
-	struct teamd_context *ctx = team_get_user_priv(th);
-	struct teamd_balancer *tb = arg;
+	struct teamd_balancer *tb = priv;
+	struct teamd_context *ctx = tb->ctx;
 	struct team_option *option;
 	bool rebalance_needed = false;
 
@@ -417,13 +417,13 @@ int teamd_balancer_init(struct teamd_context *ctx, struct teamd_balancer **ptb)
 		teamd_log_info("Balancing interval %u.", tb->balancing_interval);
 	}
 
+	tb->ctx = ctx;
 	err = team_change_handler_register(ctx->th,
 					   &tb_option_change_handler, tb);
 	if (err) {
 		teamd_log_err("Failed to register tb option change handler.");
 		goto err_change_handler_register;
 	}
-	tb->ctx = ctx;
 	*ptb = tb;
 	return 0;
 

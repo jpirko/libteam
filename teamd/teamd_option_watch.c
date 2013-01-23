@@ -28,10 +28,10 @@
 
 #include "teamd.h"
 
-static int tow_option_change_handler_func(struct team_handle *th, void *arg,
+static int tow_option_change_handler_func(struct team_handle *th, void *priv,
 					  team_change_type_mask_t type_mask)
 {
-	struct teamd_context *ctx = team_get_user_priv(th);
+	struct teamd_context *ctx = priv;
 	struct team_option *option;
 	int err;
 
@@ -53,11 +53,11 @@ static struct team_change_handler tow_option_change_handler = {
 int teamd_option_watch_init(struct teamd_context *ctx)
 {
 	return team_change_handler_register(ctx->th,
-					    &tow_option_change_handler, NULL);
+					    &tow_option_change_handler, ctx);
 }
 
 void teamd_option_watch_fini(struct teamd_context *ctx)
 {
 	team_change_handler_unregister(ctx->th,
-				       &tow_option_change_handler, NULL);
+				       &tow_option_change_handler, ctx);
 }

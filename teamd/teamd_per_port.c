@@ -248,10 +248,10 @@ static void check_port_objs_to_be_freed(struct teamd_context *ctx)
 	}
 }
 
-static int port_priv_change_handler_func(struct team_handle *th, void *arg,
+static int port_priv_change_handler_func(struct team_handle *th, void *priv,
 					 team_change_type_mask_t type_mask)
 {
-	struct teamd_context *ctx = team_get_user_priv(th);
+	struct teamd_context *ctx = priv;
 	struct team_port *port;
 	struct port_obj *port_obj;
 	int err;
@@ -293,14 +293,14 @@ int teamd_per_port_init(struct teamd_context *ctx)
 
 	list_init(&ctx->port_obj_list);
 	err = team_change_handler_register(ctx->th,
-					   &port_priv_change_handler, NULL);
+					   &port_priv_change_handler, ctx);
 	return err;
 }
 
 void teamd_per_port_fini(struct teamd_context *ctx)
 {
 	team_change_handler_unregister(ctx->th,
-				       &port_priv_change_handler, NULL);
+				       &port_priv_change_handler, ctx);
 	check_port_objs_to_be_freed(ctx);
 }
 

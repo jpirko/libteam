@@ -1137,10 +1137,10 @@ static void debug_log_ifinfo_list(struct teamd_context *ctx)
 	teamd_log_dbg("</ifinfo_list>");
 }
 
-static int debug_change_handler_func(struct team_handle *th, void *arg,
+static int debug_change_handler_func(struct team_handle *th, void *priv,
 				     team_change_type_mask_t type_mask)
 {
-	struct teamd_context *ctx = team_get_user_priv(th);
+	struct teamd_context *ctx = priv;
 
 	if (type_mask & TEAM_PORT_CHANGE)
 		debug_log_port_list(ctx);
@@ -1161,14 +1161,14 @@ static int teamd_register_default_handlers(struct teamd_context *ctx)
 	if (!ctx->debug)
 		return 0;
 	return team_change_handler_register(ctx->th,
-					    &debug_change_handler, NULL);
+					    &debug_change_handler, ctx);
 }
 
 static void teamd_unregister_default_handlers(struct teamd_context *ctx)
 {
 	if (!ctx->debug)
 		return;
-	team_change_handler_unregister(ctx->th, &debug_change_handler, NULL);
+	team_change_handler_unregister(ctx->th, &debug_change_handler, ctx);
 }
 
 static int teamd_init(struct teamd_context *ctx)
@@ -1207,7 +1207,6 @@ static int teamd_init(struct teamd_context *ctx)
 		goto team_destroy;
 	}
 
-	team_set_user_priv(ctx->th, ctx);
 	ctx->ifinfo = team_get_ifinfo(ctx->th);
 	ctx->hwaddr = team_get_ifinfo_hwaddr(ctx->ifinfo);
 	ctx->hwaddr_len = team_get_ifinfo_hwaddr_len(ctx->ifinfo);

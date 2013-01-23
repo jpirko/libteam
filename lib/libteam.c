@@ -660,31 +660,6 @@ void team_set_log_priority(struct team_handle *th, int priority)
 	th->log_priority = priority;
 }
 
-/**
- * team_get_user_priv:
- * @th: libteam library context
- *
- * Returns: pointer to user private data
- **/
-TEAM_EXPORT
-void *team_get_user_priv(struct team_handle *th)
-{
-	return th->user_priv;
-}
-
-/**
- * team_set_user_priv:
- * @th: libteam library context
- * @priv: the new pointer to user private data
- *
- * Set pointer to user private data.
- **/
-TEAM_EXPORT
-void team_set_user_priv(struct team_handle *th, void *priv)
-{
-	th->user_priv = priv;
-}
-
 static int get_sock_event_fd(struct team_handle *th)
 {
 	return nl_socket_get_fd(th->nl_sock_event);

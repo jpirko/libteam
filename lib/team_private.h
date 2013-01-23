@@ -57,7 +57,6 @@ struct team_handle {
 		       const char *file, int line, const char *fn,
 		       const char *format, va_list args);
 	int log_priority;
-	void *user_priv;
 };
 
 /**
