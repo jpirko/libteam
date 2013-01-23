@@ -244,6 +244,7 @@ static int __set_optval_from_str_bool(struct team_handle *th,
  *
  * Returns: zero on success or negative number in case of an error.
  **/
+TEAM_EXPORT
 int team_set_option_value_from_string(struct team_handle *th,
 				      struct team_option *option,
 				      const char *str)
