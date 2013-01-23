@@ -61,7 +61,7 @@ int team_hwaddr_get(struct team_handle *th, uint32_t ifindex, char *addr, unsign
 struct _py_team_change_handler {
     struct team_change_handler handler;
     PyObject *orig_func;
-    void *orig_priv;
+    PyObject *orig_priv;
 };
 %}
 
@@ -75,18 +75,14 @@ struct _py_team_change_handler {
                 return NULL;
         py_handler->handler.func = (void *) func;
         py_handler->handler.type_mask = type_mask;
+
+        Py_XINCREF(py_handler->handler.func);
         return &py_handler->handler;
     }
 
     ~team_change_handler() {
+        Py_XDECREF($self->func);
         free($self);
-    }
-}
-
-%exception team_call_eventfd_handler {
-    $action
-    if (PyErr_Occurred() != NULL) {
-        return NULL;
     }
 }
 
@@ -105,14 +101,22 @@ static int PythonCallBack(struct team_handle *th, void *func_priv,
     PyObject *arglist;
     PyObject *result;
     struct _py_team_change_handler *py_handler;
+    int retval = 0;
 
     py_handler = (struct _py_team_change_handler *) func_priv;
     arglist = Py_BuildValue("(Oi)", py_handler->orig_priv, type_mask);
-    result =  PyEval_CallObject(py_handler->orig_func, arglist);
+
+    result =  PyObject_CallObject(py_handler->orig_func, arglist);
+
+    if (result == NULL)
+        return -1;
+    if (PyInt_Check(result))
+        retval = PyInt_AsLong(result);
     if (arglist != NULL)
         Py_DECREF(arglist);
     Py_XDECREF(result);
-    return 0;
+
+    return retval;
 }
 
 void py_team_change_handler_register(struct team_handle *th,

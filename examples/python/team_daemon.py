@@ -109,12 +109,14 @@ class TeamDaemon(object):
             print ("\tifname %s, linkup %d, changed %d, speed %d, duplex %d, removed %d" %
                         (port.ifname, port.linkup, port.changed,
                          port.speed, port.duplex, port.removed))
+        return 0
 
     def _option_change_handler_func(self, unused):
         print "------------------\noption change\n\toption list:"
         for option in self._t.option_list():
             print ("\t%s = %s (changed %d)" % (option.name, option.value,
                                                option.changed))
+        return 0
 
     def _change_active_port(self, old_active, new_active):
         if old_active:

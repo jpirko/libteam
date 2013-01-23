@@ -32,12 +32,14 @@ def port_change_handler_func(t):
         print ("\tifname %s, linkup %d, changed %d, speed %d, duplex %d, removed %d" %
                         (port.ifname, port.linkup, port.changed,
                          port.speed, port.duplex, port.removed))
+    return 0
 
 def option_change_handler_func(t):
     print "------------------\noption change\n\toption list:"
     for option in t.option_list():
         print ("\t%s = %s (changed %d)" % (option.name, option.value,
                                            option.changed))
+    return 0
 
 def main():
     appname = sys.argv[0]

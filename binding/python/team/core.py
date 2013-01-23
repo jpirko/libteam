@@ -363,7 +363,9 @@ class TeamChangeHandler(object):
 
     def call(self, curr_type_mask):
         if self._type_mask & curr_type_mask:
-            self._func(self._func_priv)
+            return self._func(self._func_priv)
+        else:
+            return 0
 
 class TeamChangeHandlerList(object):
     def __init__(self):
@@ -381,13 +383,10 @@ class TeamChangeHandlerList(object):
 
     def call(self, type_mask):
         for handler in self._list:
-            handler.call(type_mask)
+            ret = handler.call(type_mask)
+            if ret != 0:
+                return ret
 
-"""
-This is ugly, change this to be in Team.
-"""
-def _change_handler_func(t, type_mask):
-    t._change_handler_func(type_mask)
 
 class Team(TeamNetDevice):
     """
@@ -403,7 +402,7 @@ class Team(TeamNetDevice):
         if not th:
             raise TeamLibError("Failed to allocate team handle.")
 
-        TeamNetDevice.__init__(self, th)
+        super(Team, self).__init__(th)
 
         if isinstance(teamdev, str):
             err = 0
@@ -426,9 +425,10 @@ class Team(TeamNetDevice):
         self._port_list = TeamPortList(th)
         self._option_list = TeamOptionList(th)
 
-        self._change_handler = capi.team_change_handler(_change_handler_func,
+        self._change_handler = capi.team_change_handler(self._change_handler_func,
                                                         TEAM_ANY_CHANGE)
-        capi.py_team_change_handler_register(self._th, self._change_handler, self)
+        capi.py_team_change_handler_register(self._th, self._change_handler, None)
+
 
     def close(self):
         """
@@ -440,7 +440,7 @@ class Team(TeamNetDevice):
                 raise TeamLibError("Failed to destroy team.", err)
 
         capi.py_team_change_handler_unregister(self._th,
-                                               self._change_handler, self)
+                                               self._change_handler, None)
         capi.team_free(self._th)
 
     def kill_loop(self):
@@ -467,7 +467,7 @@ class Team(TeamNetDevice):
     def check_events(self):
         capi.team_check_events(self._th)
 
-    def _change_handler_func(self, type_mask):
+    def _change_handler_func(self, func_priv, type_mask):
         if type_mask & TEAM_PORT_CHANGE:
             self._port_list.update()
         if type_mask & TEAM_OPTION_CHANGE:
