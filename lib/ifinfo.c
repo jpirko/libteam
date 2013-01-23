@@ -22,7 +22,6 @@
 #include <netlink/netlink.h>
 #include <netlink/cli/utils.h>
 #include <netlink/cli/link.h>
-#include <netlink/object-api.h>
 #include <linux/netdevice.h>
 #include <linux/types.h>
 #include <team.h>
@@ -122,7 +121,7 @@ static void obj_input(struct nl_object *obj, void *arg)
 	struct rtnl_link *link;
 	struct team_ifinfo *ifinfo;
 
-	if (!obj->ce_msgtype == RTM_NEWLINK)
+	if (nl_object_get_msgtype(obj) != RTM_NEWLINK)
 		return;
 	link = (struct rtnl_link *) obj;
 
