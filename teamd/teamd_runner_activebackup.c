@@ -31,7 +31,6 @@
 #include "teamd.h"
 
 struct ab_priv {
-	char active_orig_hwaddr[MAX_ADDR_LEN];
 	uint32_t active_ifindex;
 };
 
@@ -87,14 +86,6 @@ static int ab_clear_active_port(struct teamd_context *ctx)
 			      tdport->ifname);
 		return err;
 	}
-	err = team_hwaddr_set(ctx->th, tdport->ifindex,
-			      ab_priv(ctx)->active_orig_hwaddr,
-			      ctx->hwaddr_len);
-	if (err) {
-		teamd_log_err("%s: Failed to set restore active port original hardware address.",
-			      tdport->ifname);
-		return err;
-	}
 finish:
 	ab_priv(ctx)->active_ifindex = 0;
 	return 0;
@@ -113,14 +104,9 @@ static int ab_set_active_port(struct teamd_context *ctx,
 			      tdport->ifname);
 		return err;
 	}
-	memcpy(ab_priv(ctx)->active_orig_hwaddr,
-	       team_get_ifinfo_hwaddr(tdport->team_ifinfo),
-	       ctx->hwaddr_len);
-
-	err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
-			      ctx->hwaddr_len);
+	err = team_set_active_port(ctx->th, tdport->ifindex);
 	if (err) {
-		teamd_log_err("%s: Failed to set active port hardware address.",
+		teamd_log_err("%s: Failed to set as active port.",
 			      tdport->ifname);
 		return err;
 	}
@@ -169,6 +155,7 @@ static int ab_link_watch_handler(struct teamd_context *ctx)
 	struct teamd_port *active_tdport;
 	struct ab_port_state_info best;
 	int err;
+	uint32_t active_ifindex;
 
 	memset(&best, 0, sizeof(best));
 	best.prio = INT_MIN;
@@ -179,11 +166,18 @@ static int ab_link_watch_handler(struct teamd_context *ctx)
 			      active_tdport->ifname, active_tdport->ifindex,
 			      ab_get_port_prio(ctx, active_tdport));
 
+		err = team_get_active_port(ctx->th, &active_ifindex);
+		if (err) {
+			teamd_log_err("Failed to get active port.");
+			return err;
+		}
+
 		/*
-		 * When active port went down, clear it and proceed as if
-		 * none was set in the first place.
+		 * When active port went down or it is other than currently set,
+		 * clear it and proceed as if none was set in the first place.
 		 */
-		if (!teamd_link_watch_port_up(ctx, active_tdport)) {
+		if (!teamd_link_watch_port_up(ctx, active_tdport) ||
+		    active_ifindex != active_tdport->ifindex) {
 			err = ab_clear_active_port(ctx);
 			if (err)
 				return err;
@@ -230,6 +224,13 @@ static int ab_event_watch_port_added(struct teamd_context *ctx,
 		return err;
 	}
 
+	err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
+			      ctx->hwaddr_len);
+	if (err) {
+		teamd_log_err("%s: Failed to set port hardware address.",
+			      tdport->ifname);
+		return err;
+	}
 	return 0;
 }
 
@@ -301,7 +302,7 @@ static const struct teamd_state_json_ops ab_state_ops = {
 
 const struct teamd_runner teamd_runner_activebackup = {
 	.name			= "activebackup",
-	.team_mode_name		= "broadcast",
+	.team_mode_name		= "activebackup",
 	.priv_size		= sizeof(struct ab_priv),
 	.init			= ab_init,
 	.fini			= ab_fini,
