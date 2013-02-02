@@ -23,6 +23,9 @@
 #include <string.h>
 #include <getopt.h>
 #include <errno.h>
+#include <sys/signalfd.h>
+#include <signal.h>
+#include <unistd.h>
 #include <team.h>
 
 #include <private/misc.h>
@@ -147,6 +150,238 @@ static int run_cmd_setoption(char *cmd_name, struct team_handle *th,
 	return team_set_option_value_from_string(th, option, cmd_ctx->argv[1]);
 }
 
+static int run_main_loop(struct team_handle *th)
+{
+	fd_set rfds;
+	fd_set rfds_tmp;
+	int fdmax;
+	int ret;
+	const struct team_eventfd *eventfd;
+	sigset_t mask;
+	int sfd;
+	int err = 0;
+
+	sigemptyset(&mask);
+	sigaddset(&mask, SIGINT);
+	sigaddset(&mask, SIGQUIT);
+
+	ret = sigprocmask(SIG_BLOCK, &mask, NULL);
+	if (ret == -1) {
+		fprintf(stderr, "Failed to set blocked signals\n");
+		return -errno;
+	}
+
+	sfd = signalfd(-1, &mask, 0);
+	if (sfd == -1) {
+		fprintf(stderr, "Failed to open signalfd\n");
+		return -errno;
+	}
+
+	FD_ZERO(&rfds);
+	FD_SET(sfd, &rfds);
+	fdmax = sfd;
+	team_for_each_event_fd(eventfd, th) {
+		int fd = team_get_eventfd_fd(th, eventfd);
+
+		FD_SET(fd, &rfds);
+		if (fd > fdmax)
+			fdmax = fd;
+	}
+	fdmax++;
+
+	for (;;) {
+		rfds_tmp = rfds;
+		ret = select(fdmax, &rfds_tmp, NULL, NULL, NULL);
+		if (ret == -1) {
+			fprintf(stderr, "Select failed\n");
+			err = -errno;
+			goto out;
+		}
+		if (FD_ISSET(sfd, &rfds_tmp)) {
+			struct signalfd_siginfo fdsi;
+			ssize_t len;
+
+			len = read(sfd, &fdsi, sizeof(struct signalfd_siginfo));
+		        if (len != sizeof(struct signalfd_siginfo)) {
+				fprintf(stderr, "Unexpected data length came from signalfd\n");
+				err = -EINVAL;
+				goto out;
+			}
+			switch (fdsi.ssi_signo) {
+			case SIGINT:
+			case SIGQUIT:
+			case SIGTERM:
+				goto out;
+			default:
+				fprintf(stderr, "Read unexpected signal\n");
+				err = -EINVAL;
+				goto out;
+			}
+
+		}
+		team_for_each_event_fd(eventfd, th) {
+			if (FD_ISSET(team_get_eventfd_fd(th, eventfd), &rfds_tmp))
+				err = team_call_eventfd_handler(th, eventfd);
+				if (err) {
+					fprintf(stderr, "Team eventfd handler call failed\n");
+					return err;
+				}
+		}
+	}
+out:
+	close(sfd);
+	return err;
+}
+
+enum {
+	MONITOR_STYLE_CHANGED,
+	MONITOR_STYLE_ALL,
+};
+
+struct monitor_priv {
+	unsigned int style;
+};
+
+static bool __should_show(struct monitor_priv *mpriv, bool changed)
+{
+	if (mpriv->style == MONITOR_STYLE_ALL)
+		return true;
+	if (mpriv->style == MONITOR_STYLE_CHANGED && changed)
+		return true;
+	return false;
+}
+
+static void monitor_port_list(struct team_handle *th,
+			      struct monitor_priv *mpriv)
+{
+	struct team_port *port;
+	char buf[120];
+	bool trunc;
+	bool skip = true;
+
+	team_for_each_port(port, th) {
+		if (__should_show(mpriv, team_is_port_changed(port))) {
+			skip = false;
+			break;
+		}
+	}
+	if (skip)
+		return;
+
+	printf("ports:\n");
+	team_for_each_port(port, th) {
+		if (!__should_show(mpriv, team_is_port_changed(port)))
+			continue;
+		trunc = team_port_str(port, buf, sizeof(buf));
+		printf("  %s %s\n", buf, trunc ? "..." : "");
+	}
+}
+
+static void monitor_option_list(struct team_handle *th,
+				struct monitor_priv *mpriv)
+{
+	struct team_option *option;
+	char buf[120];
+	bool trunc;
+	bool skip = true;
+
+	team_for_each_option(option, th) {
+		if (__should_show(mpriv, team_is_option_changed(option))) {
+			skip = false;
+			break;
+		}
+	}
+	if (skip)
+		return;
+
+	printf("options:\n");
+	team_for_each_option(option, th) {
+		if (!__should_show(mpriv, team_is_option_changed(option)))
+			continue;
+		trunc = team_option_str(th, option, buf, sizeof(buf));
+		printf("  %s%s%s\n", buf, trunc ? "..." : "",
+		       team_is_option_changed(option) ? " changed" : "");
+	}
+}
+
+static void monitor_ifinfo_list(struct team_handle *th,
+				struct monitor_priv *mpriv)
+{
+	struct team_ifinfo *ifinfo;
+	char buf[120];
+	bool trunc;
+	bool skip = true;
+
+	team_for_each_ifinfo(ifinfo, th) {
+		if (__should_show(mpriv, team_is_ifinfo_changed(ifinfo))) {
+			skip = false;
+			break;
+		}
+	}
+	if (skip)
+		return;
+
+	printf("ifinfos:\n");
+	team_for_each_ifinfo(ifinfo, th) {
+		if (!__should_show(mpriv, team_is_ifinfo_changed(ifinfo)))
+			continue;
+		trunc = team_ifinfo_str(ifinfo, buf, sizeof(buf));
+		printf("  %s %s\n", buf, trunc ? "..." : "");
+	}
+}
+
+static int debug_change_handler_func(struct team_handle *th, void *priv,
+				     team_change_type_mask_t type_mask)
+{
+	struct monitor_priv *mpriv = priv;
+
+	if (type_mask & TEAM_PORT_CHANGE)
+		monitor_port_list(th, mpriv);
+	if (type_mask & TEAM_OPTION_CHANGE)
+		monitor_option_list(th, mpriv);
+	if (type_mask & TEAM_IFINFO_CHANGE)
+		monitor_ifinfo_list(th, mpriv);
+	return 0;
+}
+
+static const struct team_change_handler debug_change_handler = {
+	.func = debug_change_handler_func,
+	.type_mask = TEAM_PORT_CHANGE | TEAM_OPTION_CHANGE | TEAM_IFINFO_CHANGE,
+};
+
+static int run_cmd_monitor(char *cmd_name, struct team_handle *th,
+			   struct cmd_ctx *cmd_ctx)
+{
+	struct monitor_priv mpriv;
+	int err;
+
+	mpriv.style = MONITOR_STYLE_CHANGED;
+	if (cmd_ctx->argc > 0) {
+		char *monitor_style_str = cmd_ctx->argv[0];
+
+		if (!strncmp(monitor_style_str, "all",
+			     strlen(monitor_style_str))) {
+			mpriv.style = MONITOR_STYLE_ALL;
+		} else if (!strncmp(monitor_style_str, "changed",
+			     strlen(monitor_style_str))) {
+			mpriv.style = MONITOR_STYLE_CHANGED;
+		} else {
+			fprintf(stderr, "Unknown monitor style \"%s\"\n",
+					monitor_style_str);
+			return -EINVAL;
+		}
+	}
+
+	err = team_change_handler_register(th, &debug_change_handler, &mpriv);
+	if (err) {
+		fprintf(stderr, "Failed to register change handler\n");
+		return err;
+	}
+	err = run_main_loop(th);
+	team_change_handler_unregister(th, &debug_change_handler, &mpriv);
+	return err;
+}
+
 static struct cmd_type cmd_types[] = {
 	{
 		.name = "ports",
@@ -167,6 +402,11 @@ static struct cmd_type cmd_types[] = {
 		.name = "setoption",
 		.params = { "OPT_NAME", "OPT_VALUE", NULL },
 		.run_cmd = run_cmd_setoption,
+	},
+	{
+		.name = "monitor",
+		.params = { "OPT_STYLE", NULL },
+		.run_cmd = run_cmd_monitor,
 	},
 };
 #define CMD_TYPE_COUNT ARRAY_SIZE(cmd_types)
