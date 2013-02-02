@@ -327,13 +327,14 @@ static bool __team_port_str(struct team_port *port,
 	uint32_t ifindex = team_get_port_ifindex(port);
 	struct team_ifinfo *ifinfo = team_get_port_ifinfo(port);
 
-	return __buf_append(pbuf, pbufsiz, "%d: %s: %s %u %s%s%s", ifindex,
+	return __buf_append(pbuf, pbufsiz, "%s%d: %s: %s %uMbit %s",
+			    team_is_port_removed(port) ? "-" :
+				team_is_port_changed(port) ? "*" : " ",
+			    ifindex,
 			    team_get_ifinfo_ifname(ifinfo),
 			    team_is_port_link_up(port) ? "up": "down",
 			    team_get_port_speed(port),
-			    team_get_port_duplex(port) ? "fullduplex" : "halfduplex",
-			    team_is_port_changed(port) ? " changed" : "",
-			    team_is_port_removed(port) ? " removed" : "");
+			    team_get_port_duplex(port) ? "FD" : "HD");
 }
 
 /**
