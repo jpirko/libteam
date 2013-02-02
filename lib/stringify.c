@@ -272,7 +272,8 @@ static bool __team_option_str(struct team_handle *th,
 	char *name = team_get_option_name(option);
 	bool trunc;
 
-	trunc = __buf_append(pbuf, pbufsiz, "%s ", name);
+	trunc = __buf_append(pbuf, pbufsiz, "%s%s ",
+			     team_is_option_changed(option) ? "*" : " ", name);
 	if (trunc)
 		return true;
 
