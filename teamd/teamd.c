@@ -1118,21 +1118,13 @@ static void debug_log_option_list(struct teamd_context *ctx)
 static void debug_log_ifinfo_list(struct teamd_context *ctx)
 {
 	struct team_ifinfo *ifinfo;
+	char buf[120];
+	bool trunc;
 
 	teamd_log_dbg("<ifinfo_list>");
 	team_for_each_ifinfo(ifinfo, ctx->th) {
-		uint32_t ifindex = team_get_ifinfo_ifindex(ifinfo);
-		size_t hwaddr_len = team_get_ifinfo_hwaddr_len(ifinfo);
-		char str[hwaddr_str_len(hwaddr_len)];
-
-		hwaddr_str(str, team_get_ifinfo_hwaddr(ifinfo), hwaddr_len);
-		teamd_log_dbg("%d: hwaddr: %s%s", ifindex, str,
-			      team_is_ifinfo_hwaddr_changed(ifinfo) ? " changed" : "");
-		teamd_log_dbg("%d: hwaddr_len: %Zu%s", ifindex, hwaddr_len,
-			      team_is_ifinfo_hwaddr_len_changed(ifinfo) ? " changed" : "");
-		teamd_log_dbg("%d: ifname: %s%s", ifindex,
-			      team_get_ifinfo_ifname(ifinfo),
-			      team_is_ifinfo_ifname_changed(ifinfo) ? " changed" : "");
+		trunc = team_ifinfo_str(ifinfo, buf, sizeof(buf));
+		teamd_log_dbg("%s %s", buf, trunc ? "<trunc>" : "");
 	}
 	teamd_log_dbg("</ifinfo_list>");
 }
