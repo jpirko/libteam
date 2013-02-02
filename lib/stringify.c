@@ -25,6 +25,7 @@
 #include <stdint.h>
 #include <errno.h>
 #include <team.h>
+#include <private/misc.h>
 #include "team_private.h"
 
 static char *__get_port_ifname(struct team_handle *th, uint32_t port_ifindex)
@@ -352,4 +353,38 @@ TEAM_EXPORT
 bool team_port_str(struct team_port *port, char *buf, size_t bufsiz)
 {
 	return __team_port_str(port, &buf, &bufsiz);
+}
+
+static bool __team_ifinfo_str(struct team_ifinfo *ifinfo,
+			      char **pbuf, size_t *pbufsiz)
+{
+	uint32_t ifindex = team_get_ifinfo_ifindex(ifinfo);
+	size_t hwaddr_len = team_get_ifinfo_hwaddr_len(ifinfo);
+	char str[hwaddr_str_len(hwaddr_len)];
+
+	hwaddr_str(str, team_get_ifinfo_hwaddr(ifinfo), hwaddr_len);
+	return __buf_append(pbuf, pbufsiz, "%s%d: %s%s: %s%s",
+			    team_is_ifinfo_changed(ifinfo) ? "*" : " ",
+			    ifindex,
+			    team_is_ifinfo_ifname_changed(ifinfo) ? "*" : "",
+			    team_get_ifinfo_ifname(ifinfo),
+			    team_is_ifinfo_hwaddr_len_changed(ifinfo) ||
+			    team_is_ifinfo_hwaddr_changed(ifinfo) ? "*" : "",
+			    str);
+}
+
+/**
+ * team_ifinfo_str:
+ * @ifinfo: ifinfo structure
+ * @buf: buffer where string will be stored
+ * @bufsiz: available buffer size
+ *
+ * Converts ifinfo structure to string.
+ *
+ * Returns: true in case buffer is not big enough to contain whole string.
+ **/
+TEAM_EXPORT
+bool team_ifinfo_str(struct team_ifinfo *ifinfo, char *buf, size_t bufsiz)
+{
+	return __team_ifinfo_str(ifinfo, &buf, &bufsiz);
 }

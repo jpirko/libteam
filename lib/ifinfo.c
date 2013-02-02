@@ -315,3 +315,18 @@ bool team_is_ifinfo_ifname_changed(struct team_ifinfo *ifinfo)
 {
 	return is_changed(ifinfo, CHANGED_IFNAME);
 }
+
+/**
+ * team_is_ifinfo_changed:
+ * @ifinfo: ifinfo structure
+ *
+ * See if ifinfo got changed.
+ *
+ * Returns: true if ifinfo changed.
+ **/
+TEAM_EXPORT
+bool team_is_ifinfo_changed(struct team_ifinfo *ifinfo)
+{
+	return is_changed(ifinfo, CHANGED_HWADDR | CHANGED_HWADDR_LEN |
+				  CHANGED_IFNAME);
+}

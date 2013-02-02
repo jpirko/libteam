@@ -130,6 +130,7 @@ size_t team_get_ifinfo_hwaddr_len(struct team_ifinfo *ifinfo);
 bool team_is_ifinfo_hwaddr_len_changed(struct team_ifinfo *ifinfo);
 char *team_get_ifinfo_ifname(struct team_ifinfo *ifinfo);
 bool team_is_ifinfo_ifname_changed(struct team_ifinfo *ifinfo);
+bool team_is_ifinfo_changed(struct team_ifinfo *ifinfo);
 
 /*
  * team_option
@@ -229,6 +230,7 @@ int team_set_option_value_from_string(struct team_handle *th,
 bool team_option_str(struct team_handle *th, struct team_option *option,
 		     char *buf, size_t bufsiz);
 bool team_port_str(struct team_port *port, char *buf, size_t bufsiz);
+bool team_ifinfo_str(struct team_ifinfo *ifinfo, char *buf, size_t bufsiz);
 
 /*
  * route netlink helper functions
