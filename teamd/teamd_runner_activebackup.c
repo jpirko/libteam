@@ -34,11 +34,6 @@ struct ab_priv {
 	uint32_t active_ifindex;
 };
 
-static struct ab_priv *ab_priv(struct teamd_context *ctx)
-{
-	return (struct ab_priv *) ctx->runner_priv;
-}
-
 static int ab_get_port_prio(struct teamd_context *ctx,
 			    struct teamd_port *tdport)
 {
@@ -68,12 +63,13 @@ static bool ab_is_port_sticky(struct teamd_context *ctx, const char *port_name)
 	return sticky;
 }
 
-static int ab_clear_active_port(struct teamd_context *ctx)
+static int ab_clear_active_port(struct teamd_context *ctx,
+				struct ab_priv *ab_priv)
 {
 	struct teamd_port *tdport;
 	int err;
 
-	tdport = teamd_get_port(ctx, ab_priv(ctx)->active_ifindex);
+	tdport = teamd_get_port(ctx, ab_priv->active_ifindex);
 	if (!tdport || team_is_port_removed(tdport->team_port))
 		return 0;
 	teamd_log_dbg("Clearing active port \"%s\".", tdport->ifname);
@@ -87,11 +83,12 @@ static int ab_clear_active_port(struct teamd_context *ctx)
 		return err;
 	}
 finish:
-	ab_priv(ctx)->active_ifindex = 0;
+	ab_priv->active_ifindex = 0;
 	return 0;
 }
 
 static int ab_set_active_port(struct teamd_context *ctx,
+			      struct ab_priv *ab_priv,
 			      struct teamd_port *tdport)
 {
 	int err;
@@ -110,7 +107,7 @@ static int ab_set_active_port(struct teamd_context *ctx,
 			      tdport->ifname);
 		return err;
 	}
-	ab_priv(ctx)->active_ifindex = tdport->ifindex;
+	ab_priv->active_ifindex = tdport->ifindex;
 	teamd_log_info("Changed active port to \"%s\".",
 		       tdport->ifname);
 	return 0;
@@ -149,7 +146,8 @@ static void ab_best_port_check_set(struct teamd_context *ctx,
 	}
 }
 
-static int ab_link_watch_handler(struct teamd_context *ctx)
+static int ab_link_watch_handler(struct teamd_context *ctx,
+				 struct ab_priv *ab_priv)
 {
 	struct teamd_port *tdport;
 	struct teamd_port *active_tdport;
@@ -160,7 +158,7 @@ static int ab_link_watch_handler(struct teamd_context *ctx)
 	memset(&best, 0, sizeof(best));
 	best.prio = INT_MIN;
 
-	active_tdport = teamd_get_port(ctx, ab_priv(ctx)->active_ifindex);
+	active_tdport = teamd_get_port(ctx, ab_priv->active_ifindex);
 	if (active_tdport) {
 		teamd_log_dbg("Current active port: \"%s\" (ifindex \"%d\", prio \"%d\").",
 			      active_tdport->ifname, active_tdport->ifindex,
@@ -178,7 +176,7 @@ static int ab_link_watch_handler(struct teamd_context *ctx)
 		 */
 		if (!teamd_link_watch_port_up(ctx, active_tdport) ||
 		    active_ifindex != active_tdport->ifindex) {
-			err = ab_clear_active_port(ctx);
+			err = ab_clear_active_port(ctx, ab_priv);
 			if (err)
 				return err;
 			active_tdport = NULL;
@@ -202,10 +200,10 @@ static int ab_link_watch_handler(struct teamd_context *ctx)
 		      best.tdport->ifname, best.tdport->ifindex, best.prio);
 
 	if (!active_tdport || !ab_is_port_sticky(ctx, active_tdport->ifname)) {
-		err = ab_clear_active_port(ctx);
+		err = ab_clear_active_port(ctx, ab_priv);
 		if (err)
 			return err;
-		err = ab_set_active_port(ctx, best.tdport);
+		err = ab_set_active_port(ctx, ab_priv, best.tdport);
 		if (err)
 			return err;
 	}
@@ -254,21 +252,21 @@ static int ab_event_watch_port_added(struct teamd_context *ctx,
 static void ab_event_watch_port_removed(struct teamd_context *ctx,
 					struct teamd_port *tdport, void *priv)
 {
-	ab_link_watch_handler(ctx);
+	ab_link_watch_handler(ctx, priv);
 }
 
 static int ab_event_watch_port_link_changed(struct teamd_context *ctx,
 					    struct teamd_port *tdport,
 					    void *priv)
 {
-	return ab_link_watch_handler(ctx);
+	return ab_link_watch_handler(ctx, priv);
 }
 
 static int ab_event_watch_prio_option_changed(struct teamd_context *ctx,
 					      struct team_option *option,
 					      void *priv)
 {
-	return ab_link_watch_handler(ctx);
+	return ab_link_watch_handler(ctx, priv);
 }
 
 static const struct teamd_event_watch_ops ab_event_watch_ops = {
@@ -282,9 +280,10 @@ static const struct teamd_event_watch_ops ab_event_watch_ops = {
 
 static int ab_init(struct teamd_context *ctx)
 {
+	struct ab_priv *ab_priv = ctx->runner_priv;
 	int err;
 
-	err = teamd_event_watch_register(ctx, &ab_event_watch_ops, NULL);
+	err = teamd_event_watch_register(ctx, &ab_event_watch_ops, ab_priv);
 	if (err) {
 		teamd_log_err("Failed to register event watch.");
 		return err;
@@ -294,17 +293,20 @@ static int ab_init(struct teamd_context *ctx)
 
 static void ab_fini(struct teamd_context *ctx)
 {
-	teamd_event_watch_unregister(ctx, &ab_event_watch_ops, NULL);
+	struct ab_priv *ab_priv = ctx->runner_priv;
+
+	teamd_event_watch_unregister(ctx, &ab_event_watch_ops, ab_priv);
 }
 
 static int ab_state_json_dump(struct teamd_context *ctx,
 			       json_t **pstate_json, void *priv)
 {
+	struct ab_priv *ab_priv = priv;
 	struct teamd_port *active_tdport;
 	json_t *state_json;
 	char *active_port;
 
-	active_tdport = teamd_get_port(ctx, ab_priv(ctx)->active_ifindex);
+	active_tdport = teamd_get_port(ctx, ab_priv->active_ifindex);
 	active_port = active_tdport ? active_tdport->ifname : "";
 	state_json = json_pack("{s:s}", "active_port", active_port);
 	if (!state_json)
