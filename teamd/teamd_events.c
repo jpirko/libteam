@@ -114,6 +114,52 @@ int teamd_event_option_changed(struct teamd_context *ctx,
 	return 0;
 }
 
+int teamd_event_ifinfo_hwaddr_changed(struct teamd_context *ctx,
+				      struct team_ifinfo *ifinfo)
+{
+	struct event_watch_item *watch;
+	uint32_t ifindex = team_get_ifinfo_ifindex(ifinfo);
+	struct teamd_port *tdport = teamd_get_port(ctx, ifindex);
+	int err;
+
+	list_for_each_node_entry(watch, &ctx->event_watch_list, list) {
+		if (watch->ops->hwaddr_changed && ctx->ifindex == ifindex) {
+			err = watch->ops->hwaddr_changed(ctx, watch->priv);
+			if (err)
+				return err;
+		} else if (watch->ops->port_hwaddr_changed && tdport) {
+			err = watch->ops->port_hwaddr_changed(ctx, tdport,
+							      watch->priv);
+			if (err)
+				return err;
+		}
+	}
+	return 0;
+}
+
+int teamd_event_ifinfo_ifname_changed(struct teamd_context *ctx,
+				      struct team_ifinfo *ifinfo)
+{
+	struct event_watch_item *watch;
+	uint32_t ifindex = team_get_ifinfo_ifindex(ifinfo);
+	struct teamd_port *tdport = teamd_get_port(ctx, ifindex);
+	int err;
+
+	list_for_each_node_entry(watch, &ctx->event_watch_list, list) {
+		if (watch->ops->ifname_changed && ctx->ifindex == ifindex) {
+			err = watch->ops->ifname_changed(ctx, watch->priv);
+			if (err)
+				return err;
+		} else if (watch->ops->port_ifname_changed && tdport) {
+			err = watch->ops->port_ifname_changed(ctx, tdport,
+							      watch->priv);
+			if (err)
+				return err;
+		}
+	}
+	return 0;
+}
+
 int teamd_events_init(struct teamd_context *ctx)
 {
 	list_init(&ctx->event_watch_list);

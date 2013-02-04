@@ -118,6 +118,8 @@ struct teamd_runner {
 };
 
 struct teamd_event_watch_ops {
+	int (*hwaddr_changed)(struct teamd_context *ctx, void *priv);
+	int (*ifname_changed)(struct teamd_context *ctx, void *priv);
 	int (*port_added)(struct teamd_context *ctx,
 			  struct teamd_port *tdport, void *priv);
 	void (*port_removed)(struct teamd_context *ctx,
@@ -126,6 +128,10 @@ struct teamd_event_watch_ops {
 			      struct teamd_port *tdport, void *priv);
 	int (*port_link_changed)(struct teamd_context *ctx,
 				 struct teamd_port *tdport, void *priv);
+	int (*port_hwaddr_changed)(struct teamd_context *ctx,
+				   struct teamd_port *tdport, void *priv);
+	int (*port_ifname_changed)(struct teamd_context *ctx,
+				   struct teamd_port *tdport, void *priv);
 	int (*option_changed)(struct teamd_context *ctx,
 			      struct team_option *option, void *priv);
 	char *option_changed_match_name;
@@ -141,6 +147,10 @@ int teamd_event_port_link_changed(struct teamd_context *ctx,
 				  struct teamd_port *tdport);
 int teamd_event_option_changed(struct teamd_context *ctx,
 			       struct team_option *option);
+int teamd_event_ifinfo_hwaddr_changed(struct teamd_context *ctx,
+				      struct team_ifinfo *ifinfo);
+int teamd_event_ifinfo_ifname_changed(struct teamd_context *ctx,
+				      struct team_ifinfo *ifinfo);
 int teamd_events_init(struct teamd_context *ctx);
 void teamd_events_fini(struct teamd_context *ctx);
 int teamd_event_watch_register(struct teamd_context *ctx,
@@ -292,6 +302,9 @@ void teamd_link_watch_fini(struct teamd_context *ctx);
 
 int teamd_option_watch_init(struct teamd_context *ctx);
 void teamd_option_watch_fini(struct teamd_context *ctx);
+
+int teamd_ifinfo_watch_init(struct teamd_context *ctx);
+void teamd_ifinfo_watch_fini(struct teamd_context *ctx);
 
 int teamd_dbus_init(struct teamd_context *ctx);
 void teamd_dbus_fini(struct teamd_context *ctx);

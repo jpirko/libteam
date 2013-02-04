@@ -1233,10 +1233,16 @@ static int teamd_init(struct teamd_context *ctx)
 		goto events_fini;
 	}
 
+	err = teamd_ifinfo_watch_init(ctx);
+	if (err) {
+		teamd_log_err("Failed to init ifinfo watches.");
+		goto option_watch_fini;
+	}
+
 	err = teamd_port_watch_init(ctx);
 	if (err) {
 		teamd_log_err("Failed to init port watch.");
-		goto option_watch_fini;
+		goto ifinfo_watch_fini;
 	}
 
 	err = teamd_state_json_init(ctx);
@@ -1315,6 +1321,8 @@ state_json_fini:
 	teamd_state_json_fini(ctx);
 port_watch_fini:
 	teamd_port_watch_fini(ctx);
+ifinfo_watch_fini:
+	teamd_ifinfo_watch_fini(ctx);
 option_watch_fini:
 	teamd_option_watch_fini(ctx);
 events_fini:
@@ -1338,6 +1346,7 @@ static void teamd_fini(struct teamd_context *ctx)
 	teamd_link_watch_fini(ctx);
 	teamd_per_port_fini(ctx);
 	teamd_state_json_fini(ctx);
+	teamd_ifinfo_watch_fini(ctx);
 	teamd_option_watch_fini(ctx);
 	teamd_events_fini(ctx);
 	teamd_unregister_default_handlers(ctx);
