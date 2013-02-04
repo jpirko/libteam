@@ -50,6 +50,13 @@ See examples for more information.
 
 .SH ACTIVE-BACKUP RUNNER SPECIFIC OPTIONS
 .TP
+.BR "runner.hwaddr_policy " (string)
+This defines policy on how hardware addresses of team device and port devices should be set during the team lifetime. Following are available:
+
+.BR "same_all "-
+All ports will have always the same hardware address as team device.
+
+.TP
 .BR "ports.PORTIFNAME.prio " (int)
 Port priority. The higher number means higher priority.
 

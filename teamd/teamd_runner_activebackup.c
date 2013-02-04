@@ -26,13 +26,87 @@
 #include <linux/netdevice.h>
 #include <jansson.h>
 #include <limits.h>
+#include <private/misc.h>
 #include <team.h>
 
 #include "teamd.h"
 
+struct ab_priv;
+
+struct ab_hwaddr_policy {
+	const char *name;
+	int (*hwaddr_changed)(struct teamd_context *ctx,
+			      struct ab_priv *ab_priv);
+	int (*port_added)(struct teamd_context *ctx, struct ab_priv *ab_priv,
+			  struct teamd_port *tdport);
+};
+
 struct ab_priv {
 	uint32_t active_ifindex;
+	const struct ab_hwaddr_policy *hwaddr_policy;
 };
+
+static int ab_hwaddr_policy_same_all_hwaddr_changed(struct teamd_context *ctx,
+						    struct ab_priv *ab_priv)
+{
+	struct teamd_port *tdport;
+	int err;
+
+	teamd_for_each_tdport(tdport, ctx) {
+		err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
+				      ctx->hwaddr_len);
+		if (err) {
+			teamd_log_err("%s: Failed to set port hardware address.",
+				      tdport->ifname);
+			return err;
+		}
+	}
+	return 0;
+}
+
+static int ab_hwaddr_policy_same_all_port_added(struct teamd_context *ctx,
+						struct ab_priv *ab_priv,
+						struct teamd_port *tdport)
+{
+	int err;
+
+	err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
+			      ctx->hwaddr_len);
+	if (err) {
+		teamd_log_err("%s: Failed to set port hardware address.",
+			      tdport->ifname);
+		return err;
+	}
+	return 0;
+}
+
+static const struct ab_hwaddr_policy ab_hwaddr_policy_same_all = {
+	.name = "same_all",
+	.hwaddr_changed = ab_hwaddr_policy_same_all_hwaddr_changed,
+	.port_added = ab_hwaddr_policy_same_all_port_added,
+};
+
+static const struct ab_hwaddr_policy *ab_hwaddr_policy_list[] = {
+	&ab_hwaddr_policy_same_all,
+};
+
+#define AB_HWADDR_POLICY_LIST_SIZE ARRAY_SIZE(ab_hwaddr_policy_list)
+
+static int ab_assign_hwaddr_policy(struct ab_priv *ab_priv,
+				   char *hwaddr_policy_name)
+{
+	int i = 0;
+
+	if (!hwaddr_policy_name)
+		goto found;
+	for (i = 0; i < AB_HWADDR_POLICY_LIST_SIZE; i++)
+		if (!strcmp(ab_hwaddr_policy_list[i]->name, hwaddr_policy_name))
+			goto found;
+	return -ENOENT;
+found:
+	ab_priv->hwaddr_policy = ab_hwaddr_policy_list[i];
+	return 0;
+}
 
 static int ab_get_port_prio(struct teamd_context *ctx,
 			    struct teamd_port *tdport)
@@ -212,24 +286,17 @@ static int ab_link_watch_handler(struct teamd_context *ctx,
 
 static int ab_event_watch_hwaddr_changed(struct teamd_context *ctx, void *priv)
 {
-	struct teamd_port *tdport;
-	int err;
+	struct ab_priv *ab_priv = priv;
 
-	teamd_for_each_tdport(tdport, ctx) {
-		err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
-				      ctx->hwaddr_len);
-		if (err) {
-			teamd_log_err("%s: Failed to set port hardware address.",
-				      tdport->ifname);
-			return err;
-		}
-	}
+	if (ab_priv->hwaddr_policy->hwaddr_changed)
+		return ab_priv->hwaddr_policy->hwaddr_changed(ctx, ab_priv);
 	return 0;
 }
 
 static int ab_event_watch_port_added(struct teamd_context *ctx,
 				     struct teamd_port *tdport, void *priv)
 {
+	struct ab_priv *ab_priv = priv;
 	int err;
 
 	/* Newly added ports are enabled */
@@ -239,13 +306,8 @@ static int ab_event_watch_port_added(struct teamd_context *ctx,
 		return err;
 	}
 
-	err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
-			      ctx->hwaddr_len);
-	if (err) {
-		teamd_log_err("%s: Failed to set port hardware address.",
-			      tdport->ifname);
-		return err;
-	}
+	if (ab_priv->hwaddr_policy->port_added)
+		return ab_priv->hwaddr_policy->port_added(ctx, ab_priv, tdport);
 	return 0;
 }
 
@@ -278,11 +340,32 @@ static const struct teamd_event_watch_ops ab_event_watch_ops = {
 	.option_changed_match_name = "priority",
 };
 
+static int ab_load_config(struct teamd_context *ctx, struct ab_priv *ab_priv)
+{
+	int err;
+	char *hwaddr_policy_name;
+
+	err = json_unpack(ctx->config_json, "{s:{s:s}}", "runner", "hwaddr_policy",
+			  &hwaddr_policy_name);
+	if (err)
+		hwaddr_policy_name = NULL;
+	err = ab_assign_hwaddr_policy(ab_priv, hwaddr_policy_name);
+	if (err)
+		return err;
+	teamd_log_dbg("Using hwaddr_policy \"%s\".", ab_priv->hwaddr_policy->name);
+	return 0;
+}
+
 static int ab_init(struct teamd_context *ctx)
 {
 	struct ab_priv *ab_priv = ctx->runner_priv;
 	int err;
 
+	err = ab_load_config(ctx, ab_priv);
+	if (err) {
+		teamd_log_err("Failed to load config values.");
+		return err;
+	}
 	err = teamd_event_watch_register(ctx, &ab_event_watch_ops, ab_priv);
 	if (err) {
 		teamd_log_err("Failed to register event watch.");
