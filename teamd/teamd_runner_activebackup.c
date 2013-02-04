@@ -39,6 +39,8 @@ struct ab_hwaddr_policy {
 			      struct ab_priv *ab_priv);
 	int (*port_added)(struct teamd_context *ctx, struct ab_priv *ab_priv,
 			  struct teamd_port *tdport);
+	int (*active_set)(struct teamd_context *ctx, struct ab_priv *ab_priv,
+			  struct teamd_port *tdport);
 };
 
 struct ab_priv {
@@ -86,8 +88,30 @@ static const struct ab_hwaddr_policy ab_hwaddr_policy_same_all = {
 	.port_added = ab_hwaddr_policy_same_all_port_added,
 };
 
+static int ab_hwaddr_policy_by_active_active_set(struct teamd_context *ctx,
+						 struct ab_priv *ab_priv,
+						 struct teamd_port *tdport)
+{
+	int err;
+
+	err = team_hwaddr_set(ctx->th, ctx->ifindex,
+			      team_get_ifinfo_hwaddr(tdport->team_ifinfo),
+			      ctx->hwaddr_len);
+	if (err) {
+		teamd_log_err("Failed to team hardware address.");
+		return err;
+	}
+	return 0;
+}
+
+static const struct ab_hwaddr_policy ab_hwaddr_policy_by_active = {
+	.name = "by_active",
+	.active_set = ab_hwaddr_policy_by_active_active_set,
+};
+
 static const struct ab_hwaddr_policy *ab_hwaddr_policy_list[] = {
 	&ab_hwaddr_policy_same_all,
+	&ab_hwaddr_policy_by_active,
 };
 
 #define AB_HWADDR_POLICY_LIST_SIZE ARRAY_SIZE(ab_hwaddr_policy_list)
@@ -182,6 +206,12 @@ static int ab_set_active_port(struct teamd_context *ctx,
 		return err;
 	}
 	ab_priv->active_ifindex = tdport->ifindex;
+	if (ab_priv->hwaddr_policy->active_set) {
+		err =  ab_priv->hwaddr_policy->active_set(ctx, ab_priv,
+							  tdport);
+		if (err)
+			return err;
+	}
 	teamd_log_info("Changed active port to \"%s\".",
 		       tdport->ifname);
 	return 0;
