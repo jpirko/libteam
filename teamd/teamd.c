@@ -148,9 +148,11 @@ static int parse_command_line(struct teamd_context *ctx,
 		case 'f':
 			free(ctx->config_file);
 			ctx->config_file = realpath(optarg, NULL);
-			if (!ctx->config_file)
+			if (!ctx->config_file) {
 				fprintf(stderr, "Failed to get absolute path of \"%s\": %s\n",
 					optarg, strerror(errno));
+				return -1;
+			}
 			break;
 		case 'c':
 			free(ctx->config_text);
