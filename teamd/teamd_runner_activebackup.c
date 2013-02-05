@@ -41,10 +41,13 @@ struct ab_hwaddr_policy {
 			  struct teamd_port *tdport);
 	int (*active_set)(struct teamd_context *ctx, struct ab_priv *ab_priv,
 			  struct teamd_port *tdport);
+	int (*active_clear)(struct teamd_context *ctx, struct ab_priv *ab_priv,
+			    struct teamd_port *tdport);
 };
 
 struct ab_priv {
 	uint32_t active_ifindex;
+	char active_orig_hwaddr[MAX_ADDR_LEN];
 	const struct ab_hwaddr_policy *hwaddr_policy;
 };
 
@@ -109,9 +112,73 @@ static const struct ab_hwaddr_policy ab_hwaddr_policy_by_active = {
 	.active_set = ab_hwaddr_policy_by_active_active_set,
 };
 
+static int ab_hwaddr_policy_only_active_hwaddr_changed(struct teamd_context *ctx,
+						       struct ab_priv *ab_priv)
+{
+	struct teamd_port *tdport;
+	int err;
+
+	tdport = teamd_get_port(ctx, ab_priv->active_ifindex);
+	if (!tdport)
+		return 0;
+	err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
+			      ctx->hwaddr_len);
+	if (err) {
+		teamd_log_err("%s: Failed to set port hardware address.",
+			      tdport->ifname);
+		return err;
+	}
+	return 0;
+}
+
+static int ab_hwaddr_policy_only_active_active_set(struct teamd_context *ctx,
+						   struct ab_priv *ab_priv,
+						   struct teamd_port *tdport)
+{
+	int err;
+
+	memcpy(ab_priv->active_orig_hwaddr,
+	       team_get_ifinfo_hwaddr(tdport->team_ifinfo),
+	       ctx->hwaddr_len);
+	err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
+			      ctx->hwaddr_len);
+	if (err) {
+		teamd_log_err("%s: Failed to set port hardware address.",
+			      tdport->ifname);
+		return err;
+	}
+	return 0;
+}
+
+static int ab_hwaddr_policy_only_active_active_clear(struct teamd_context *ctx,
+						     struct ab_priv *ab_priv,
+						     struct teamd_port *tdport)
+{
+	int err;
+
+	err = team_hwaddr_set(ctx->th, tdport->ifindex,
+			      ab_priv->active_orig_hwaddr,
+			      ctx->hwaddr_len);
+	if (err) {
+		teamd_log_err("%s: Failed to set port hardware address.",
+			      tdport->ifname);
+		return err;
+	}
+	return 0;
+}
+
+
+static const struct ab_hwaddr_policy ab_hwaddr_policy_only_active = {
+	.name = "only_active",
+	.hwaddr_changed = ab_hwaddr_policy_only_active_hwaddr_changed,
+	.active_set = ab_hwaddr_policy_only_active_active_set,
+	.active_clear = ab_hwaddr_policy_only_active_active_clear,
+};
+
 static const struct ab_hwaddr_policy *ab_hwaddr_policy_list[] = {
 	&ab_hwaddr_policy_same_all,
 	&ab_hwaddr_policy_by_active,
+	&ab_hwaddr_policy_only_active,
 };
 
 #define AB_HWADDR_POLICY_LIST_SIZE ARRAY_SIZE(ab_hwaddr_policy_list)
@@ -179,6 +246,12 @@ static int ab_clear_active_port(struct teamd_context *ctx,
 		teamd_log_err("%s: Failed to disable active port.",
 			      tdport->ifname);
 		return err;
+	}
+	if (ab_priv->hwaddr_policy->active_clear) {
+		err =  ab_priv->hwaddr_policy->active_clear(ctx, ab_priv,
+							    tdport);
+		if (err)
+			return err;
 	}
 finish:
 	ab_priv->active_ifindex = 0;
