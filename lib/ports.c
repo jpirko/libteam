@@ -321,3 +321,20 @@ struct team_ifinfo *team_get_port_ifinfo(struct team_port *port)
 {
 	return port->ifinfo;
 }
+
+/**
+ * team_is_port_present:
+ * @th: libteam library context
+ * @port: port structure
+ *
+ * See if port is actually present in this team.
+ *
+ * Returns: true if port is present at a moment.
+ **/
+TEAM_EXPORT
+bool team_is_port_present(struct team_handle *th, struct team_port *port)
+{
+	struct team_ifinfo *ifinfo = team_get_port_ifinfo(port);
+
+	return team_get_ifinfo_master_ifindex(ifinfo) == th->ifindex;
+}
