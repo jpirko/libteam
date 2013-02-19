@@ -31,28 +31,28 @@
 
 #include "teamd.h"
 
-struct ab_priv;
+struct ab;
 
 struct ab_hwaddr_policy {
 	const char *name;
 	int (*hwaddr_changed)(struct teamd_context *ctx,
-			      struct ab_priv *ab_priv);
-	int (*port_added)(struct teamd_context *ctx, struct ab_priv *ab_priv,
+			      struct ab *ab);
+	int (*port_added)(struct teamd_context *ctx, struct ab *ab,
 			  struct teamd_port *tdport);
-	int (*active_set)(struct teamd_context *ctx, struct ab_priv *ab_priv,
+	int (*active_set)(struct teamd_context *ctx, struct ab *ab,
 			  struct teamd_port *tdport);
-	int (*active_clear)(struct teamd_context *ctx, struct ab_priv *ab_priv,
+	int (*active_clear)(struct teamd_context *ctx, struct ab *ab,
 			    struct teamd_port *tdport);
 };
 
-struct ab_priv {
+struct ab {
 	uint32_t active_ifindex;
 	char active_orig_hwaddr[MAX_ADDR_LEN];
 	const struct ab_hwaddr_policy *hwaddr_policy;
 };
 
 static int ab_hwaddr_policy_same_all_hwaddr_changed(struct teamd_context *ctx,
-						    struct ab_priv *ab_priv)
+						    struct ab *ab)
 {
 	struct teamd_port *tdport;
 	int err;
@@ -70,7 +70,7 @@ static int ab_hwaddr_policy_same_all_hwaddr_changed(struct teamd_context *ctx,
 }
 
 static int ab_hwaddr_policy_same_all_port_added(struct teamd_context *ctx,
-						struct ab_priv *ab_priv,
+						struct ab *ab,
 						struct teamd_port *tdport)
 {
 	int err;
@@ -92,7 +92,7 @@ static const struct ab_hwaddr_policy ab_hwaddr_policy_same_all = {
 };
 
 static int ab_hwaddr_policy_by_active_active_set(struct teamd_context *ctx,
-						 struct ab_priv *ab_priv,
+						 struct ab *ab,
 						 struct teamd_port *tdport)
 {
 	int err;
@@ -113,12 +113,12 @@ static const struct ab_hwaddr_policy ab_hwaddr_policy_by_active = {
 };
 
 static int ab_hwaddr_policy_only_active_hwaddr_changed(struct teamd_context *ctx,
-						       struct ab_priv *ab_priv)
+						       struct ab *ab)
 {
 	struct teamd_port *tdport;
 	int err;
 
-	tdport = teamd_get_port(ctx, ab_priv->active_ifindex);
+	tdport = teamd_get_port(ctx, ab->active_ifindex);
 	if (!tdport || !teamd_port_present(ctx, tdport))
 		return 0;
 	err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
@@ -132,12 +132,12 @@ static int ab_hwaddr_policy_only_active_hwaddr_changed(struct teamd_context *ctx
 }
 
 static int ab_hwaddr_policy_only_active_active_set(struct teamd_context *ctx,
-						   struct ab_priv *ab_priv,
+						   struct ab *ab,
 						   struct teamd_port *tdport)
 {
 	int err;
 
-	memcpy(ab_priv->active_orig_hwaddr,
+	memcpy(ab->active_orig_hwaddr,
 	       team_get_ifinfo_hwaddr(tdport->team_ifinfo),
 	       ctx->hwaddr_len);
 	err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
@@ -151,13 +151,13 @@ static int ab_hwaddr_policy_only_active_active_set(struct teamd_context *ctx,
 }
 
 static int ab_hwaddr_policy_only_active_active_clear(struct teamd_context *ctx,
-						     struct ab_priv *ab_priv,
+						     struct ab *ab,
 						     struct teamd_port *tdport)
 {
 	int err;
 
 	err = team_hwaddr_set(ctx->th, tdport->ifindex,
-			      ab_priv->active_orig_hwaddr,
+			      ab->active_orig_hwaddr,
 			      ctx->hwaddr_len);
 	if (err) {
 		teamd_log_err("%s: Failed to set port hardware address.",
@@ -183,8 +183,7 @@ static const struct ab_hwaddr_policy *ab_hwaddr_policy_list[] = {
 
 #define AB_HWADDR_POLICY_LIST_SIZE ARRAY_SIZE(ab_hwaddr_policy_list)
 
-static int ab_assign_hwaddr_policy(struct ab_priv *ab_priv,
-				   char *hwaddr_policy_name)
+static int ab_assign_hwaddr_policy(struct ab *ab, char *hwaddr_policy_name)
 {
 	int i = 0;
 
@@ -195,7 +194,7 @@ static int ab_assign_hwaddr_policy(struct ab_priv *ab_priv,
 			goto found;
 	return -ENOENT;
 found:
-	ab_priv->hwaddr_policy = ab_hwaddr_policy_list[i];
+	ab->hwaddr_policy = ab_hwaddr_policy_list[i];
 	return 0;
 }
 
@@ -228,13 +227,12 @@ static bool ab_is_port_sticky(struct teamd_context *ctx, const char *port_name)
 	return sticky;
 }
 
-static int ab_clear_active_port(struct teamd_context *ctx,
-				struct ab_priv *ab_priv,
+static int ab_clear_active_port(struct teamd_context *ctx, struct ab *ab,
 				struct teamd_port *tdport)
 {
 	int err;
 
-	ab_priv->active_ifindex = 0;
+	ab->active_ifindex = 0;
 	if (!tdport || !teamd_port_present(ctx, tdport))
 		return 0;
 	teamd_log_dbg("Clearing active port \"%s\".", tdport->ifname);
@@ -245,17 +243,15 @@ static int ab_clear_active_port(struct teamd_context *ctx,
 			      tdport->ifname);
 		return err;
 	}
-	if (ab_priv->hwaddr_policy->active_clear) {
-		err =  ab_priv->hwaddr_policy->active_clear(ctx, ab_priv,
-							    tdport);
+	if (ab->hwaddr_policy->active_clear) {
+		err =  ab->hwaddr_policy->active_clear(ctx, ab, tdport);
 		if (err)
 			return err;
 	}
 	return 0;
 }
 
-static int ab_set_active_port(struct teamd_context *ctx,
-			      struct ab_priv *ab_priv,
+static int ab_set_active_port(struct teamd_context *ctx, struct ab *ab,
 			      struct teamd_port *tdport)
 {
 	int err;
@@ -272,10 +268,9 @@ static int ab_set_active_port(struct teamd_context *ctx,
 			      tdport->ifname);
 		return err;
 	}
-	ab_priv->active_ifindex = tdport->ifindex;
-	if (ab_priv->hwaddr_policy->active_set) {
-		err =  ab_priv->hwaddr_policy->active_set(ctx, ab_priv,
-							  tdport);
+	ab->active_ifindex = tdport->ifindex;
+	if (ab->hwaddr_policy->active_set) {
+		err =  ab->hwaddr_policy->active_set(ctx, ab, tdport);
 		if (err)
 			return err;
 	}
@@ -316,8 +311,7 @@ static void ab_best_port_check_set(struct teamd_context *ctx,
 	}
 }
 
-static int ab_link_watch_handler(struct teamd_context *ctx,
-				 struct ab_priv *ab_priv)
+static int ab_link_watch_handler(struct teamd_context *ctx, struct ab *ab)
 {
 	struct teamd_port *tdport;
 	struct teamd_port *active_tdport;
@@ -328,7 +322,7 @@ static int ab_link_watch_handler(struct teamd_context *ctx,
 	memset(&best, 0, sizeof(best));
 	best.prio = INT_MIN;
 
-	active_tdport = teamd_get_port(ctx, ab_priv->active_ifindex);
+	active_tdport = teamd_get_port(ctx, ab->active_ifindex);
 	if (active_tdport) {
 		teamd_log_dbg("Current active port: \"%s\" (ifindex \"%d\", prio \"%d\").",
 			      active_tdport->ifname, active_tdport->ifindex,
@@ -346,7 +340,7 @@ static int ab_link_watch_handler(struct teamd_context *ctx,
 		 */
 		if (!teamd_link_watch_port_up(ctx, active_tdport) ||
 		    active_ifindex != active_tdport->ifindex) {
-			err = ab_clear_active_port(ctx, ab_priv, active_tdport);
+			err = ab_clear_active_port(ctx, ab, active_tdport);
 			if (err)
 				return err;
 			active_tdport = NULL;
@@ -370,10 +364,10 @@ static int ab_link_watch_handler(struct teamd_context *ctx,
 		      best.tdport->ifname, best.tdport->ifindex, best.prio);
 
 	if (!active_tdport || !ab_is_port_sticky(ctx, active_tdport->ifname)) {
-		err = ab_clear_active_port(ctx, ab_priv, active_tdport);
+		err = ab_clear_active_port(ctx, ab, active_tdport);
 		if (err)
 			return err;
-		err = ab_set_active_port(ctx, ab_priv, best.tdport);
+		err = ab_set_active_port(ctx, ab, best.tdport);
 		if (err)
 			return err;
 	}
@@ -382,17 +376,17 @@ static int ab_link_watch_handler(struct teamd_context *ctx,
 
 static int ab_event_watch_hwaddr_changed(struct teamd_context *ctx, void *priv)
 {
-	struct ab_priv *ab_priv = priv;
+	struct ab *ab = priv;
 
-	if (ab_priv->hwaddr_policy->hwaddr_changed)
-		return ab_priv->hwaddr_policy->hwaddr_changed(ctx, ab_priv);
+	if (ab->hwaddr_policy->hwaddr_changed)
+		return ab->hwaddr_policy->hwaddr_changed(ctx, ab);
 	return 0;
 }
 
 static int ab_event_watch_port_added(struct teamd_context *ctx,
 				     struct teamd_port *tdport, void *priv)
 {
-	struct ab_priv *ab_priv = priv;
+	struct ab *ab = priv;
 	int err;
 
 	/* Newly added ports are enabled */
@@ -402,8 +396,8 @@ static int ab_event_watch_port_added(struct teamd_context *ctx,
 		return err;
 	}
 
-	if (ab_priv->hwaddr_policy->port_added)
-		return ab_priv->hwaddr_policy->port_added(ctx, ab_priv, tdport);
+	if (ab->hwaddr_policy->port_added)
+		return ab->hwaddr_policy->port_added(ctx, ab, tdport);
 	return 0;
 }
 
@@ -436,7 +430,7 @@ static const struct teamd_event_watch_ops ab_event_watch_ops = {
 	.option_changed_match_name = "priority",
 };
 
-static int ab_load_config(struct teamd_context *ctx, struct ab_priv *ab_priv)
+static int ab_load_config(struct teamd_context *ctx, struct ab *ab)
 {
 	int err;
 	char *hwaddr_policy_name;
@@ -445,27 +439,27 @@ static int ab_load_config(struct teamd_context *ctx, struct ab_priv *ab_priv)
 			  &hwaddr_policy_name);
 	if (err)
 		hwaddr_policy_name = NULL;
-	err = ab_assign_hwaddr_policy(ab_priv, hwaddr_policy_name);
+	err = ab_assign_hwaddr_policy(ab, hwaddr_policy_name);
 	if (err) {
 		teamd_log_err("Unknown \"hwaddr_policy\" named \"%s\" passed.",
 			      hwaddr_policy_name);
 		return err;
 	}
-	teamd_log_dbg("Using hwaddr_policy \"%s\".", ab_priv->hwaddr_policy->name);
+	teamd_log_dbg("Using hwaddr_policy \"%s\".", ab->hwaddr_policy->name);
 	return 0;
 }
 
 static int ab_init(struct teamd_context *ctx)
 {
-	struct ab_priv *ab_priv = ctx->runner_priv;
+	struct ab *ab = ctx->runner_priv;
 	int err;
 
-	err = ab_load_config(ctx, ab_priv);
+	err = ab_load_config(ctx, ab);
 	if (err) {
 		teamd_log_err("Failed to load config values.");
 		return err;
 	}
-	err = teamd_event_watch_register(ctx, &ab_event_watch_ops, ab_priv);
+	err = teamd_event_watch_register(ctx, &ab_event_watch_ops, ab);
 	if (err) {
 		teamd_log_err("Failed to register event watch.");
 		return err;
@@ -475,20 +469,20 @@ static int ab_init(struct teamd_context *ctx)
 
 static void ab_fini(struct teamd_context *ctx)
 {
-	struct ab_priv *ab_priv = ctx->runner_priv;
+	struct ab *ab = ctx->runner_priv;
 
-	teamd_event_watch_unregister(ctx, &ab_event_watch_ops, ab_priv);
+	teamd_event_watch_unregister(ctx, &ab_event_watch_ops, ab);
 }
 
 static int ab_state_json_dump(struct teamd_context *ctx,
 			       json_t **pstate_json, void *priv)
 {
-	struct ab_priv *ab_priv = priv;
+	struct ab *ab = priv;
 	struct teamd_port *active_tdport;
 	json_t *state_json;
 	char *active_port;
 
-	active_tdport = teamd_get_port(ctx, ab_priv->active_ifindex);
+	active_tdport = teamd_get_port(ctx, ab->active_ifindex);
 	active_port = active_tdport ? active_tdport->ifname : "";
 	state_json = json_pack("{s:s}", "active_port", active_port);
 	if (!state_json)
@@ -505,7 +499,7 @@ static const struct teamd_state_json_ops ab_state_ops = {
 const struct teamd_runner teamd_runner_activebackup = {
 	.name			= "activebackup",
 	.team_mode_name		= "activebackup",
-	.priv_size		= sizeof(struct ab_priv),
+	.priv_size		= sizeof(struct ab),
 	.init			= ab_init,
 	.fini			= ab_fini,
 	.state_json_ops		= &ab_state_ops,
