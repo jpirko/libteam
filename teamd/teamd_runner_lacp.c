@@ -305,15 +305,16 @@ static int lacp_port_should_be_disabled(struct lacp_port *lacp_port)
 static int lacp_port_update_enabled(struct lacp_port *lacp_port)
 {
 	struct teamd_port *tdport = lacp_port->tdport;
+	struct teamd_context *ctx = lacp_port->ctx;
 	int err;
 	bool new_enabled_state;
 	bool curr_enabled_state;
 	struct team_option *option;
 
-	if (teamd_port_removed(tdport))
+	if (!teamd_port_present(ctx, tdport))
 		return 0;
 
-	option = team_get_option(lacp_port->ctx->th, "np", "enabled",
+	option = team_get_option(ctx->th, "np", "enabled",
 				 tdport->ifindex);
 	if (!option) {
 		teamd_log_err("%s: Failed to find \"enabled\" option.",
@@ -333,9 +334,8 @@ static int lacp_port_update_enabled(struct lacp_port *lacp_port)
 	teamd_log_dbg("%s: %s port, aggregator id %d", tdport->ifname,
 		      new_enabled_state ? "Enabling": "Disabling",
 		      lacp_port->aggregator_id);
-	err = team_set_option_value_bool(lacp_port->ctx->th, option,
-					 new_enabled_state);
-	if (err && !teamd_err_port_disappeared(err, lacp_port->ctx, tdport)) {
+	err = team_set_option_value_bool(ctx->th, option, new_enabled_state);
+	if (err) {
 		teamd_log_err("%s: Failed to %s port.", tdport->ifname,
 			      new_enabled_state ? "enable": "disable");
 		return err;;

@@ -277,26 +277,10 @@ static inline unsigned int teamd_port_count(struct teamd_context *ctx)
 int teamd_port_add(struct teamd_context *ctx, const char *port_name);
 int teamd_port_remove(struct teamd_context *ctx, const char *port_name);
 
-static inline bool teamd_port_removed(struct teamd_port *tdport)
-{
-	return team_is_port_removed(tdport->team_port);
-}
-
 static inline bool teamd_port_present(struct teamd_context *ctx,
 				      struct teamd_port *tdport)
 {
 	return team_is_port_present(ctx->th, tdport->team_port);
-}
-
-static inline bool teamd_err_port_disappeared(int err,
-					      struct teamd_context *ctx,
-					      struct teamd_port *tdport)
-{
-	/*
-	 * Port might have disappeared but the message might be still in queue.
-	 * So do not fail in case like this
-	 */
-	return err == -ENOENT && !team_is_our_port(ctx->th, tdport->ifindex);
 }
 
 bool teamd_link_watch_port_up(struct teamd_context *ctx,

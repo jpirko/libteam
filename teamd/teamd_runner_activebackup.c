@@ -119,7 +119,7 @@ static int ab_hwaddr_policy_only_active_hwaddr_changed(struct teamd_context *ctx
 	int err;
 
 	tdport = teamd_get_port(ctx, ab_priv->active_ifindex);
-	if (!tdport)
+	if (!tdport || !teamd_port_present(ctx, tdport))
 		return 0;
 	err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
 			      ctx->hwaddr_len);
@@ -235,14 +235,15 @@ static int ab_clear_active_port(struct teamd_context *ctx,
 	int err;
 
 	tdport = teamd_get_port(ctx, ab_priv->active_ifindex);
-	if (!tdport || team_is_port_removed(tdport->team_port))
+	if (!tdport)
 		return 0;
 	teamd_log_dbg("Clearing active port \"%s\".", tdport->ifname);
+	ab_priv->active_ifindex = 0;
+	if (!teamd_port_present(ctx, tdport))
+		return 0;
 
 	err = team_set_port_enabled(ctx->th, tdport->ifindex, false);
 	if (err) {
-		if (teamd_err_port_disappeared(err, ctx, tdport))
-			goto finish;
 		teamd_log_err("%s: Failed to disable active port.",
 			      tdport->ifname);
 		return err;
@@ -253,8 +254,6 @@ static int ab_clear_active_port(struct teamd_context *ctx,
 		if (err)
 			return err;
 	}
-finish:
-	ab_priv->active_ifindex = 0;
 	return 0;
 }
 
@@ -266,8 +265,6 @@ static int ab_set_active_port(struct teamd_context *ctx,
 
 	err = team_set_port_enabled(ctx->th, tdport->ifindex, true);
 	if (err) {
-		if (teamd_err_port_disappeared(err, ctx, tdport))
-			return 0;
 		teamd_log_err("%s: Failed to enable active port.",
 			      tdport->ifname);
 		return err;
@@ -306,8 +303,7 @@ static void ab_best_port_check_set(struct teamd_context *ctx,
 	uint8_t duplex;
 	int prio;
 
-	if (!teamd_link_watch_port_up(ctx, tdport) || best->tdport == tdport ||
-	    team_is_port_removed(port))
+	if (!teamd_link_watch_port_up(ctx, tdport) || best->tdport == tdport)
 		return;
 
 	speed = team_get_port_speed(port);
@@ -365,7 +361,7 @@ static int ab_link_watch_handler(struct teamd_context *ctx,
 	 * port, if there's any. This is because other port might have the
 	 * same prio, speed and duplex. We do not want to change in that case
 	 */
-	if (active_tdport)
+	if (active_tdport && teamd_port_present(ctx, active_tdport))
 		ab_best_port_check_set(ctx, &best, active_tdport);
 	teamd_for_each_tdport(tdport, ctx)
 		ab_best_port_check_set(ctx, &best, tdport);
