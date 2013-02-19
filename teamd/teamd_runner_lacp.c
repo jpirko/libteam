@@ -416,7 +416,7 @@ static int lacp_set_carrier(struct lacp *lacp, bool carrier_up)
 		if (err)
 			return err;
 
-		teamd_log_info("%s: carrier changed to %s\n", ctx->team_devname,
+		teamd_log_info("carrier changed to %s",
 			       carrier_up ? "UP" : "DOWN" );
 		lacp->carrier_up = carrier_up;
 	}
