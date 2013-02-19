@@ -27,7 +27,7 @@ Watches for link changes and selects active port to be used for data transfers.
 To do passive load balancing, runner only setups BPF hash function which will determine port for packet transmit. To do active load balancing, runner is moving hashes among available ports trying to reach perfect balance.
 
 .BR "lacp "-
-Implements 802.3ad LACP protocol. Can use TX port selection which is used either in hash or loadbalance runner.
+Implements 802.3ad LACP protocol. Can use same TX port selection possibilities as loadbalance runner.
 
 .TP
 .BR "link_watch.name "| " ports.PORTIFNAME.link_watch.name " (string)
@@ -61,6 +61,9 @@ Team device has hardware address of currently active port. This is useful in cas
 
 .BR "only_active "-
 Only active port has hardware address of the team device. The others have their own.
+
+Default:
+.BR "same_all"
 
 .TP
 .BR "ports.PORTIFNAME.prio " (int)
@@ -103,6 +106,16 @@ Uses source and destination IPv6 addresses.
 Name of active TX balancer. Active TX balancing is disabled by default. The only value available is
 .BR "basic".
 
+Default:
+.BR "None"
+
+.TP
+.BR "runner.tx_balancer.balancing_interval " (int)
+In tenths of second. Interval in what will be rebalancing periodically done.
+
+Default:
+.BR "50"
+
 .SH LACP RUNNER SPECIFIC OPTIONS
 .TP
 .BR "runner.active " (bool)
@@ -121,10 +134,15 @@ then packets will be sent once per second. Otherwise they will be sent every 30 
 
 .TP
 .BR "runner.tx_hash " (array)
-Same as for load balance runner
+Same as for load balance runner.
 
-Default:
-.BR "false"
+.TP
+.BR "runner.tx_balancer.name " (string)
+Same as for load balance runner.
+
+.TP
+.BR "runner.tx_balancer.balancing_interval " (int)
+Same as for load balance runner.
 
 .TP
 .BR "runner.sys_prio " (int)
