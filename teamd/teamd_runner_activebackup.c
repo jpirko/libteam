@@ -229,18 +229,15 @@ static bool ab_is_port_sticky(struct teamd_context *ctx, const char *port_name)
 }
 
 static int ab_clear_active_port(struct teamd_context *ctx,
-				struct ab_priv *ab_priv)
+				struct ab_priv *ab_priv,
+				struct teamd_port *tdport)
 {
-	struct teamd_port *tdport;
 	int err;
 
-	tdport = teamd_get_port(ctx, ab_priv->active_ifindex);
-	if (!tdport)
+	ab_priv->active_ifindex = 0;
+	if (!tdport || !teamd_port_present(ctx, tdport))
 		return 0;
 	teamd_log_dbg("Clearing active port \"%s\".", tdport->ifname);
-	ab_priv->active_ifindex = 0;
-	if (!teamd_port_present(ctx, tdport))
-		return 0;
 
 	err = team_set_port_enabled(ctx->th, tdport->ifindex, false);
 	if (err) {
@@ -349,7 +346,7 @@ static int ab_link_watch_handler(struct teamd_context *ctx,
 		 */
 		if (!teamd_link_watch_port_up(ctx, active_tdport) ||
 		    active_ifindex != active_tdport->ifindex) {
-			err = ab_clear_active_port(ctx, ab_priv);
+			err = ab_clear_active_port(ctx, ab_priv, active_tdport);
 			if (err)
 				return err;
 			active_tdport = NULL;
@@ -373,7 +370,7 @@ static int ab_link_watch_handler(struct teamd_context *ctx,
 		      best.tdport->ifname, best.tdport->ifindex, best.prio);
 
 	if (!active_tdport || !ab_is_port_sticky(ctx, active_tdport->ifname)) {
-		err = ab_clear_active_port(ctx, ab_priv);
+		err = ab_clear_active_port(ctx, ab_priv, active_tdport);
 		if (err)
 			return err;
 		err = ab_set_active_port(ctx, ab_priv, best.tdport);
