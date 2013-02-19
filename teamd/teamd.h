@@ -282,6 +282,12 @@ static inline bool teamd_port_removed(struct teamd_port *tdport)
 	return team_is_port_removed(tdport->team_port);
 }
 
+static inline bool teamd_port_present(struct teamd_context *ctx,
+				      struct teamd_port *tdport)
+{
+	return team_is_port_present(ctx->th, tdport->team_port);
+}
+
 static inline bool teamd_err_port_disappeared(int err,
 					      struct teamd_context *ctx,
 					      struct teamd_port *tdport)
