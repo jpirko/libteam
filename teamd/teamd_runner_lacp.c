@@ -105,6 +105,20 @@ static bool lacpdu_check(struct lacpdu *lacpdu)
 	return true;
 }
 
+enum lacp_agg_select_policy {
+	LACP_AGG_SELECT_PRIO = 0,
+	LACP_AGG_SELECT_STABLE = 1,
+	LACP_AGG_SELECT_BANDWIDTH = 2,
+	LACP_AGG_SELECT_COUNT = 3,
+};
+
+static const char *lacp_agg_select_policy_names_list[] = {
+	"prio", "stable", "bandwidth", "count",
+};
+
+#define LACP_AGG_SELECT_POLICY_NAMES_LIST_SIZE \
+	ARRAY_SIZE(lacp_agg_select_policy_names_list)
+
 struct lacp {
 	struct teamd_context *ctx;
 	uint32_t selected_aggregator_id;
@@ -118,6 +132,8 @@ struct lacp {
 #define		LACP_CFG_DFLT_FAST_RATE false
 		int min_ports;
 #define		LACP_CFG_DFLT_MIN_PORTS 1
+		enum lacp_agg_select_policy agg_select_policy;
+#define		LACP_CFG_DFLT_AGG_SELECT_POLICY LACP_AGG_SELECT_PRIO
 	} cfg;
 	struct teamd_balancer *tb;
 };
@@ -172,10 +188,33 @@ static struct lacp_port *lacp_port_get(struct lacp *lacp,
 	return teamd_get_first_port_priv_by_creator(tdport, lacp);
 }
 
+static const char *lacp_get_agg_select_policy_name(struct lacp *lacp)
+{
+	return lacp_agg_select_policy_names_list[lacp->cfg.agg_select_policy];
+}
+
+static int lacp_assign_agg_select_policy(struct lacp *lacp,
+					 char *agg_select_policy_name)
+{
+	int i = LACP_CFG_DFLT_AGG_SELECT_POLICY;
+
+	if (!agg_select_policy_name)
+		goto found;
+	for (i = 0; i < LACP_AGG_SELECT_POLICY_NAMES_LIST_SIZE; i++)
+		if (!strcmp(lacp_agg_select_policy_names_list[i],
+		    agg_select_policy_name))
+			goto found;
+	return -ENOENT;
+found:
+	lacp->cfg.agg_select_policy = i;
+	return 0;
+}
+
 static int lacp_load_config(struct teamd_context *ctx, struct lacp *lacp)
 {
 	int err;
 	int tmp;
+	char *agg_select_policy_name;
 
 	err = json_unpack(ctx->config_json, "{s:{s:b}}", "runner", "active",
 			  &tmp);
@@ -211,6 +250,18 @@ static int lacp_load_config(struct teamd_context *ctx, struct lacp *lacp)
 	}
 	teamd_log_dbg("Using min_ports \"%d\".", lacp->cfg.min_ports);
 
+	err = json_unpack(ctx->config_json, "{s:{s:s}}", "runner",
+			  "agg_select_policy", &agg_select_policy_name);
+	if (err)
+		agg_select_policy_name = NULL;
+	err = lacp_assign_agg_select_policy(lacp, agg_select_policy_name);
+	if (err) {
+		teamd_log_err("Unknown \"agg_select_policy\" named \"%s\" passed.",
+			      agg_select_policy_name);
+		return err;
+	}
+	teamd_log_dbg("Using agg_select_policy \"%s\".",
+		      lacp_get_agg_select_policy_name(lacp));
 	return 0;
 }
 
@@ -401,12 +452,106 @@ static int lacp_update_carrier(struct lacp *lacp)
 	return lacp_set_carrier(lacp, false);
 }
 
+static bool lacp_agg_has_selected_port(struct lacp *lacp,
+				       uint32_t aggregator_id)
+{
+	struct teamd_port *tdport;
+	struct lacp_port *lacp_port;
+
+	teamd_for_each_tdport(tdport, lacp->ctx) {
+		lacp_port = lacp_port_get(lacp, tdport);
+		if (lacp_port->selected &&
+		    lacp_port->aggregator_id == aggregator_id)
+			return true;
+	}
+	return false;
+}
+
+static uint32_t lacp_get_agg_bandwidth(struct lacp *lacp,
+				       uint32_t aggregator_id)
+{
+	struct teamd_port *tdport;
+	struct lacp_port *lacp_port;
+	uint32_t speed = 0;
+
+	teamd_for_each_tdport(tdport, lacp->ctx) {
+		lacp_port = lacp_port_get(lacp, tdport);
+		if (!lacp_port->selected ||
+		    lacp_port->aggregator_id != aggregator_id)
+			continue;
+		speed += team_get_port_speed(tdport->team_port);
+	}
+	return speed;
+}
+
+static uint32_t lacp_get_best_agg_by_bandwidth(struct lacp *lacp)
+{
+	struct teamd_port *tdport;
+	struct lacp_port *lacp_port;
+	uint32_t speed;
+	uint32_t best_speed = 0;
+	uint32_t best_aggregator_id = 0;
+
+	teamd_for_each_tdport(tdport, lacp->ctx) {
+		lacp_port = lacp_port_get(lacp, tdport);
+		if (!lacp_port->selected)
+			continue;
+		speed = lacp_get_agg_bandwidth(lacp, lacp_port->aggregator_id);
+		if (speed > best_speed) {
+			best_speed = speed;
+			best_aggregator_id = lacp_port->aggregator_id;
+		}
+	}
+	return best_aggregator_id;
+}
+
+static unsigned int lacp_get_agg_port_count(struct lacp *lacp,
+					    uint32_t aggregator_id)
+{
+	struct teamd_port *tdport;
+	struct lacp_port *lacp_port;
+	unsigned int port_count = 0;
+
+	teamd_for_each_tdport(tdport, lacp->ctx) {
+		lacp_port = lacp_port_get(lacp, tdport);
+		if (!lacp_port->selected ||
+		    lacp_port->aggregator_id != aggregator_id)
+			continue;
+		port_count++;
+	}
+	return port_count;
+}
+
+static uint32_t lacp_get_best_agg_by_port_count(struct lacp *lacp)
+{
+	struct teamd_port *tdport;
+	struct lacp_port *lacp_port;
+	unsigned int port_count;
+	unsigned int best_port_count = 0;
+	uint32_t best_aggregator_id = 0;
+
+	teamd_for_each_tdport(tdport, lacp->ctx) {
+		lacp_port = lacp_port_get(lacp, tdport);
+		if (!lacp_port->selected)
+			continue;
+		port_count = lacp_get_agg_port_count(lacp,
+						     lacp_port->aggregator_id);
+		if (port_count > best_port_count) {
+			best_port_count = port_count;
+			best_aggregator_id = lacp_port->aggregator_id;
+		}
+	}
+	return best_aggregator_id;
+}
+
 static int lacp_update_selected(struct lacp *lacp)
 {
 	struct lacp_port *best_lacp_port;
 	struct teamd_port *tdport;
 	struct lacp_port *lacp_port;
 	uint32_t aggregator_id;
+	uint32_t orig_selected_aggregator_id = lacp->selected_aggregator_id;
+	uint32_t best_aggregator_id = 0;
 	int err;
 
 	/*
@@ -418,13 +563,14 @@ static int lacp_update_selected(struct lacp *lacp)
 		lacp_port->selected = false;
 		lacp_port->aggregator_id = 0;
 	}
+
 	lacp->selected_aggregator_id = 0;
 
 	while ((best_lacp_port = lacp_get_best_port(lacp))) {
 		/* Use best port ifindex as aggregator id */
 		aggregator_id = best_lacp_port->tdport->ifindex;
-		if (!lacp->selected_aggregator_id)
-			lacp->selected_aggregator_id = aggregator_id;
+		if (!best_aggregator_id)
+			best_aggregator_id = aggregator_id;
 		teamd_for_each_tdport(tdport, lacp->ctx) {
 			lacp_port = lacp_port_get(lacp, tdport);
 			if (lacp_port_selectable(lacp_port) &&
@@ -433,6 +579,26 @@ static int lacp_update_selected(struct lacp *lacp)
 				lacp_port->aggregator_id = aggregator_id;
 			}
 		}
+	}
+
+	switch (lacp->cfg.agg_select_policy) {
+	case LACP_AGG_SELECT_PRIO:
+		lacp->selected_aggregator_id = best_aggregator_id;
+		break;
+	case LACP_AGG_SELECT_STABLE:
+		if (best_aggregator_id &&
+		    !lacp_agg_has_selected_port(lacp,
+						orig_selected_aggregator_id))
+			lacp->selected_aggregator_id = best_aggregator_id;
+		break;
+	case LACP_AGG_SELECT_BANDWIDTH:
+		lacp->selected_aggregator_id =
+			lacp_get_best_agg_by_bandwidth(lacp);
+		break;
+	case LACP_AGG_SELECT_COUNT:
+		lacp->selected_aggregator_id =
+			lacp_get_best_agg_by_port_count(lacp);
+		break;
 	}
 
 	/*

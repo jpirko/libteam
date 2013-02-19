@@ -140,6 +140,25 @@ Specifies the minimum number of ports that must be active before asserting carri
 Default:
 .BR "0"
 
+.TP
+.BR "runner.agg_select_policy " (string)
+This selects policy on how the aggregators will be selected. Following are available:
+
+.BR "prio "-
+Aggregator with highest priority according to LACP standard will be selected.
+
+.BR "stable "-
+Same as previous one, only do not replace selected aggregator if is still usable.
+
+.BR "bandwidth "-
+Select aggregator with highest total bandwidth.
+
+.BR "count "-
+Select aggregator with highest number of ports.
+
+Default:
+.BR "prio"
+
 .SH ETHTOOL LINK WATCH SPECIFIC OPTIONS
 .TP
 .BR "link_watch.delay_up "| " ports.PORTIFNAME.link_watch.delay_up " (int)
