@@ -453,8 +453,11 @@ static int ab_load_config(struct teamd_context *ctx, struct ab_priv *ab_priv)
 	if (err)
 		hwaddr_policy_name = NULL;
 	err = ab_assign_hwaddr_policy(ab_priv, hwaddr_policy_name);
-	if (err)
+	if (err) {
+		teamd_log_err("Unknown \"hwaddr_policy\" named \"%s\" passed.",
+			      hwaddr_policy_name);
 		return err;
+	}
 	teamd_log_dbg("Using hwaddr_policy \"%s\".", ab_priv->hwaddr_policy->name);
 	return 0;
 }
