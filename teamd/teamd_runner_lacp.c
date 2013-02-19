@@ -428,7 +428,6 @@ static int lacp_update_selected(struct lacp *lacp)
 		teamd_for_each_tdport(tdport, lacp->ctx) {
 			lacp_port = lacp_port_get(lacp, tdport);
 			if (lacp_port_selectable(lacp_port) &&
-			    best_lacp_port &&
 			    lacp_ports_aggregable(lacp_port, best_lacp_port)) {
 				lacp_port->selected = true;
 				lacp_port->aggregator_id = aggregator_id;
