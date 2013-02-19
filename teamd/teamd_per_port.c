@@ -65,7 +65,7 @@ int teamd_port_priv_create_and_get(void **ppriv, struct teamd_port *tdport,
 int teamd_port_priv_create(struct teamd_port *tdport,
 			   const struct teamd_port_priv *pp, void *creator_priv)
 {
-	return teamd_port_priv_create_and_get(NULL, tdport,pp, creator_priv);
+	return teamd_port_priv_create_and_get(NULL, tdport, pp, creator_priv);
 }
 
 void *teamd_get_next_port_priv_by_creator(struct teamd_port *tdport,

@@ -1060,7 +1060,7 @@ static int teamd_runner_init(struct teamd_context *ctx)
 	}
 
 	if (ctx->runner->init) {
-		err = ctx->runner->init(ctx);
+		err = ctx->runner->init(ctx, ctx->runner_priv);
 		if (err)
 			goto runner_state_unreg;
 	}
@@ -1078,7 +1078,7 @@ free_runner_priv:
 static void teamd_runner_fini(struct teamd_context *ctx)
 {
 	if (ctx->runner->fini)
-		ctx->runner->fini(ctx);
+		ctx->runner->fini(ctx, ctx->runner_priv);
 	if (ctx->runner->state_json_ops)
 		teamd_state_json_unregister(ctx, ctx->runner->state_json_ops,
 					    ctx->runner_priv);

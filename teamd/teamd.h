@@ -112,8 +112,8 @@ struct teamd_runner {
 	const char *name;
 	const char *team_mode_name;
 	size_t priv_size;
-	int (*init)(struct teamd_context *ctx);
-	void (*fini)(struct teamd_context *ctx);
+	int (*init)(struct teamd_context *ctx, void *priv);
+	void (*fini)(struct teamd_context *ctx, void *priv);
 	const struct teamd_state_json_ops *state_json_ops;
 };
 

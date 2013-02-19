@@ -56,9 +56,9 @@ static const struct teamd_event_watch_ops lb_port_watch_ops = {
 	.port_removed = lb_event_watch_port_removed,
 };
 
-static int lb_init(struct teamd_context *ctx)
+static int lb_init(struct teamd_context *ctx, void *priv)
 {
-	struct lb *lb = ctx->runner_priv;
+	struct lb *lb = priv;
 	int err;
 
 	err = teamd_hash_func_set(ctx);
@@ -80,9 +80,9 @@ event_watch_unregister:
 	return err;
 }
 
-static void lb_fini(struct teamd_context *ctx)
+static void lb_fini(struct teamd_context *ctx, void *priv)
 {
-	struct lb *lb = ctx->runner_priv;
+	struct lb *lb = priv;
 
 	teamd_balancer_fini(lb->tb);
 	teamd_event_watch_unregister(ctx, &lb_port_watch_ops, lb);

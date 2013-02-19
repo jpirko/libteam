@@ -449,9 +449,9 @@ static int ab_load_config(struct teamd_context *ctx, struct ab *ab)
 	return 0;
 }
 
-static int ab_init(struct teamd_context *ctx)
+static int ab_init(struct teamd_context *ctx, void *priv)
 {
-	struct ab *ab = ctx->runner_priv;
+	struct ab *ab = priv;
 	int err;
 
 	err = ab_load_config(ctx, ab);
@@ -467,9 +467,9 @@ static int ab_init(struct teamd_context *ctx)
 	return 0;
 }
 
-static void ab_fini(struct teamd_context *ctx)
+static void ab_fini(struct teamd_context *ctx, void *priv)
 {
-	struct ab *ab = ctx->runner_priv;
+	struct ab *ab = priv;
 
 	teamd_event_watch_unregister(ctx, &ab_event_watch_ops, ab);
 }

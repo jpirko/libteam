@@ -1034,7 +1034,7 @@ static int lacp_port_added(struct teamd_context *ctx,
 			   void *priv, void *creator_priv)
 {
 	struct lacp_port *lacp_port = priv;
-	struct lacp *lacp = ctx->runner_priv;
+	struct lacp *lacp = creator_priv;
 	int err;
 
 	lacp_port->ctx = ctx;
@@ -1199,9 +1199,9 @@ static int lacp_carrier_fini(struct teamd_context *ctx, struct lacp *lacp)
 	return 0;
 }
 
-static int lacp_init(struct teamd_context *ctx)
+static int lacp_init(struct teamd_context *ctx, void *priv)
 {
-	struct lacp *lacp = ctx->runner_priv;
+	struct lacp *lacp = priv;
 	int err;
 
 	if (ctx->hwaddr_len != ETH_ALEN) {
@@ -1239,9 +1239,9 @@ event_watch_unregister:
 	return err;
 }
 
-static void lacp_fini(struct teamd_context *ctx)
+static void lacp_fini(struct teamd_context *ctx, void *priv)
 {
-	struct lacp *lacp = ctx->runner_priv;
+	struct lacp *lacp = priv;
 
 	teamd_balancer_fini(lacp->tb);
 	teamd_event_watch_unregister(ctx, &lacp_port_watch_ops, lacp);
