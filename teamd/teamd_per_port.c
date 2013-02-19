@@ -330,10 +330,14 @@ struct teamd_port *teamd_get_next_tdport(struct teamd_context *ctx,
 {
 	struct port_obj *port_obj = NULL;
 
+next_one:
 	if (tdport)
 		port_obj = get_container(tdport, struct port_obj, port);
 	port_obj = list_get_next_node_entry(&ctx->port_obj_list, port_obj, list);
 	if (!port_obj)
 		return NULL;
-	return _port(port_obj);
+	tdport = _port(port_obj);
+	if (!teamd_port_present(ctx, tdport))
+		goto next_one;
+	return tdport;
 }
