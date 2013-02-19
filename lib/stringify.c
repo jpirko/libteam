@@ -363,14 +363,16 @@ static bool __team_ifinfo_str(struct team_ifinfo *ifinfo,
 	char str[hwaddr_str_len(hwaddr_len)];
 
 	hwaddr_str(str, team_get_ifinfo_hwaddr(ifinfo), hwaddr_len);
-	return __buf_append(pbuf, pbufsiz, "%s%d: %s%s: %s%s",
+	return __buf_append(pbuf, pbufsiz, "%s%d: %s%s: %s%s: %s%d",
 			    team_is_ifinfo_changed(ifinfo) ? "*" : " ",
 			    ifindex,
 			    team_is_ifinfo_ifname_changed(ifinfo) ? "*" : "",
 			    team_get_ifinfo_ifname(ifinfo),
 			    team_is_ifinfo_hwaddr_len_changed(ifinfo) ||
 			    team_is_ifinfo_hwaddr_changed(ifinfo) ? "*" : "",
-			    str);
+			    str,
+			    team_is_ifinfo_master_ifindex_changed(ifinfo) ? "*" : "",
+			    team_get_ifinfo_master_ifindex(ifinfo));
 }
 
 /**

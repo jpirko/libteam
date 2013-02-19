@@ -36,12 +36,14 @@ struct team_ifinfo {
 	char			hwaddr[MAX_ADDR_LEN];
 	size_t			hwaddr_len;
 	char			ifname[IFNAMSIZ];
+	uint32_t		master_ifindex;
 	int			changed;
 };
 
 #define CHANGED_HWADDR		(1 << 0)
 #define CHANGED_HWADDR_LEN	(1 << 1)
 #define CHANGED_IFNAME		(1 << 2)
+#define CHANGED_MASTER_IFINDEX	(1 << 3)
 
 static void set_changed(struct team_ifinfo *ifinfo, int bit)
 {
@@ -90,10 +92,22 @@ static void update_ifname(struct team_ifinfo *ifinfo, struct rtnl_link *link)
 	}
 }
 
+static void update_master(struct team_ifinfo *ifinfo, struct rtnl_link *link)
+{
+	uint32_t master_ifindex;
+
+	master_ifindex = rtnl_link_get_master(link);
+	if (ifinfo->master_ifindex != master_ifindex) {
+		ifinfo->master_ifindex = master_ifindex;
+		set_changed(ifinfo, CHANGED_MASTER_IFINDEX);
+	}
+}
+
 static void ifinfo_update(struct team_ifinfo *ifinfo, struct rtnl_link *link)
 {
 	update_hwaddr(ifinfo, link);
 	update_ifname(ifinfo, link);
+	update_master(ifinfo, link);
 }
 
 static struct team_ifinfo *find_ifinfo(struct team_handle *th, uint32_t ifindex)
@@ -315,6 +329,35 @@ bool team_is_ifinfo_ifname_changed(struct team_ifinfo *ifinfo)
 {
 	return is_changed(ifinfo, CHANGED_IFNAME);
 }
+
+/**
+ * team_get_ifinfo_master_ifindex:
+ * @ifinfo: ifinfo structure
+ *
+ * Get interface index of master interface.
+ *
+ * Returns: master interface index as idenfified by in kernel.
+ **/
+TEAM_EXPORT
+uint32_t team_get_ifinfo_master_ifindex(struct team_ifinfo *ifinfo)
+{
+	return ifinfo->master_ifindex;
+}
+
+/**
+ * team_is_ifinfo_master_ifindex_changed:
+ * @ifinfo: ifinfo structure
+ *
+ * See if interface index of master interface got changed.
+ *
+ * Returns: true if interface index of master interface got changed.
+ **/
+TEAM_EXPORT
+bool team_is_ifinfo_master_ifindex_changed(struct team_ifinfo *ifinfo)
+{
+	return is_changed(ifinfo, CHANGED_MASTER_IFINDEX);
+}
+
 
 /**
  * team_is_ifinfo_changed:
