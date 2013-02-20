@@ -51,6 +51,29 @@ struct ab {
 	const struct ab_hwaddr_policy *hwaddr_policy;
 };
 
+struct ab_port {
+	struct teamd_port *tdport;
+	struct {
+		bool sticky;
+#define		AB_DFLT_PORT_STICKY false
+	} cfg;
+};
+
+static struct ab_port *ab_port_get(struct ab *ab, struct teamd_port *tdport)
+{
+	/*
+	 * When calling this after teamd_event_watch_register() which is in
+	 * ab_init() it is ensured that this will always return valid priv
+	 * pointer for an existing port.
+	 */
+	return teamd_get_first_port_priv_by_creator(tdport, ab);
+}
+
+static bool ab_is_port_sticky(struct ab *ab, struct teamd_port *tdport)
+{
+	return ab_port_get(ab, tdport)->cfg.sticky;
+}
+
 static int ab_hwaddr_policy_same_all_hwaddr_changed(struct teamd_context *ctx,
 						    struct ab *ab)
 {
@@ -213,20 +236,6 @@ static int ab_get_port_prio(struct teamd_context *ctx,
 	return prio;
 }
 
-static bool ab_is_port_sticky(struct teamd_context *ctx, const char *port_name)
-{
-	int sticky;
-	int err;
-
-	err = json_unpack(ctx->config_json, "{s:{s:{s:b}}}", "ports", port_name,
-							     "sticky", &sticky);
-	if (err) {
-		teamd_log_dbg("%s: Using default port stickiness.", port_name);
-		return false; /* return default stickiness */
-	}
-	return sticky;
-}
-
 static int ab_clear_active_port(struct teamd_context *ctx, struct ab *ab,
 				struct teamd_port *tdport)
 {
@@ -274,8 +283,7 @@ static int ab_set_active_port(struct teamd_context *ctx, struct ab *ab,
 		if (err)
 			return err;
 	}
-	teamd_log_info("Changed active port to \"%s\".",
-		       tdport->ifname);
+	teamd_log_info("Changed active port to \"%s\".", tdport->ifname);
 	return 0;
 }
 
@@ -363,7 +371,7 @@ static int ab_link_watch_handler(struct teamd_context *ctx, struct ab *ab)
 	teamd_log_dbg("Found best port: \"%s\" (ifindex \"%d\", prio \"%d\").",
 		      best.tdport->ifname, best.tdport->ifindex, best.prio);
 
-	if (!active_tdport || !ab_is_port_sticky(ctx, active_tdport->ifname)) {
+	if (!active_tdport || !ab_is_port_sticky(ab, active_tdport)) {
 		err = ab_clear_active_port(ctx, ab, active_tdport);
 		if (err)
 			return err;
@@ -383,12 +391,35 @@ static int ab_event_watch_hwaddr_changed(struct teamd_context *ctx, void *priv)
 	return 0;
 }
 
-static int ab_event_watch_port_added(struct teamd_context *ctx,
-				     struct teamd_port *tdport, void *priv)
+static int ab_port_load_config(struct teamd_context *ctx,
+			       struct ab_port *ab_port)
 {
-	struct ab *ab = priv;
+	const char *port_name = ab_port->tdport->ifname;
+	int err;
+	int tmp;
+
+	err = json_unpack(ctx->config_json, "{s:{s:{s:b}}}", "ports", port_name,
+							     "sticky", &tmp);
+	ab_port->cfg.sticky = err ? AB_DFLT_PORT_STICKY : !!tmp;
+	teamd_log_dbg("%s: Using sticky \"%d\".", port_name,
+		      ab_port->cfg.sticky);
+	return 0;
+}
+
+static int ab_port_added(struct teamd_context *ctx,
+			 struct teamd_port *tdport,
+			 void *priv, void *creator_priv)
+{
+	struct ab_port *ab_port = priv;
+	struct ab *ab = creator_priv;
 	int err;
 
+	ab_port->tdport = tdport;
+	err = ab_port_load_config(ctx, ab_port);
+	if (err) {
+		teamd_log_err("Failed to load port config.");
+		return err;
+	}
 	/* Newly added ports are enabled */
 	err = team_set_port_enabled(ctx->th, tdport->ifindex, false);
 	if (err) {
@@ -401,10 +432,27 @@ static int ab_event_watch_port_added(struct teamd_context *ctx,
 	return 0;
 }
 
-static void ab_event_watch_port_removed(struct teamd_context *ctx,
-					struct teamd_port *tdport, void *priv)
+static void ab_port_removed(struct teamd_context *ctx,
+			    struct teamd_port *tdport,
+			    void *priv, void *creator_priv)
 {
-	ab_link_watch_handler(ctx, priv);
+	struct ab *ab = creator_priv;
+
+	ab_link_watch_handler(ctx, ab);
+}
+
+static const struct teamd_port_priv ab_port_priv = {
+	.init = ab_port_added,
+	.fini = ab_port_removed,
+	.priv_size = sizeof(struct ab_port),
+};
+
+static int ab_event_watch_port_added(struct teamd_context *ctx,
+				     struct teamd_port *tdport, void *priv)
+{
+	struct ab *ab = priv;
+
+	return teamd_port_priv_create(tdport, &ab_port_priv, ab);
 }
 
 static int ab_event_watch_port_link_changed(struct teamd_context *ctx,
@@ -424,7 +472,6 @@ static int ab_event_watch_prio_option_changed(struct teamd_context *ctx,
 static const struct teamd_event_watch_ops ab_event_watch_ops = {
 	.hwaddr_changed = ab_event_watch_hwaddr_changed,
 	.port_added = ab_event_watch_port_added,
-	.port_removed = ab_event_watch_port_removed,
 	.port_link_changed = ab_event_watch_port_link_changed,
 	.option_changed = ab_event_watch_prio_option_changed,
 	.option_changed_match_name = "priority",
