@@ -787,9 +787,6 @@ static int lw_ap_receive(struct lw_psr_port_priv *psr_ppriv)
 
 	if ((port_enabled && ap_ppriv->validate_active) ||
 	    (!port_enabled && ap_ppriv->validate_inactive)) {
-		if (ll_from.sll_pkttype != PACKET_HOST)
-			return 0;
-
 		err = __get_port_curr_hwaddr(psr_ppriv, &ll_my, 0);
 		if (err)
 			return err;
@@ -797,13 +794,14 @@ static int lw_ap_receive(struct lw_psr_port_priv *psr_ppriv)
 		if (ap.ah.ar_hrd != htons(ll_my.sll_hatype) ||
 		    ap.ah.ar_pro != htons(ETH_P_IP) ||
 		    ap.ah.ar_hln != ll_my.sll_halen ||
-		    ap.ah.ar_pln != 4 ||
-		    ap.ah.ar_op != htons(ARPOP_REPLY))
+		    ap.ah.ar_pln != 4) {
 			return 0;
+		}
 
-		if (ap_ppriv->src.s_addr != ap.target_ip.s_addr ||
-		    ap_ppriv->dst.s_addr != ap.sender_ip.s_addr ||
-		    memcmp(ap.target_mac, ll_my.sll_addr, ll_my.sll_halen))
+		if ((ap_ppriv->src.s_addr != ap.target_ip.s_addr ||
+		     ap_ppriv->dst.s_addr != ap.sender_ip.s_addr) &&
+		    (ap_ppriv->dst.s_addr != ap.target_ip.s_addr ||
+		     ap_ppriv->src.s_addr != ap.sender_ip.s_addr))
 			return 0;
 	}
 
