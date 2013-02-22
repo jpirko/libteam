@@ -276,6 +276,8 @@ static inline unsigned int teamd_port_count(struct teamd_context *ctx)
 
 int teamd_port_add(struct teamd_context *ctx, const char *port_name);
 int teamd_port_remove(struct teamd_context *ctx, const char *port_name);
+int teamd_port_enabled(struct teamd_context *ctx, struct teamd_port *tdport,
+		       bool *enabled);
 
 static inline bool teamd_port_present(struct teamd_context *ctx,
 				      struct teamd_port *tdport)

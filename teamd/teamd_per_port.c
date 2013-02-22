@@ -341,3 +341,23 @@ next_one:
 		goto next_one;
 	return tdport;
 }
+
+int teamd_port_enabled(struct teamd_context *ctx, struct teamd_port *tdport,
+		       bool *enabled)
+{
+	struct team_option *option;
+
+	option = team_get_option(ctx->th, "np", "enabled", tdport->ifindex);
+	if (!option) {
+		teamd_log_err("%s: Failed to find \"enabled\" option.",
+			      tdport->ifname);
+		return -ENOENT;
+	}
+	if (team_get_option_type(option) != TEAM_OPTION_TYPE_BOOL) {
+		teamd_log_err("Unexpected type of \"enabled\" option.");
+		return -EINVAL;
+	}
+
+	*enabled = team_get_option_value_bool(option);
+	return 0;
+}

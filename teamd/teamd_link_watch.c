@@ -1283,23 +1283,14 @@ static void __set_forced_active_for_port(struct teamd_port *tdport,
 static int link_watch_refresh_forced_active(struct teamd_context *ctx)
 {
 	struct teamd_port *tdport;
-	struct team_option *option;
 	bool port_enabled;
 	int enabled_port_count = 0;
+	int err;
 
 	teamd_for_each_tdport(tdport, ctx) {
-		option = team_get_option(ctx->th, "np", "enabled",
-					 tdport->ifindex);
-		if (!option) {
-			teamd_log_err("%s: Failed to find \"enabled\" option.",
-				      tdport->ifname);
-			return -EINVAL;
-		}
-		if (team_get_option_type(option) != TEAM_OPTION_TYPE_BOOL) {
-			teamd_log_err("Unexpected type of \"enabled\" option.");
-			return -EINVAL;
-		}
-		port_enabled = team_get_option_value_bool(option);
+		err = teamd_port_enabled(ctx, tdport, &port_enabled);
+		if (err)
+			return err;
 		__set_forced_active_for_port(tdport, port_enabled);
 		if (port_enabled)
 			enabled_port_count++;
