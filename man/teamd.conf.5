@@ -201,6 +201,9 @@ Value is positive number in milliseconds. It's an interval in which ARP requests
 .BR "link_watch.init_wait "| " ports.PORTIFNAME.link_watch.init_wait " (int)
 Value is positive number in milliseconds. It's an delay between link watch initialization and first ARP request send.
 
+Default:
+.BR "0"
+
 .TP
 .BR "link_watch.missed_max "| " ports.PORTIFNAME.link_watch.missed_max " (int)
 Maximum number of missed ARP replies. If this number is overreached, link is reported as down.
@@ -230,6 +233,9 @@ Default:
 .TP
 .BR "link_watch.send_always "| " ports.PORTIFNAME.link_watch.send_always " (bool)
 By default, ARP requests are send on active ports only. This option allows to force sending even on inactive ones.
+
+Default:
+.BR "false"
 
 .SH NS/NA PING LINK WATCH SPECIFIC OPTIONS
 .TP
