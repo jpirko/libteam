@@ -213,7 +213,7 @@ static int stateview_json_link_watch_info_process(char *lw_name,
 		int interval;
 		int init_wait;
 		int validate;
-		int always_active;
+		int send_always;
 		int missed_max;
 		int missed;
 
@@ -223,7 +223,7 @@ static int stateview_json_link_watch_info_process(char *lw_name,
 				  "interval", &interval,
 				  "init_wait", &init_wait,
 				  "validate", &validate,
-				  "always_active", &always_active,
+				  "send_always", &send_always,
 				  "missed_max", &missed_max,
 				  "missed", &missed);
 		if (err) {
@@ -235,7 +235,7 @@ static int stateview_json_link_watch_info_process(char *lw_name,
 		pr_out2("interval: %d\n", interval);
 		pr_out2("missed packets: %d/%d\n", missed, missed_max);
 		pr_out2("validate: %s\n", boolyesno(validate));
-		pr_out2("always active: %s\n", boolyesno(always_active));
+		pr_out2("send_always: %s\n", boolyesno(send_always));
 		pr_out2("initial wait: %d\n", init_wait);
 	} else if (!strcmp(lw_name, "nsna_ping")) {
 		char *target_host;

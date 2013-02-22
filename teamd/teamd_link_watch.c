@@ -43,7 +43,7 @@ struct lw_common_port_priv {
 	const struct teamd_link_watch *link_watch;
 	struct teamd_port *tdport;
 	bool link_up;
-	bool forced_active;
+	bool forced_send;
 	json_t *link_watch_json;
 };
 
@@ -532,7 +532,7 @@ struct lw_ap_port_priv {
 	struct in_addr src;
 	struct in_addr dst;
 	bool validate;
-	bool always_active;
+	bool send_always;
 	bool vlanid_in_use;
 	unsigned short vlanid;
 };
@@ -654,9 +654,9 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 	ap_ppriv->validate = err ? false : !!tmp;
 	teamd_log_dbg("validate \"%d\".", ap_ppriv->validate);
 
-	err = json_unpack(link_watch_json, "{s:b}",  "always_active", &tmp);
-	ap_ppriv->always_active = err ? false : !!tmp;
-	teamd_log_dbg("always_active \"%d\".", ap_ppriv->always_active);
+	err = json_unpack(link_watch_json, "{s:b}",  "send_always", &tmp);
+	ap_ppriv->send_always = err ? false : !!tmp;
+	teamd_log_dbg("send_always \"%d\".", ap_ppriv->send_always);
 
 	err = json_unpack(link_watch_json, "{s:i}", "vlanid", &tmp);
 	if (!err) {
@@ -722,7 +722,7 @@ static int lw_ap_send(struct lw_psr_port_priv *psr_ppriv)
 	struct sockaddr_ll ll_bcast;
 	struct arp_packet ap;
 
-	if (!(psr_ppriv->common.forced_active || ap_ppriv->always_active))
+	if (!(psr_ppriv->common.forced_send || ap_ppriv->send_always))
 		return 0;
 
 	err = __get_port_curr_hwaddr(psr_ppriv, &ll_my, 0);
@@ -833,7 +833,7 @@ static json_t *lw_ap_state_json(struct teamd_context *ctx,
 			 "interval", timespec_to_ms(&psr_ppriv->interval),
 			 "init_wait", timespec_to_ms(&psr_ppriv->init_wait),
 			 "validate", ap_ppriv->validate,
-			 "always_active", ap_ppriv->always_active,
+			 "send_always", ap_ppriv->send_always,
 			 "missed_max", psr_ppriv->missed_max,
 			 "missed", psr_ppriv->missed);
 }
@@ -1269,18 +1269,18 @@ static int link_watch_event_watch_port_link_changed(struct teamd_context *ctx,
 	return teamd_link_watch_refresh_user_linkup(ctx, tdport);
 }
 
-static void __set_forced_active_for_port(struct teamd_port *tdport,
-					 bool forced_active)
+static void __set_forced_send_for_port(struct teamd_port *tdport,
+				       bool forced_send)
 {
 	struct lw_common_port_priv *common_ppriv;
 
 	teamd_for_each_port_priv_by_creator(common_ppriv, tdport,
 					    LW_PORT_PRIV_CREATOR_PRIV) {
-		common_ppriv->forced_active = forced_active;
+		common_ppriv->forced_send = forced_send;
 	}
 }
 
-static int link_watch_refresh_forced_active(struct teamd_context *ctx)
+static int link_watch_refresh_forced_send(struct teamd_context *ctx)
 {
 	struct teamd_port *tdport;
 	bool port_enabled;
@@ -1291,19 +1291,19 @@ static int link_watch_refresh_forced_active(struct teamd_context *ctx)
 		err = teamd_port_enabled(ctx, tdport, &port_enabled);
 		if (err)
 			return err;
-		__set_forced_active_for_port(tdport, port_enabled);
+		__set_forced_send_for_port(tdport, port_enabled);
 		if (port_enabled)
 			enabled_port_count++;
 	}
 
 	/*
-	 * In case no ports are enabled, set forced_active to true for all
+	 * In case no ports are enabled, set forced_send to true for all
 	 * ports. That enforces active linkwatch approach to regain link
 	 * on some port again.
 	 */
 	if (enabled_port_count == 0) {
 		teamd_for_each_tdport(tdport, ctx)
-			__set_forced_active_for_port(tdport, true);
+			__set_forced_send_for_port(tdport, true);
 	}
 	return 0;
 }
@@ -1312,7 +1312,7 @@ static int link_watch_enabled_option_changed(struct teamd_context *ctx,
 					     struct team_option *option,
 					     void *priv)
 {
-	return link_watch_refresh_forced_active(ctx);
+	return link_watch_refresh_forced_send(ctx);
 }
 
 static const struct teamd_event_watch_ops link_watch_port_watch_ops = {
