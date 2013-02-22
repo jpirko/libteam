@@ -41,6 +41,7 @@
 
 struct lw_common_port_priv {
 	const struct teamd_link_watch *link_watch;
+	struct teamd_context *ctx;
 	struct teamd_port *tdport;
 	bool link_up;
 	bool forced_send;
@@ -228,7 +229,7 @@ static int lw_ethtool_callback_delay(struct teamd_context *ctx, int events,
 	struct teamd_port *tdport;
 	bool link_up;
 
-	tdport = common_ppriv-> tdport;
+	tdport = common_ppriv->tdport;
 	link_up = team_is_port_link_up(tdport->team_port);
 	return teamd_link_watch_check_link_up(ctx, tdport, common_ppriv,
 					      link_up);
@@ -531,7 +532,8 @@ struct lw_ap_port_priv {
 	} start; /* must be first */
 	struct in_addr src;
 	struct in_addr dst;
-	bool validate;
+	bool validate_active;
+	bool validate_inactive;
 	bool send_always;
 	bool vlanid_in_use;
 	unsigned short vlanid;
@@ -650,9 +652,13 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 		return err;
 	teamd_log_dbg("target address \"%s\".", str_in_addr(&ap_ppriv->dst));
 
-	err = json_unpack(link_watch_json, "{s:b}",  "validate", &tmp);
-	ap_ppriv->validate = err ? false : !!tmp;
-	teamd_log_dbg("validate \"%d\".", ap_ppriv->validate);
+	err = json_unpack(link_watch_json, "{s:b}",  "validate_active", &tmp);
+	ap_ppriv->validate_active = err ? false : !!tmp;
+	teamd_log_dbg("validate_active \"%d\".", ap_ppriv->validate_active);
+
+	err = json_unpack(link_watch_json, "{s:b}",  "validate_inactive", &tmp);
+	ap_ppriv->validate_inactive = err ? false : !!tmp;
+	teamd_log_dbg("validate_inactive \"%d\".", ap_ppriv->validate_inactive);
 
 	err = json_unpack(link_watch_json, "{s:b}",  "send_always", &tmp);
 	ap_ppriv->send_always = err ? false : !!tmp;
@@ -761,18 +767,26 @@ static int lw_ap_send(struct lw_psr_port_priv *psr_ppriv)
 
 static int lw_ap_receive(struct lw_psr_port_priv *psr_ppriv)
 {
+	struct lw_common_port_priv *common_ppriv = &psr_ppriv->common;
 	struct lw_ap_port_priv *ap_ppriv = lw_ap_ppriv_get(psr_ppriv);
 	int err;
 	struct sockaddr_ll ll_my;
 	struct sockaddr_ll ll_from;
 	struct arp_packet ap;
+	bool port_enabled;
 
 	err = teamd_recvfrom(psr_ppriv->sock, &ap, sizeof(ap), 0,
 			     (struct sockaddr *) &ll_from, sizeof(ll_from));
 	if (err <= 0)
 		return err;
 
-	if (ap_ppriv->validate) {
+	err = teamd_port_enabled(common_ppriv->ctx, common_ppriv->tdport,
+				 &port_enabled);
+	if (err)
+		return err;
+
+	if ((port_enabled && ap_ppriv->validate_active) ||
+	    (!port_enabled && ap_ppriv->validate_inactive)) {
 		if (ll_from.sll_pkttype != PACKET_HOST)
 			return 0;
 
@@ -827,12 +841,13 @@ static json_t *lw_ap_state_json(struct teamd_context *ctx,
 
 	strcpy(src, str_in_addr(&ap_ppriv->src));
 	strcpy(dst, str_in_addr(&ap_ppriv->dst));
-	return json_pack("{s:s, s:s, s:i, s:i, s:b, s:b, s:i, s:i}",
+	return json_pack("{s:s, s:s, s:i, s:i, s:b, s:b, s:b, s:i, s:i}",
 			 "source_host", src,
 			 "target_host", dst,
 			 "interval", timespec_to_ms(&psr_ppriv->interval),
 			 "init_wait", timespec_to_ms(&psr_ppriv->init_wait),
-			 "validate", ap_ppriv->validate,
+			 "validate_active", ap_ppriv->validate_active,
+			 "validate_inactive", ap_ppriv->validate_inactive,
 			 "send_always", ap_ppriv->send_always,
 			 "missed_max", psr_ppriv->missed_max,
 			 "missed", psr_ppriv->missed);
@@ -1204,6 +1219,7 @@ static int link_watch_load_one_json_obj(struct teamd_context *ctx,
 	if (err)
 		return err;
 	common_ppriv->link_watch = link_watch;
+	common_ppriv->ctx = ctx;
 	common_ppriv->tdport = tdport;
 	common_ppriv->link_watch_json = link_watch_obj;
 	return 0;

@@ -214,8 +214,18 @@ Hostname to be converted to IP address which will be filled into ARP request as 
 Hostname to be converted to IP address which will be filled into ARP request as destination address.
 
 .TP
-.BR "link_watch.validate "| " ports.PORTIFNAME.link_watch.validate " (bool)
-Validate received ARP packets. If this is not set, all incoming ARP packets will be considered as good reply.
+.BR "link_watch.validate_active "| " ports.PORTIFNAME.link_watch.validate_active " (bool)
+Validate received ARP packets on active ports. If this is not set, all incoming ARP packets will be considered as good reply.
+
+Default:
+.BR "false"
+
+.TP
+.BR "link_watch.validate_inactive "| " ports.PORTIFNAME.link_watch.validate_inactive " (bool)
+Validate received ARP packets on inactive ports. If this is not set, all incoming ARP packets will be considered as good reply.
+
+Default:
+.BR "false"
 
 .TP
 .BR "link_watch.send_always "| " ports.PORTIFNAME.link_watch.send_always " (bool)
