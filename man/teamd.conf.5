@@ -48,6 +48,13 @@ List of port NICs to be used in team device.
 
 See examples for more information.
 
+.TP
+.BR "ports.PORTIFNAME.queue_id " (int)
+ID of queue which should this port be mapped on.
+
+Default:
+.BR "None"
+
 .SH ACTIVE-BACKUP RUNNER SPECIFIC OPTIONS
 .TP
 .BR "runner.hwaddr_policy " (string)
@@ -78,13 +85,6 @@ Flag which tells if the port is sticky. That means it does not get de-selected i
 
 Default:
 .BR "false"
-
-.TP
-.BR "ports.PORTIFNAME.queue_id " (int)
-ID of queue which should this port be mapped on.
-
-Default:
-.BR "None"
 
 .SH LOAD BALANCE RUNNER SPECIFIC OPTIONS
 
