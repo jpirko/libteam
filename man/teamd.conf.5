@@ -162,10 +162,10 @@ Default:
 .BR "runner.agg_select_policy " (string)
 This selects policy on how the aggregators will be selected. Following are available:
 
-.BR "prio "-
-Aggregator with highest priority according to LACP standard will be selected.
+.BR "lacp_prio "-
+Aggregator with highest priority according to LACP standard will be selected. Aggregator priority is affected by per-port option lacp_prio.
 
-.BR "stable "-
+.BR "lacp_prio_stable "-
 Same as previous one, only do not replace selected aggregator if is still usable.
 
 .BR "bandwidth "-
@@ -175,7 +175,18 @@ Select aggregator with highest total bandwidth.
 Select aggregator with highest number of ports.
 
 Default:
-.BR "prio"
+.BR "lacp_prio"
+
+.TP
+.BR "ports.PORTIFNAME.lacp_prio " (int)
+Port priority according to LACP standard. The lower number means higher priority.
+
+.TP
+.BR "ports.PORTIFNAME.lacp_key " (int)
+Port key according to LACP standard. Only ports with the same key are possible to aggregate.
+
+Default:
+.BR "0"
 
 .SH ETHTOOL LINK WATCH SPECIFIC OPTIONS
 .TP

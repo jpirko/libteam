@@ -106,14 +106,14 @@ static bool lacpdu_check(struct lacpdu *lacpdu)
 }
 
 enum lacp_agg_select_policy {
-	LACP_AGG_SELECT_PRIO = 0,
-	LACP_AGG_SELECT_STABLE = 1,
+	LACP_AGG_SELECT_LACP_PRIO = 0,
+	LACP_AGG_SELECT_LACP_PRIO_STABLE = 1,
 	LACP_AGG_SELECT_BANDWIDTH = 2,
 	LACP_AGG_SELECT_COUNT = 3,
 };
 
 static const char *lacp_agg_select_policy_names_list[] = {
-	"prio", "stable", "bandwidth", "count",
+	"lacp_prio", "lacp_prio_stable", "bandwidth", "count",
 };
 
 #define LACP_AGG_SELECT_POLICY_NAMES_LIST_SIZE \
@@ -133,7 +133,7 @@ struct lacp {
 		int min_ports;
 #define		LACP_CFG_DFLT_MIN_PORTS 1
 		enum lacp_agg_select_policy agg_select_policy;
-#define		LACP_CFG_DFLT_AGG_SELECT_POLICY LACP_AGG_SELECT_PRIO
+#define		LACP_CFG_DFLT_AGG_SELECT_POLICY LACP_AGG_SELECT_LACP_PRIO
 	} cfg;
 	struct teamd_balancer *tb;
 };
@@ -566,10 +566,10 @@ static int lacp_update_selected(struct lacp *lacp)
 	}
 
 	switch (lacp->cfg.agg_select_policy) {
-	case LACP_AGG_SELECT_PRIO:
+	case LACP_AGG_SELECT_LACP_PRIO:
 		lacp->selected_aggregator_id = best_aggregator_id;
 		break;
-	case LACP_AGG_SELECT_STABLE:
+	case LACP_AGG_SELECT_LACP_PRIO_STABLE:
 		if (best_aggregator_id &&
 		    !lacp_agg_has_selected_port(lacp,
 						orig_selected_aggregator_id))
