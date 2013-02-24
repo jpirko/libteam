@@ -190,7 +190,6 @@ static int ab_hwaddr_policy_only_active_active_clear(struct teamd_context *ctx,
 	return 0;
 }
 
-
 static const struct ab_hwaddr_policy ab_hwaddr_policy_only_active = {
 	.name = "only_active",
 	.hwaddr_changed = ab_hwaddr_policy_only_active_hwaddr_changed,
@@ -219,21 +218,6 @@ static int ab_assign_hwaddr_policy(struct ab *ab, char *hwaddr_policy_name)
 found:
 	ab->hwaddr_policy = ab_hwaddr_policy_list[i];
 	return 0;
-}
-
-static int ab_get_port_prio(struct teamd_context *ctx,
-			    struct teamd_port *tdport)
-{
-	int prio;
-	int err;
-
-	err = team_get_port_priority(ctx->th, tdport->ifindex, &prio);
-	if (err) {
-		teamd_log_warn("%s: Can't get port priority. Using default.",
-			       tdport->ifname);
-		return 0; /* return default priority */
-	}
-	return prio;
 }
 
 static int ab_clear_active_port(struct teamd_context *ctx, struct ab *ab,
@@ -308,7 +292,7 @@ static void ab_best_port_check_set(struct teamd_context *ctx,
 
 	speed = team_get_port_speed(port);
 	duplex = team_get_port_duplex(port);
-	prio = ab_get_port_prio(ctx, tdport);
+	prio = teamd_port_prio(ctx, tdport);
 
 	if (!best->tdport || (prio > best->prio) || (speed > best->speed) ||
 	    (speed == best->speed && duplex > best->duplex)) {
@@ -334,7 +318,7 @@ static int ab_link_watch_handler(struct teamd_context *ctx, struct ab *ab)
 	if (active_tdport) {
 		teamd_log_dbg("Current active port: \"%s\" (ifindex \"%d\", prio \"%d\").",
 			      active_tdport->ifname, active_tdport->ifindex,
-			      ab_get_port_prio(ctx, active_tdport));
+			      teamd_port_prio(ctx, active_tdport));
 
 		err = team_get_active_port(ctx->th, &active_ifindex);
 		if (err) {

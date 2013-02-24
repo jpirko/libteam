@@ -278,6 +278,7 @@ int teamd_port_add(struct teamd_context *ctx, const char *port_name);
 int teamd_port_remove(struct teamd_context *ctx, const char *port_name);
 int teamd_port_enabled(struct teamd_context *ctx, struct teamd_port *tdport,
 		       bool *enabled);
+int teamd_port_prio(struct teamd_context *ctx, struct teamd_port *tdport);
 
 static inline bool teamd_port_present(struct teamd_context *ctx,
 				      struct teamd_port *tdport)

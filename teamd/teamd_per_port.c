@@ -361,3 +361,17 @@ int teamd_port_enabled(struct teamd_context *ctx, struct teamd_port *tdport,
 	*enabled = team_get_option_value_bool(option);
 	return 0;
 }
+
+int teamd_port_prio(struct teamd_context *ctx, struct teamd_port *tdport)
+{
+	int prio;
+	int err;
+
+	err = team_get_port_priority(ctx->th, tdport->ifindex, &prio);
+	if (err) {
+		teamd_log_warn("%s: Can't get port priority. Using default.",
+			       tdport->ifname);
+		return 0; /* return default priority */
+	}
+	return prio;
+}
