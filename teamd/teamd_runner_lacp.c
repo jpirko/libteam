@@ -371,8 +371,11 @@ static void get_lacp_port_prio_info(struct lacp_port *lacp_port,
 	prio_info->state = 0;
 }
 
-static bool has_better_prio(struct lacp_port *lacp_port1,
-			    struct lacp_port *lacp_port2)
+typedef bool (*lacp_is_port_better_t)(struct lacp_port *lacp_port1,
+				      struct lacp_port *lacp_port2);
+
+static bool lacp_is_port_better_by_lacp_prio(struct lacp_port *lacp_port1,
+					     struct lacp_port *lacp_port2)
 {
 	struct lacpdu_info prio_info1;
 	struct lacpdu_info prio_info2;
@@ -382,7 +385,8 @@ static bool has_better_prio(struct lacp_port *lacp_port1,
 	return memcmp(&prio_info1, &prio_info2, sizeof(prio_info1)) < 0;
 }
 
-static struct lacp_port *lacp_get_best_port(struct lacp *lacp)
+static struct lacp_port *lacp_get_best_port(struct lacp *lacp,
+					    lacp_is_port_better_t is_port_better_func)
 {
 	struct teamd_port *tdport;
 	struct lacp_port *lacp_port;
@@ -393,7 +397,7 @@ static struct lacp_port *lacp_get_best_port(struct lacp *lacp)
 		if (!lacp_port_selectable(lacp_port))
 			continue;
 		if (!best_lacp_port ||
-		    has_better_prio(lacp_port, best_lacp_port))
+		    is_port_better_func(lacp_port, best_lacp_port))
 			best_lacp_port = lacp_port;
 	}
 	return best_lacp_port;
@@ -536,6 +540,7 @@ static int lacp_update_selected(struct lacp *lacp)
 	uint32_t aggregator_id;
 	uint32_t orig_selected_aggregator_id = lacp->selected_aggregator_id;
 	uint32_t best_aggregator_id = 0;
+	lacp_is_port_better_t is_port_better_func;
 	int err;
 
 	/*
@@ -550,7 +555,9 @@ static int lacp_update_selected(struct lacp *lacp)
 
 	lacp->selected_aggregator_id = 0;
 
-	while ((best_lacp_port = lacp_get_best_port(lacp))) {
+	is_port_better_func = lacp_is_port_better_by_lacp_prio;
+
+	while ((best_lacp_port = lacp_get_best_port(lacp, is_port_better_func))) {
 		/* Use best port ifindex as aggregator id */
 		aggregator_id = best_lacp_port->tdport->ifindex;
 		if (!best_aggregator_id)
