@@ -28,3 +28,8 @@ const struct teamd_runner teamd_runner_roundrobin = {
 	.name		= "roundrobin",
 	.team_mode_name	= "roundrobin",
 };
+
+const struct teamd_runner teamd_runner_random = {
+	.name		= "random",
+	.team_mode_name	= "random",
+};

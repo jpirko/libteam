@@ -226,6 +226,7 @@ void teamd_run_loop_restart(struct teamd_context *ctx);
 /* Runner structures */
 const struct teamd_runner teamd_runner_broadcast;
 const struct teamd_runner teamd_runner_roundrobin;
+const struct teamd_runner teamd_runner_random;
 const struct teamd_runner teamd_runner_activebackup;
 const struct teamd_runner teamd_runner_loadbalance;
 const struct teamd_runner teamd_runner_lacp;

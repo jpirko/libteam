@@ -47,6 +47,7 @@
 static const struct teamd_runner *teamd_runner_list[] = {
 	&teamd_runner_broadcast,
 	&teamd_runner_roundrobin,
+	&teamd_runner_random,
 	&teamd_runner_activebackup,
 	&teamd_runner_loadbalance,
 	&teamd_runner_lacp,
