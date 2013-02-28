@@ -31,7 +31,7 @@ CFLAGS="$CFLAGS -Wall -Werror"
 AC_PROG_CC
 LT_INIT
 
-PKG_CHECK_MODULES([LIBNL], [libnl-3.0 libnl-genl-3.0 libnl-cli-3.0])
+PKG_CHECK_MODULES([LIBNL], [libnl-3.0 libnl-genl-3.0 libnl-route-3.0 >= 3.2.19 libnl-cli-3.0])
 PKG_CHECK_MODULES([LIBDAEMON], [libdaemon])
 PKG_CHECK_MODULES([JANSSON], [jansson])
 PKG_CHECK_MODULES([DBUS], [dbus-1])
