@@ -195,7 +195,7 @@ static int parse_command_line(struct teamd_context *ctx,
 	return 0;
 }
 
-static const char *pid_file_proc(void) {
+static const char *teamd_pid_file_proc(void) {
 	return *__g_pid_file;
 }
 
@@ -1483,6 +1483,26 @@ static int teamd_get_devname(struct teamd_context *ctx)
 	return 0;
 }
 
+static int teamd_set_default_pid_file(struct teamd_context *ctx)
+{
+	int err;
+
+	/* Generate PID filename only if it was not set on command line */
+	if (ctx->pid_file)
+		return 0;
+
+	err = teamd_make_rundir();
+	if (err)
+		return err;
+
+	err = asprintf(&ctx->pid_file, TEAMD_RUN_DIR"%s.pid", ctx->team_devname);
+	if (err == -1) {
+		teamd_log_err("Failed allocate memory for PID file string.");
+		return -ENOMEM;
+	}
+	return 0;
+}
+
 static int teamd_context_init(struct teamd_context **pctx)
 {
 	struct teamd_context *ctx;
@@ -1536,11 +1556,12 @@ int main(int argc, char **argv)
 	if (err)
 		goto config_free;
 
-	daemon_log_ident = ctx->ident;
-	daemon_pid_file_ident = ctx->ident;
+	err = teamd_set_default_pid_file(ctx);
+	if (err)
+		goto config_free;
 
-	if (ctx->pid_file)
-		daemon_pid_file_proc = pid_file_proc;
+	daemon_log_ident = ctx->ident;
+	daemon_pid_file_proc = teamd_pid_file_proc;
 
 	teamd_log_dbg("Using PID file \"%s\"", daemon_pid_file_proc());
 	if (ctx->config_file)

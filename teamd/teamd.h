@@ -27,6 +27,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <jansson.h>
 #include <linux/filter.h>
@@ -34,8 +35,6 @@
 #include <dbus/dbus.h>
 #include <team.h>
 #include <private/list.h>
-
-#define TEAMD_RUN_DIR LOCALSTATEDIR "/run/"
 
 #define teamd_log_err(args...) daemon_log(LOG_ERR, ##args)
 #define teamd_log_warn(args...) daemon_log(LOG_WARNING, ##args)
@@ -45,6 +44,21 @@
 #define teamd_log_dbgx(ctx, val, args...)	\
 	if (val <= ctx->debug)			\
 		daemon_log(LOG_DEBUG, ##args)
+
+#define TEAMD_RUN_DIR "/var/run/teamd/"
+
+static inline int teamd_make_rundir(void)
+{
+	int ret;
+
+	ret = mkdir(TEAMD_RUN_DIR, 0755);
+	if (ret && errno != EEXIST) {
+		teamd_log_err("Failed to create directory \"%s\"",
+			      TEAMD_RUN_DIR);
+		return -errno;
+	}
+	return 0;
+}
 
 enum teamd_command {
 	DAEMON_CMD_RUN,
