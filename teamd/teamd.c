@@ -991,13 +991,13 @@ static int teamd_event_watch_port_added(struct teamd_context *ctx,
 		}
 	}
 	err = json_unpack(port_obj, "{s:i}", "prio", &tmp);
-	if (!err) {
-		err = team_set_port_priority(ctx->th, tdport->ifindex, tmp);
-		if (err) {
-			teamd_log_err("%s: Failed to set \"priority\".",
-				      tdport->ifname);
-			return err;
-		}
+	if (!err)
+		tmp = 0;
+	err = team_set_port_priority(ctx->th, tdport->ifindex, tmp);
+	if (err) {
+		teamd_log_err("%s: Failed to set \"priority\".",
+			      tdport->ifname);
+		return err;
 	}
 	return 0;
 }
