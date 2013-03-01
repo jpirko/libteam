@@ -163,7 +163,8 @@ Default:
 This selects policy on how the aggregators will be selected. Following are available:
 
 .BR "lacp_prio "-
-Aggregator with highest priority according to LACP standard will be selected. Aggregator priority is affected by per-port option lacp_prio.
+Aggregator with highest priority according to LACP standard will be selected. Aggregator priority is affected by per-port option
+.BR "lacp_prio".
 
 .BR "lacp_prio_stable "-
 Same as previous one, only do not replace selected aggregator if is still usable.
@@ -173,6 +174,11 @@ Select aggregator with highest total bandwidth.
 
 .BR "count "-
 Select aggregator with highest number of ports.
+
+.BR "port_options "-
+Aggregator with highest priority according per-port options
+.BR "prio " and
+.BR "sticky " will be selected. This means that aggregator containing port with highest priority will be selected unless at least one of the ports in currently selected aggregator is sticky.
 
 Default:
 .BR "lacp_prio"

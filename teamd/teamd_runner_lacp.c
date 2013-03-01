@@ -110,10 +110,11 @@ enum lacp_agg_select_policy {
 	LACP_AGG_SELECT_LACP_PRIO_STABLE = 1,
 	LACP_AGG_SELECT_BANDWIDTH = 2,
 	LACP_AGG_SELECT_COUNT = 3,
+	LACP_AGG_SELECT_PORT_CONFIG = 4,
 };
 
 static const char *lacp_agg_select_policy_names_list[] = {
-	"lacp_prio", "lacp_prio_stable", "bandwidth", "count",
+	"lacp_prio", "lacp_prio_stable", "bandwidth", "count", "port_config",
 };
 
 #define LACP_AGG_SELECT_POLICY_NAMES_LIST_SIZE \
@@ -174,6 +175,8 @@ struct lacp_port {
 #define		LACP_PORT_CFG_DFLT_LACP_PRIO 0xff
 		uint16_t lacp_key;
 #define		LACP_PORT_CFG_DFLT_LACP_KEY 0
+		bool sticky;
+#define		LACP_PORT_CFG_DFLT_STICKY false
 	} cfg;
 };
 
@@ -385,6 +388,15 @@ static bool lacp_is_port_better_by_lacp_prio(struct lacp_port *lacp_port1,
 	return memcmp(&prio_info1, &prio_info2, sizeof(prio_info1)) < 0;
 }
 
+static bool lacp_is_port_better_by_port_config(struct lacp_port *lacp_port1,
+					       struct lacp_port *lacp_port2)
+{
+	int prio1 = teamd_port_prio(lacp_port1->ctx, lacp_port1->tdport);
+	int prio2 = teamd_port_prio(lacp_port2->ctx, lacp_port2->tdport);
+
+	return prio1 > prio2;
+}
+
 static struct lacp_port *lacp_get_best_port(struct lacp *lacp,
 					    lacp_is_port_better_t is_port_better_func)
 {
@@ -532,13 +544,28 @@ static uint32_t lacp_get_best_agg_by_port_count(struct lacp *lacp)
 	return best_aggregator_id;
 }
 
+static bool lacp_agg_sticky(struct lacp *lacp, uint32_t aggregator_id)
+{
+	struct teamd_port *tdport;
+	struct lacp_port *lacp_port;
+
+	teamd_for_each_tdport(tdport, lacp->ctx) {
+		lacp_port = lacp_port_get(lacp, tdport);
+		if (!lacp_port->selected ||
+		    lacp_port->aggregator_id != aggregator_id)
+			continue;
+		if (lacp_port->cfg.sticky)
+			return true;
+	}
+	return false;
+}
+
 static int lacp_update_selected(struct lacp *lacp)
 {
 	struct lacp_port *best_lacp_port;
 	struct teamd_port *tdport;
 	struct lacp_port *lacp_port;
 	uint32_t aggregator_id;
-	uint32_t orig_selected_aggregator_id = lacp->selected_aggregator_id;
 	uint32_t best_aggregator_id = 0;
 	lacp_is_port_better_t is_port_better_func;
 	int err;
@@ -553,9 +580,14 @@ static int lacp_update_selected(struct lacp *lacp)
 		lacp_port->aggregator_id = 0;
 	}
 
-	lacp->selected_aggregator_id = 0;
-
-	is_port_better_func = lacp_is_port_better_by_lacp_prio;
+	switch (lacp->cfg.agg_select_policy) {
+	case LACP_AGG_SELECT_PORT_CONFIG:
+		is_port_better_func = lacp_is_port_better_by_port_config;
+		break;
+	default:
+		is_port_better_func = lacp_is_port_better_by_lacp_prio;
+		break;
+	}
 
 	while ((best_lacp_port = lacp_get_best_port(lacp, is_port_better_func))) {
 		/* Use best port ifindex as aggregator id */
@@ -572,14 +604,16 @@ static int lacp_update_selected(struct lacp *lacp)
 		}
 	}
 
+	/* See if currently selected aggregator is usable */
+	if (!lacp_agg_has_selected_port(lacp, lacp->selected_aggregator_id))
+		lacp->selected_aggregator_id = 0;
+
 	switch (lacp->cfg.agg_select_policy) {
 	case LACP_AGG_SELECT_LACP_PRIO:
 		lacp->selected_aggregator_id = best_aggregator_id;
 		break;
 	case LACP_AGG_SELECT_LACP_PRIO_STABLE:
-		if (best_aggregator_id &&
-		    !lacp_agg_has_selected_port(lacp,
-						orig_selected_aggregator_id))
+		if (!lacp->selected_aggregator_id)
 			lacp->selected_aggregator_id = best_aggregator_id;
 		break;
 	case LACP_AGG_SELECT_BANDWIDTH:
@@ -589,6 +623,10 @@ static int lacp_update_selected(struct lacp *lacp)
 	case LACP_AGG_SELECT_COUNT:
 		lacp->selected_aggregator_id =
 			lacp_get_best_agg_by_port_count(lacp);
+		break;
+	case LACP_AGG_SELECT_PORT_CONFIG:
+		if (!lacp_agg_sticky(lacp, lacp->selected_aggregator_id))
+			lacp->selected_aggregator_id = best_aggregator_id;
 		break;
 	}
 
@@ -1017,6 +1055,12 @@ static int lacp_port_load_config(struct teamd_context *ctx,
 	}
 	teamd_log_dbg("%s: Using lacp_key \"%d\".", port_name,
 		      lacp_port->cfg.lacp_key);
+
+	err = json_unpack(ctx->config_json, "{s:{s:{s:b}}}", "ports", port_name,
+							     "sticky", &tmp);
+	lacp_port->cfg.sticky = err ? LACP_PORT_CFG_DFLT_STICKY : !!tmp;
+	teamd_log_dbg("%s: Using sticky \"%d\".", port_name,
+		      lacp_port->cfg.sticky);
 	return 0;
 }
 
