@@ -234,6 +234,7 @@ static int teamd_usock_sock_open(struct teamd_context *ctx)
 	teamd_usock_get_sockpath(addr.sun_path, sizeof(addr.sun_path),
 				 ctx->team_devname);
 
+	teamd_log_dbg("usock: Using sockpath \"%s\"", addr.sun_path);
 	err = unlink(addr.sun_path);
 	if (err == -1 && errno != ENOENT) {
 		teamd_log_err("usock: Failed to remove socket file.");
