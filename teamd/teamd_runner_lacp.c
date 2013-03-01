@@ -170,10 +170,10 @@ struct lacp_port {
 		bool up;
 	} __link_last;
 	struct {
-		uint16_t prio;
-#define		LACP_PORT_CFG_DFLT_PRIO 0xff
-		uint16_t key;
-#define		LACP_PORT_CFG_DFLT_KEY 0
+		uint16_t lacp_prio;
+#define		LACP_PORT_CFG_DFLT_LACP_PRIO 0xff
+		uint16_t lacp_key;
+#define		LACP_PORT_CFG_DFLT_LACP_KEY 0
 	} cfg;
 };
 
@@ -749,8 +749,8 @@ static void lacp_port_actor_init(struct lacp_port *lacp_port)
 
 	actor->system_priority = htons(lacp_port->lacp->cfg.sys_prio);
 	memcpy(actor->system, lacp_port->ctx->hwaddr, ETH_ALEN);
-        actor->key = htons(lacp_port->cfg.key);
-        actor->port_priority = htons(lacp_port->cfg.prio);
+        actor->key = htons(lacp_port->cfg.lacp_key);
+        actor->port_priority = htons(lacp_port->cfg.lacp_prio);
 	actor->port = htons(lacp_port->tdport->ifindex);
 }
 
@@ -993,30 +993,30 @@ static int lacp_port_load_config(struct teamd_context *ctx,
 	err = json_unpack(ctx->config_json, "{s:{s:{s:i}}}", "ports", port_name,
 							     "lacp_prio", &tmp);
 	if (err) {
-		lacp_port->cfg.prio = LACP_PORT_CFG_DFLT_PRIO;
+		lacp_port->cfg.lacp_prio = LACP_PORT_CFG_DFLT_LACP_PRIO;
 	} else if (tmp < 0 || tmp > USHRT_MAX) {
 		teamd_log_err("%s: \"lacp_prio\" value is out of its limits.",
 			      port_name);
 		return -EINVAL;
 	} else {
-		lacp_port->cfg.prio = tmp;
+		lacp_port->cfg.lacp_prio = tmp;
 	}
 	teamd_log_dbg("%s: Using lacp_prio \"%d\".", port_name,
-		      lacp_port->cfg.prio);
+		      lacp_port->cfg.lacp_prio);
 
 	err = json_unpack(ctx->config_json, "{s:{s:{s:i}}}", "ports", port_name,
 							     "lacp_key", &tmp);
 	if (err) {
-		lacp_port->cfg.key = LACP_PORT_CFG_DFLT_KEY;
+		lacp_port->cfg.lacp_key = LACP_PORT_CFG_DFLT_LACP_KEY;
 	} else if (tmp < 0 || tmp > USHRT_MAX) {
 		teamd_log_err("%s: \"lacp_key\" value is out of its limits.",
 			      port_name);
 		return -EINVAL;
 	} else {
-		lacp_port->cfg.key = tmp;
+		lacp_port->cfg.lacp_key = tmp;
 	}
 	teamd_log_dbg("%s: Using lacp_key \"%d\".", port_name,
-		      lacp_port->cfg.key);
+		      lacp_port->cfg.lacp_key);
 	return 0;
 }
 
@@ -1273,8 +1273,8 @@ static json_t *__fill_lacp_port(struct lacp_port *lacp_port)
 			   "selected", lacp_port->selected,
 			   "aggregator_id", lacp_port->aggregator_id,
 			   "state", lacp_port_state_name[lacp_port->state],
-			   "key", lacp_port->cfg.key,
-			   "prio", lacp_port->cfg.prio,
+			   "key", lacp_port->cfg.lacp_key,
+			   "prio", lacp_port->cfg.lacp_prio,
 			   "actor_lacpdu_info", actor_json,
 			   "partner_lacpdu_info", partner_json);
 	if (!s_json) {
