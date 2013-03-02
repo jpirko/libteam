@@ -120,9 +120,11 @@ static const char *lacp_agg_select_policy_names_list[] = {
 #define LACP_AGG_SELECT_POLICY_NAMES_LIST_SIZE \
 	ARRAY_SIZE(lacp_agg_select_policy_names_list)
 
+struct lacp_port;
+
 struct lacp {
 	struct teamd_context *ctx;
-	uint32_t selected_aggregator_id;
+	struct lacp_port *selected_agg_lead; /* leading port of selected aggregator */
 	bool carrier_up;
 	struct {
 		bool active;
@@ -161,9 +163,9 @@ struct lacp_port {
 	struct lacpdu_info actor;
 	struct lacpdu_info partner;
 	struct lacpdu_info __partner_last; /* last state before update */
-	bool selected;
 	bool periodic_on;
-	uint32_t aggregator_id;
+	struct lacp_port *agg_lead; /* leading port of aggregator.
+				     * NULL in case this port is not selected */
 	enum lacp_port_state state;
 	struct {
 		uint32_t speed;
@@ -189,6 +191,16 @@ static struct lacp_port *lacp_port_get(struct lacp *lacp,
 	 * pointer for an existing port.
 	 */
 	return teamd_get_first_port_priv_by_creator(tdport, lacp);
+}
+
+static uint32_t lacp_agg_id(struct lacp_port *agg_lead)
+{
+	return agg_lead ? agg_lead->tdport->ifindex : 0;
+}
+
+static uint32_t lacp_port_agg_id(struct lacp_port *lacp_port)
+{
+	return lacp_agg_id(lacp_port->agg_lead);
 }
 
 static const char *lacp_get_agg_select_policy_name(struct lacp *lacp)
@@ -270,8 +282,6 @@ static int lacp_load_config(struct teamd_context *ctx, struct lacp *lacp)
 
 static bool lacp_port_selectable(struct lacp_port *lacp_port)
 {
-	if (lacp_port->selected)
-		return false;
 	if (!memcmp(lacp_port->actor.system,
 		    lacp_port->partner.system, ETH_ALEN)) {
 		teamd_log_warn("%s: Port seems to be loopbacked to the same "
@@ -284,13 +294,18 @@ static bool lacp_port_selectable(struct lacp_port *lacp_port)
 	return false;
 }
 
+static bool lacp_port_selected(struct lacp_port *lacp_port)
+{
+	return lacp_port->agg_lead;
+}
+
 static int lacp_port_should_be_enabled(struct lacp_port *lacp_port)
 {
 	struct lacp *lacp = lacp_port->lacp;
 
-	if (lacp_port->selected &&
+	if (lacp_port_selected(lacp_port) &&
 	    lacp_port->partner.state & INFO_STATE_SYNCHRONIZATION &&
-	    lacp_port->aggregator_id == lacp->selected_aggregator_id)
+	    lacp_port->agg_lead == lacp->selected_agg_lead)
 		return true;
 	return false;
 }
@@ -299,8 +314,8 @@ static int lacp_port_should_be_disabled(struct lacp_port *lacp_port)
 {
 	struct lacp *lacp = lacp_port->lacp;
 
-	if (!lacp_port->selected ||
-	    lacp_port->aggregator_id != lacp->selected_aggregator_id)
+	if (!lacp_port_selected(lacp_port) ||
+	    lacp_port->agg_lead != lacp->selected_agg_lead)
 		return true;
 	return false;
 }
@@ -326,9 +341,8 @@ static int lacp_port_update_enabled(struct lacp_port *lacp_port)
 	else
 		return 0;
 
-	teamd_log_dbg("%s: %s port, aggregator id %d", tdport->ifname,
-		      new_enabled_state ? "Enabling": "Disabling",
-		      lacp_port->aggregator_id);
+	teamd_log_dbg("%s: %s port", tdport->ifname,
+		      new_enabled_state ? "Enabling": "Disabling");
 	err = team_set_port_enabled(ctx->th, tdport->ifindex,
 				    new_enabled_state);
 	if (err) {
@@ -348,6 +362,27 @@ static bool lacp_ports_aggregable(struct lacp_port *lacp_port1,
 	if (memcmp(lacp_port1->partner.system,
 		   lacp_port2->partner.system, ETH_ALEN))
 		return false;
+	return true;
+}
+
+static bool lacp_port_correct_aggregation(struct lacp_port *checked_lacp_port)
+{
+	struct teamd_port *tdport;
+	struct lacp_port *lacp_port;
+
+	/* Find first port in same aggregator and see if checked port is
+	 * aggregable with that. That's enough because all of the ports
+	 * in aggregator besides the checked one are aggregable with each other.
+	 */
+
+	teamd_for_each_tdport(tdport, checked_lacp_port->ctx) {
+		lacp_port = lacp_port_get(checked_lacp_port->lacp, tdport);
+		if (!lacp_port_selected(lacp_port) ||
+		    lacp_port->agg_lead != checked_lacp_port->agg_lead ||
+		    lacp_port == checked_lacp_port)
+			continue;
+		return lacp_ports_aggregable(lacp_port, checked_lacp_port);
+	}
 	return true;
 }
 
@@ -374,11 +409,8 @@ static void get_lacp_port_prio_info(struct lacp_port *lacp_port,
 	prio_info->state = 0;
 }
 
-typedef bool (*lacp_is_port_better_t)(struct lacp_port *lacp_port1,
-				      struct lacp_port *lacp_port2);
-
-static bool lacp_is_port_better_by_lacp_prio(struct lacp_port *lacp_port1,
-					     struct lacp_port *lacp_port2)
+static bool lacp_port_better_by_lacp_prio(struct lacp_port *lacp_port1,
+					  struct lacp_port *lacp_port2)
 {
 	struct lacpdu_info prio_info1;
 	struct lacpdu_info prio_info2;
@@ -388,8 +420,8 @@ static bool lacp_is_port_better_by_lacp_prio(struct lacp_port *lacp_port1,
 	return memcmp(&prio_info1, &prio_info2, sizeof(prio_info1)) < 0;
 }
 
-static bool lacp_is_port_better_by_port_config(struct lacp_port *lacp_port1,
-					       struct lacp_port *lacp_port2)
+static bool lacp_port_better_by_port_config(struct lacp_port *lacp_port1,
+					    struct lacp_port *lacp_port2)
 {
 	int prio1 = teamd_port_prio(lacp_port1->ctx, lacp_port1->tdport);
 	int prio2 = teamd_port_prio(lacp_port2->ctx, lacp_port2->tdport);
@@ -397,22 +429,17 @@ static bool lacp_is_port_better_by_port_config(struct lacp_port *lacp_port1,
 	return prio1 > prio2;
 }
 
-static struct lacp_port *lacp_get_best_port(struct lacp *lacp,
-					    lacp_is_port_better_t is_port_better_func)
+static bool lacp_port_better(struct lacp_port *lacp_port1,
+			     struct lacp_port *lacp_port2)
 {
-	struct teamd_port *tdport;
-	struct lacp_port *lacp_port;
-	struct lacp_port *best_lacp_port = NULL;
-
-	teamd_for_each_tdport(tdport, lacp->ctx) {
-		lacp_port = lacp_port_get(lacp, tdport);
-		if (!lacp_port_selectable(lacp_port))
-			continue;
-		if (!best_lacp_port ||
-		    is_port_better_func(lacp_port, best_lacp_port))
-			best_lacp_port = lacp_port;
+	if (!lacp_port2)
+		return true;
+	switch (lacp_port1->lacp->cfg.agg_select_policy) {
+	case LACP_AGG_SELECT_PORT_CONFIG:
+		return lacp_port_better_by_port_config(lacp_port1, lacp_port2);
+	default:
+		return lacp_port_better_by_lacp_prio(lacp_port1, lacp_port2);
 	}
-	return best_lacp_port;
 }
 
 static int lacp_set_carrier(struct lacp *lacp, bool carrier_up)
@@ -452,199 +479,274 @@ static int lacp_update_carrier(struct lacp *lacp)
 	return lacp_set_carrier(lacp, false);
 }
 
-static bool lacp_agg_has_selected_port(struct lacp *lacp,
-				       uint32_t aggregator_id)
-{
-	struct teamd_port *tdport;
-	struct lacp_port *lacp_port;
-
-	teamd_for_each_tdport(tdport, lacp->ctx) {
-		lacp_port = lacp_port_get(lacp, tdport);
-		if (lacp_port->selected &&
-		    lacp_port->aggregator_id == aggregator_id)
-			return true;
-	}
-	return false;
-}
-
-static uint32_t lacp_get_agg_bandwidth(struct lacp *lacp,
-				       uint32_t aggregator_id)
+static uint32_t lacp_get_agg_bandwidth(struct lacp_port *agg_lead)
 {
 	struct teamd_port *tdport;
 	struct lacp_port *lacp_port;
 	uint32_t speed = 0;
 
-	teamd_for_each_tdport(tdport, lacp->ctx) {
-		lacp_port = lacp_port_get(lacp, tdport);
-		if (!lacp_port->selected ||
-		    lacp_port->aggregator_id != aggregator_id)
-			continue;
-		speed += team_get_port_speed(tdport->team_port);
+	teamd_for_each_tdport(tdport, agg_lead->ctx) {
+		lacp_port = lacp_port_get(agg_lead->lacp, tdport);
+		if (lacp_port->agg_lead == agg_lead)
+			speed += team_get_port_speed(tdport->team_port);
 	}
 	return speed;
 }
 
-static uint32_t lacp_get_best_agg_by_bandwidth(struct lacp *lacp)
+static struct lacp_port *lacp_get_best_agg_by_bandwidth(struct lacp *lacp)
 {
 	struct teamd_port *tdport;
 	struct lacp_port *lacp_port;
 	uint32_t speed;
 	uint32_t best_speed = 0;
-	uint32_t best_aggregator_id = 0;
+	struct lacp_port *best_agg_lead = NULL;
 
 	teamd_for_each_tdport(tdport, lacp->ctx) {
 		lacp_port = lacp_port_get(lacp, tdport);
-		if (!lacp_port->selected)
+		if (!lacp_port_selected(lacp_port))
 			continue;
-		speed = lacp_get_agg_bandwidth(lacp, lacp_port->aggregator_id);
+		speed = lacp_get_agg_bandwidth(lacp_port->agg_lead);
 		if (speed > best_speed) {
 			best_speed = speed;
-			best_aggregator_id = lacp_port->aggregator_id;
+			best_agg_lead = lacp_port->agg_lead;
 		}
 	}
-	return best_aggregator_id;
+	return best_agg_lead;
 }
 
-static unsigned int lacp_get_agg_port_count(struct lacp *lacp,
-					    uint32_t aggregator_id)
+static unsigned int lacp_get_agg_port_count(struct lacp_port *agg_lead)
 {
 	struct teamd_port *tdport;
 	struct lacp_port *lacp_port;
 	unsigned int port_count = 0;
 
-	teamd_for_each_tdport(tdport, lacp->ctx) {
-		lacp_port = lacp_port_get(lacp, tdport);
-		if (!lacp_port->selected ||
-		    lacp_port->aggregator_id != aggregator_id)
-			continue;
-		port_count++;
+	teamd_for_each_tdport(tdport, agg_lead->ctx) {
+		lacp_port = lacp_port_get(agg_lead->lacp, tdport);
+		if (lacp_port->agg_lead == agg_lead)
+			port_count++;
 	}
 	return port_count;
 }
 
-static uint32_t lacp_get_best_agg_by_port_count(struct lacp *lacp)
+static struct lacp_port *lacp_get_best_agg_by_port_count(struct lacp *lacp)
 {
 	struct teamd_port *tdport;
 	struct lacp_port *lacp_port;
 	unsigned int port_count;
 	unsigned int best_port_count = 0;
-	uint32_t best_aggregator_id = 0;
+	struct lacp_port *best_agg_lead = NULL;
 
 	teamd_for_each_tdport(tdport, lacp->ctx) {
 		lacp_port = lacp_port_get(lacp, tdport);
-		if (!lacp_port->selected)
+		if (!lacp_port_selected(lacp_port))
 			continue;
-		port_count = lacp_get_agg_port_count(lacp,
-						     lacp_port->aggregator_id);
+		port_count = lacp_get_agg_port_count(lacp_port->agg_lead);
 		if (port_count > best_port_count) {
 			best_port_count = port_count;
-			best_aggregator_id = lacp_port->aggregator_id;
+			best_agg_lead = lacp_port->agg_lead;
 		}
 	}
-	return best_aggregator_id;
+	return best_agg_lead;
 }
 
-static bool lacp_agg_sticky(struct lacp *lacp, uint32_t aggregator_id)
+static struct lacp_port *lacp_get_best_agg_by_best_port(struct lacp *lacp)
+{
+	struct teamd_port *tdport;
+	struct lacp_port *lacp_port;
+	struct lacp_port *best_agg_lead = NULL;
+
+	teamd_for_each_tdport(tdport, lacp->ctx) {
+		lacp_port = lacp_port_get(lacp, tdport);
+		if (!lacp_port_selected(lacp_port))
+			continue;
+		if (lacp_port_better(lacp_port->agg_lead, best_agg_lead))
+			best_agg_lead = lacp_port->agg_lead;
+	}
+	return best_agg_lead;
+}
+
+static bool lacp_agg_sticky(struct lacp_port *agg_lead)
 {
 	struct teamd_port *tdport;
 	struct lacp_port *lacp_port;
 
-	teamd_for_each_tdport(tdport, lacp->ctx) {
-		lacp_port = lacp_port_get(lacp, tdport);
-		if (!lacp_port->selected ||
-		    lacp_port->aggregator_id != aggregator_id)
-			continue;
-		if (lacp_port->cfg.sticky)
+	teamd_for_each_tdport(tdport, agg_lead->ctx) {
+		lacp_port = lacp_port_get(agg_lead->lacp, tdport);
+		if (lacp_port->agg_lead == agg_lead &&
+		    lacp_port->cfg.sticky)
 			return true;
 	}
 	return false;
 }
 
-static int lacp_update_selected(struct lacp *lacp)
+static struct lacp_port *lacp_get_next_agg(struct lacp *lacp)
 {
-	struct lacp_port *best_lacp_port;
-	struct teamd_port *tdport;
-	struct lacp_port *lacp_port;
-	uint32_t aggregator_id;
-	uint32_t best_aggregator_id = 0;
-	lacp_is_port_better_t is_port_better_func;
-	int err;
-
-	/*
-	 * First, unselect all so they will be all free to aggrerate with
-	 * each other.
-	 */
-	teamd_for_each_tdport(tdport, lacp->ctx) {
-		lacp_port = lacp_port_get(lacp, tdport);
-		lacp_port->selected = false;
-		lacp_port->aggregator_id = 0;
-	}
-
-	switch (lacp->cfg.agg_select_policy) {
-	case LACP_AGG_SELECT_PORT_CONFIG:
-		is_port_better_func = lacp_is_port_better_by_port_config;
-		break;
-	default:
-		is_port_better_func = lacp_is_port_better_by_lacp_prio;
-		break;
-	}
-
-	while ((best_lacp_port = lacp_get_best_port(lacp, is_port_better_func))) {
-		/* Use best port ifindex as aggregator id */
-		aggregator_id = best_lacp_port->tdport->ifindex;
-		if (!best_aggregator_id)
-			best_aggregator_id = aggregator_id;
-		teamd_for_each_tdport(tdport, lacp->ctx) {
-			lacp_port = lacp_port_get(lacp, tdport);
-			if (lacp_port_selectable(lacp_port) &&
-			    lacp_ports_aggregable(lacp_port, best_lacp_port)) {
-				lacp_port->selected = true;
-				lacp_port->aggregator_id = aggregator_id;
-			}
-		}
-	}
-
-	/* See if currently selected aggregator is usable */
-	if (!lacp_agg_has_selected_port(lacp, lacp->selected_aggregator_id))
-		lacp->selected_aggregator_id = 0;
+	struct lacp_port *next_agg_lead = lacp->selected_agg_lead;
 
 	switch (lacp->cfg.agg_select_policy) {
 	case LACP_AGG_SELECT_LACP_PRIO:
-		lacp->selected_aggregator_id = best_aggregator_id;
+		next_agg_lead = lacp_get_best_agg_by_best_port(lacp);
 		break;
 	case LACP_AGG_SELECT_LACP_PRIO_STABLE:
-		if (!lacp->selected_aggregator_id)
-			lacp->selected_aggregator_id = best_aggregator_id;
+		if (!lacp->selected_agg_lead)
+			next_agg_lead = lacp_get_best_agg_by_best_port(lacp);
 		break;
 	case LACP_AGG_SELECT_BANDWIDTH:
-		lacp->selected_aggregator_id =
-			lacp_get_best_agg_by_bandwidth(lacp);
+		next_agg_lead = lacp_get_best_agg_by_bandwidth(lacp);
 		break;
 	case LACP_AGG_SELECT_COUNT:
-		lacp->selected_aggregator_id =
-			lacp_get_best_agg_by_port_count(lacp);
+		next_agg_lead = lacp_get_best_agg_by_port_count(lacp);
 		break;
 	case LACP_AGG_SELECT_PORT_CONFIG:
-		if (!lacp_agg_sticky(lacp, lacp->selected_aggregator_id))
-			lacp->selected_aggregator_id = best_aggregator_id;
+		if (!lacp->selected_agg_lead ||
+		    !lacp_agg_sticky(lacp->selected_agg_lead))
+			next_agg_lead = lacp_get_best_agg_by_best_port(lacp);
 		break;
 	}
+	return next_agg_lead;
+}
 
-	/*
-	 * At last, do port enabling/disabling.
-	 */
+static struct lacp_port *lacp_get_agg_lead(struct lacp_port *for_lacp_port)
+{
+	struct lacp *lacp = for_lacp_port->lacp;
+	struct teamd_port *tdport;
+	struct lacp_port *lacp_port;
+
+	teamd_for_each_tdport(tdport, lacp->ctx) {
+		lacp_port = lacp_port_get(lacp, tdport);
+		if (!lacp_port_selected(lacp_port) ||
+		    lacp_port == for_lacp_port)
+			continue;
+		if (lacp_ports_aggregable(lacp_port, for_lacp_port))
+			return lacp_port->agg_lead;
+	}
+	/* If no suitable aggregator found, the port is self-lead. */
+	return for_lacp_port;
+}
+
+static void lacp_switch_agg_lead(struct lacp_port *agg_lead,
+				 struct lacp_port *new_agg_lead)
+{
+	struct lacp *lacp = agg_lead->lacp;
+	struct teamd_port *tdport;
+	struct lacp_port *lacp_port;
+
+	teamd_log_dbg("Renaming aggregator %u to %u",
+		      lacp_agg_id(agg_lead), lacp_agg_id(new_agg_lead));
+	if (lacp->selected_agg_lead == agg_lead)
+		lacp->selected_agg_lead = new_agg_lead;
+	teamd_for_each_tdport(tdport, lacp->ctx) {
+		lacp_port = lacp_port_get(lacp, tdport);
+		if (lacp_port->agg_lead == agg_lead)
+			lacp_port->agg_lead = new_agg_lead;
+	}
+}
+
+static void lacp_port_agg_select(struct lacp_port *lacp_port)
+{
+	struct lacp_port *agg_lead;
+
+	teamd_log_dbg("%s: Selecting LACP port", lacp_port->tdport->ifname);
+	agg_lead = lacp_get_agg_lead(lacp_port);
+	lacp_port->agg_lead = agg_lead;
+	if (lacp_port_better(lacp_port, agg_lead))
+		lacp_switch_agg_lead(agg_lead, lacp_port);
+	teamd_log_dbg("%s: LACP port selected into aggregator %u",
+		      lacp_port->tdport->ifname, lacp_port_agg_id(lacp_port));
+}
+
+static struct lacp_port *lacp_find_new_agg_lead(struct lacp_port *old_agg_lead)
+{
+	struct teamd_port *tdport;
+	struct lacp_port *lacp_port;
+	struct lacp_port *new_agg_lead = NULL;
+
+	teamd_for_each_tdport(tdport, old_agg_lead->ctx) {
+		lacp_port = lacp_port_get(old_agg_lead->lacp, tdport);
+		if (lacp_port->agg_lead == old_agg_lead &&
+		    lacp_port_better(lacp_port, new_agg_lead))
+			new_agg_lead = lacp_port;
+	}
+	return new_agg_lead;
+}
+
+static void lacp_port_agg_unselect(struct lacp_port *lacp_port)
+{
+	struct lacp_port *agg_lead = lacp_port->agg_lead;
+
+	teamd_log_dbg("%s: Unselecting LACP port", lacp_port->tdport->ifname);
+	teamd_log_dbg("%s: LACP port unselected from aggregator %u",
+		      lacp_port->tdport->ifname, lacp_port_agg_id(lacp_port));
+	lacp_port->agg_lead = NULL;
+	if (lacp_port == agg_lead) {
+		/* In case currently unselected port is aggregator lead lead,
+		 * find new one.
+		 */
+		struct lacp_port *new_agg_lead;
+
+		new_agg_lead = lacp_find_new_agg_lead(agg_lead);
+		lacp_switch_agg_lead(agg_lead, new_agg_lead);
+	}
+}
+
+static int lacp_ports_update_enabled(struct lacp *lacp)
+{
+	struct teamd_port *tdport;
+	struct lacp_port *lacp_port;
+	int err;
+
 	teamd_for_each_tdport(tdport, lacp->ctx) {
 		lacp_port = lacp_port_get(lacp, tdport);
 		err = lacp_port_update_enabled(lacp_port);
 		if (err)
 			return err;
 	}
+	return 0;
+}
 
+static int lacp_selected_agg_update(struct lacp *lacp)
+{
+	struct lacp_port *next_agg_lead;
+	int err;
+
+	next_agg_lead = lacp_get_next_agg(lacp);
+	if (lacp->selected_agg_lead != next_agg_lead)
+		teamd_log_dbg("Selecting aggregator %u",
+			      lacp_agg_id(next_agg_lead));
+	lacp->selected_agg_lead = next_agg_lead;
+
+	err = lacp_ports_update_enabled(lacp);
+	if (err)
+		return err;
 	err = lacp_update_carrier(lacp);
 	if (err)
 		return err;
-
 	return 0;
+}
+
+static bool lacp_port_mergeable(struct lacp_port *lacp_port)
+{
+	/* Port can be merged with other aggregator only in case it is
+	 * alone in aggragator and is aggregable with some other port.
+	 */
+	return lacp_port->agg_lead == lacp_port &&
+	       lacp_get_agg_port_count(lacp_port) == 1 &&
+	       lacp_get_agg_lead(lacp_port) != lacp_port;
+}
+
+static int lacp_port_agg_update(struct lacp_port *lacp_port)
+{
+	if (lacp_port_selected(lacp_port) &&
+	    (!lacp_port_selectable(lacp_port) ||
+	     !lacp_port_correct_aggregation(lacp_port) ||
+	     lacp_port_mergeable(lacp_port)))
+		lacp_port_agg_unselect(lacp_port);
+
+	if (!lacp_port_selected(lacp_port) &&
+	    lacp_port_selectable(lacp_port))
+		lacp_port_agg_select(lacp_port);
+
+	return lacp_selected_agg_update(lacp_port->lacp);
 }
 
 static const char slow_addr[ETH_ALEN] = { 0x01, 0x80, 0xC2, 0x00, 0x00, 0x02 };
@@ -778,7 +880,7 @@ static int lacp_port_partner_update(struct lacp_port *lacp_port)
 		lacp_port_periodic_cb_change_enabled(lacp_port);
 
 	lacp_port->__partner_last = lacp_port->partner;
-	return lacp_update_selected(lacp_port->lacp);
+	return lacp_port_agg_update(lacp_port);
 }
 
 static void lacp_port_actor_init(struct lacp_port *lacp_port)
@@ -799,7 +901,7 @@ static int lacp_port_actor_update(struct lacp_port *lacp_port)
 	int err;
 	uint8_t state = 0;
 
-	err = lacp_update_selected(lacp_port->lacp);
+	err = lacp_port_agg_update(lacp_port);
 	if (err)
 		return err;
 
@@ -807,7 +909,7 @@ static int lacp_port_actor_update(struct lacp_port *lacp_port)
 		state |= INFO_STATE_LACP_ACTIVITY;
 	if (lacp_port->lacp->cfg.fast_rate)
 		state |= INFO_STATE_LACP_TIMEOUT;
-	if (lacp_port->selected)
+	if (lacp_port_selected(lacp_port))
 		state |= INFO_STATE_SYNCHRONIZATION;
 	state |= INFO_STATE_COLLECTING | INFO_STATE_DISTRIBUTING;
 	if (lacp_port->state == PORT_STATE_EXPIRED)
@@ -1314,8 +1416,8 @@ static json_t *__fill_lacp_port(struct lacp_port *lacp_port)
 	}
 
 	s_json = json_pack("{s:b, s:i, s:s, s:i, s:i, s:o, s:o}",
-			   "selected", lacp_port->selected,
-			   "aggregator_id", lacp_port->aggregator_id,
+			   "selected", lacp_port_selected(lacp_port),
+			   "aggregator_id", lacp_port_agg_id(lacp_port),
 			   "state", lacp_port_state_name[lacp_port->state],
 			   "key", lacp_port->cfg.lacp_key,
 			   "prio", lacp_port->cfg.lacp_prio,
@@ -1351,7 +1453,7 @@ static int lacp_state_json_dump(struct teamd_context *ctx,
 
 	state_json = json_pack("{s:i, s:b, s:i, s:b}",
 			       "selected_aggregator_id",
-			       lacp->selected_aggregator_id,
+			       lacp_agg_id(lacp->selected_agg_lead),
 			       "active", lacp->cfg.active,
 			       "sys_prio", lacp->cfg.sys_prio,
 			       "fast_rate", lacp->cfg.fast_rate);
