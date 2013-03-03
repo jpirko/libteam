@@ -132,7 +132,7 @@ static void port_priv_fini_all(struct teamd_context *ctx, struct port_obj *port_
 	}
 }
 
-static void port_priv_free_all(struct teamd_context *ctx, struct port_obj *port_obj)
+static void port_priv_free_all(struct port_obj *port_obj)
 {
 	struct port_priv_item *ppitem, *tmp;
 
@@ -165,7 +165,16 @@ static struct port_obj *port_obj_alloc(struct teamd_context *ctx,
 
 static void port_obj_free(struct port_obj *port_obj)
 {
+	port_priv_free_all(port_obj);
 	free(port_obj);
+}
+
+static void port_obj_destroy(struct teamd_context *ctx,
+			     struct port_obj *port_obj)
+{
+	list_del(&port_obj->list);
+	ctx->port_obj_list_count--;
+	port_priv_fini_all(ctx, port_obj);
 }
 
 static int port_obj_create(struct teamd_context *ctx,
@@ -195,22 +204,18 @@ static int port_obj_create(struct teamd_context *ctx,
 teamd_event_port_removed:
 	teamd_event_port_removed(ctx, tdport);
 list_del:
-	list_del(&port_obj->list);
-	ctx->port_obj_list_count--;
+	port_obj_destroy(ctx, port_obj);
 	port_obj_free(port_obj);
 	return err;
 }
 
-static void port_obj_destroy(struct teamd_context *ctx,
-			     struct port_obj *port_obj)
+static void port_obj_remove(struct teamd_context *ctx,
+			    struct port_obj *port_obj)
 {
 	struct teamd_port *tdport = _port(port_obj);
 
 	teamd_event_port_removed(ctx, tdport);
-	list_del(&port_obj->list);
-	ctx->port_obj_list_count--;
-	port_priv_fini_all(ctx, port_obj);
-	port_priv_free_all(ctx, port_obj);
+	port_obj_destroy(ctx, port_obj);
 }
 
 static struct port_obj *get_port_obj(struct teamd_context *ctx,
@@ -275,7 +280,7 @@ static int port_priv_change_handler_func(struct team_handle *th, void *priv,
 				return err;
 		}
 		if (team_is_port_removed(port)) {
-			port_obj_destroy(ctx, port_obj);
+			port_obj_remove(ctx, port_obj);
 			port_obj->to_be_freed = true;
 		}
 	}
