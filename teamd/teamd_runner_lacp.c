@@ -880,7 +880,7 @@ static int lacp_port_partner_update(struct lacp_port *lacp_port)
 		lacp_port_periodic_cb_change_enabled(lacp_port);
 
 	lacp_port->__partner_last = lacp_port->partner;
-	return lacp_port_agg_update(lacp_port);
+	return 0;
 }
 
 static void lacp_port_actor_init(struct lacp_port *lacp_port)
@@ -898,12 +898,7 @@ static int lacpdu_send(struct lacp_port *lacp_port);
 
 static int lacp_port_actor_update(struct lacp_port *lacp_port)
 {
-	int err;
 	uint8_t state = 0;
-
-	err = lacp_port_agg_update(lacp_port);
-	if (err)
-		return err;
 
 	if (lacp_port->lacp->cfg.active)
 		state |= INFO_STATE_LACP_ACTIVITY;
@@ -973,6 +968,11 @@ static int lacp_port_set_state(struct lacp_port *lacp_port,
 		       lacp_port_state_name[lacp_port->state],
 		       lacp_port_state_name[new_state]);
 	lacp_port->state = new_state;
+
+	err = lacp_port_agg_update(lacp_port);
+	if (err)
+		return err;
+
 	return lacp_port_actor_update(lacp_port);
 }
 
@@ -1051,6 +1051,9 @@ static int lacpdu_recv(struct lacp_port *lacp_port)
 		   sizeof(struct lacpdu_info))) {
 		lacp_port->partner = lacpdu.actor;
 		err = lacp_port_partner_update(lacp_port);
+		if (err)
+			return err;
+		err = lacp_port_agg_update(lacp_port);
 		if (err)
 			return err;
 	}
