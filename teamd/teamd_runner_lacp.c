@@ -1391,11 +1391,11 @@ static json_t *__fill_lacpdu_info(struct lacpdu_info *lacpdu_info)
 
 	hwaddr_str(addr_str, (char *) lacpdu_info->system, ETH_ALEN);
 	return json_pack("{s:i, s:s, s:i, s:i, s:i, s:i}",
-			 "system_priority", lacpdu_info->system_priority,
+			 "system_priority", ntohs(lacpdu_info->system_priority),
 			 "system", addr_str,
-			 "key", lacpdu_info->key,
-			 "port_priority", lacpdu_info->port_priority,
-			 "port", lacpdu_info->port,
+			 "key", ntohs(lacpdu_info->key),
+			 "port_priority", ntohs(lacpdu_info->port_priority),
+			 "port", ntohs(lacpdu_info->port),
 			 "state", lacpdu_info->state);
 }
 
