@@ -336,5 +336,6 @@ bool team_is_port_present(struct team_handle *th, struct team_port *port)
 {
 	struct team_ifinfo *ifinfo = team_get_port_ifinfo(port);
 
-	return team_get_ifinfo_master_ifindex(ifinfo) == th->ifindex;
+	return team_get_ifinfo_master_ifindex(ifinfo) == th->ifindex &&
+	       !team_is_port_removed(port);
 }
