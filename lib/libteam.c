@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <syslog.h>
+#include <sys/select.h>
 #include <netlink/netlink.h>
 #include <netlink/genl/genl.h>
 #include <netlink/genl/ctrl.h>
@@ -660,13 +661,51 @@ void team_set_log_priority(struct team_handle *th, int priority)
 	th->log_priority = priority;
 }
 
+static int get_cli_sock_event_fd(struct team_handle *th)
+{
+	return nl_socket_get_fd(th->nl_cli.sock_event);
+}
+
+static int cli_sock_event_handler(struct team_handle *th)
+{
+	nl_recvmsgs_default(th->nl_cli.sock_event);
+	return check_call_change_handlers(th, TEAM_IFINFO_CHANGE);
+}
+
 static int get_sock_event_fd(struct team_handle *th)
 {
 	return nl_socket_get_fd(th->nl_sock_event);
 }
 
+static bool fd_read_ready(int fd)
+{
+	fd_set fds;
+	int fdmax;
+	struct timeval timeout;
+
+	memset(&timeout, 0, sizeof(timeout));
+	FD_ZERO(&fds);
+	FD_SET(fd, &fds);
+	fdmax = fd + 1;
+	while (select(fdmax, &fds, NULL, NULL, &timeout) < 0) {
+		if (errno == EINTR)
+			continue;
+		else
+			return false;
+	}
+	return FD_ISSET(fd, &fds);
+}
+
 static int sock_event_handler(struct team_handle *th)
 {
+	/* First, see if cli socket is ready. In case it is, just skip
+	 * this call what allows cli socket to be handled first. The reason is
+	 * that cli socket message may include information, like master unset,
+	 * which may be handy to have before we proceed.
+	 */
+	if (fd_read_ready(get_cli_sock_event_fd(th)))
+		return 0;
+
 	nl_recvmsgs_default(th->nl_sock_event);
 
 	/*
@@ -680,17 +719,6 @@ static int sock_event_handler(struct team_handle *th)
 
 	return check_call_change_handlers(th, TEAM_PORT_CHANGE |
 					      TEAM_OPTION_CHANGE);
-}
-
-static int get_cli_sock_event_fd(struct team_handle *th)
-{
-	return nl_socket_get_fd(th->nl_cli.sock_event);
-}
-
-static int cli_sock_event_handler(struct team_handle *th)
-{
-	nl_recvmsgs_default(th->nl_cli.sock_event);
-	return check_call_change_handlers(th, TEAM_IFINFO_CHANGE);
 }
 
 struct team_eventfd {
