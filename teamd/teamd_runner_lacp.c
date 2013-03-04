@@ -203,6 +203,11 @@ static uint32_t lacp_port_agg_id(struct lacp_port *lacp_port)
 	return lacp_agg_id(lacp_port->agg_lead);
 }
 
+static bool lacp_port_is_agg_lead(struct lacp_port *lacp_port)
+{
+	return lacp_port->agg_lead == lacp_port;
+}
+
 static const char *lacp_get_agg_select_policy_name(struct lacp *lacp)
 {
 	return lacp_agg_select_policy_names_list[lacp->cfg.agg_select_policy];
@@ -729,7 +734,7 @@ static bool lacp_port_mergeable(struct lacp_port *lacp_port)
 	/* Port can be merged with other aggregator only in case it is
 	 * alone in aggragator and is aggregable with some other port.
 	 */
-	return lacp_port->agg_lead == lacp_port &&
+	return lacp_port_is_agg_lead(lacp_port) &&
 	       lacp_get_agg_port_count(lacp_port) == 1 &&
 	       lacp_get_agg_lead(lacp_port) != lacp_port;
 }
@@ -1448,20 +1453,61 @@ static int lacp_state_json_per_port_dump(struct teamd_context *ctx,
 	return 0;
 }
 
+static json_t *__fill_aggregator(struct lacp *lacp, struct lacp_port *agg_lead)
+{
+	return json_pack("{s:i, s:b}",
+			 "id", lacp_agg_id(agg_lead),
+			 "selected", lacp->selected_agg_lead == agg_lead);
+}
+
+static json_t *__fill_aggregators(struct lacp *lacp)
+{
+	struct teamd_port *tdport;
+	struct lacp_port *lacp_port;
+	json_t *aggs_json;
+	json_t *agg_json;
+	int err;
+
+	aggs_json = json_array();
+	if (!aggs_json)
+		return NULL;
+	teamd_for_each_tdport(tdport, lacp->ctx) {
+		lacp_port = lacp_port_get(lacp, tdport);
+		if (!lacp_port_is_agg_lead(lacp_port))
+			continue;
+		agg_json = __fill_aggregator(lacp, lacp_port);
+		if (!agg_json)
+			goto errout;
+		err = json_array_append_new(aggs_json, agg_json);
+		if (err)
+			goto errout;
+	}
+	return aggs_json;
+errout:
+	json_decref(aggs_json);
+	return NULL;
+}
+
 static int lacp_state_json_dump(struct teamd_context *ctx,
 				json_t **pstate_json, void *priv)
 {
 	struct lacp *lacp = priv;
 	json_t *state_json;
+	json_t *aggs_json;
 
-	state_json = json_pack("{s:i, s:b, s:i, s:b}",
-			       "selected_aggregator_id",
-			       lacp_agg_id(lacp->selected_agg_lead),
+	aggs_json = __fill_aggregators(lacp);
+	if (!aggs_json)
+		return -ENOMEM;
+
+	state_json = json_pack("{s:o, s:b, s:i, s:b}",
+			       "aggregators", aggs_json,
 			       "active", lacp->cfg.active,
 			       "sys_prio", lacp->cfg.sys_prio,
 			       "fast_rate", lacp->cfg.fast_rate);
-	if (!state_json)
+	if (!state_json) {
+		json_decref(aggs_json);
 		return -ENOMEM;
+	}
 	*pstate_json = state_json;
 	return 0;
 }

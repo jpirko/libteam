@@ -287,8 +287,7 @@ static int stateview_json_port_link_watches_process(json_t *port_link_watches_js
 	pr_out("link watches:\n");
 	pr_out_indent_inc();
 	pr_out("link summary: %s\n", boolupdown(up));
-	i = 0;
-	while (i < json_array_size(lw_list_json)) {
+	for (i = 0; i < json_array_size(lw_list_json); i++) {
 		lw_json = json_array_get(lw_list_json, i);
 
 		err = json_unpack(lw_json, "{s:b, s:s, s:o}",
@@ -311,7 +310,6 @@ static int stateview_json_port_link_watches_process(json_t *port_link_watches_js
 			return err;
 		pr_out_indent_dec();
 		pr_out_indent_dec();
-		i++;
 	}
 	pr_out_indent_dec();
 	return 0;
@@ -482,15 +480,15 @@ static int stateview_json_runner_process(char *runner_name, json_t *json)
 		pr_out("active port: %s\n", active_port);
 		pr_out_indent_dec();
 	} else if (!strcmp(runner_name, "lacp")) {
-		int selected_aggregator_id;
+		json_t *agg_list_json;
 		int active;
 		int sys_prio;
 		int fast_rate;
+		int i;
 
 		pr_out("runner:\n");
-		err = json_unpack(json, "{s:{s:i, s:b, s:i, s:b}}", "runner",
-				  "selected_aggregator_id",
-				  &selected_aggregator_id,
+		err = json_unpack(json, "{s:{s:o, s:b, s:i, s:b}}", "runner",
+				  "aggregators", &agg_list_json,
 				  "active", &active,
 				  "sys_prio", &sys_prio,
 				  "fast_rate", &fast_rate);
@@ -499,7 +497,23 @@ static int stateview_json_runner_process(char *runner_name, json_t *json)
 			return -EINVAL;
 		}
 		pr_out_indent_inc();
-		pr_out("selected aggregator ID: %d\n", selected_aggregator_id);
+		for (i = 0; i < json_array_size(agg_list_json); i++) {
+			json_t *agg_json;
+			int agg_id;
+			int agg_selected;
+
+			agg_json = json_array_get(agg_list_json, i);
+			err = json_unpack(agg_json, "{s:i, s:b}",
+				  "id", &agg_id,
+				  "selected", &agg_selected);
+			if (err) {
+				pr_err("Failed to parse JSON aggregator dump.\n");
+				return -EINVAL;
+			}
+			if (agg_selected)
+				pr_out("selected aggregator ID: %d\n", agg_id);
+		}
+
 		pr_out("active: %s\n", boolyesno(active));
 		pr_out("fast rate: %s\n", boolyesno(fast_rate));
 		pr_out2("system priority: %d\n", sys_prio);
