@@ -992,7 +992,7 @@ static int teamd_event_watch_port_added(struct teamd_context *ctx,
 		}
 	}
 	err = json_unpack(port_obj, "{s:i}", "prio", &tmp);
-	if (!err)
+	if (err)
 		tmp = 0;
 	err = team_set_port_priority(ctx->th, tdport->ifindex, tmp);
 	if (err) {
