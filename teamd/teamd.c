@@ -253,7 +253,7 @@ static void teamd_run_loop_set_fds(struct list_item *lcb_list,
 }
 
 static int teamd_run_loop_do_callbacks(struct list_item *lcb_list, fd_set *fds,
-					struct teamd_context *ctx)
+				       struct teamd_context *ctx)
 {
 	struct teamd_loop_callback *lcb;
 	int i;
