@@ -25,6 +25,10 @@ AC_SUBST(LIBTEAM_CURRENT, 1)
 AC_SUBST(LIBTEAM_REVISION, 0)
 AC_SUBST(LIBTEAM_AGE, 0)
 
+AC_SUBST(LIBTEAMDCTL_CURRENT, 0)
+AC_SUBST(LIBTEAMDCTL_REVISION, 0)
+AC_SUBST(LIBTEAMDCTL_AGE, 0)
+
 CFLAGS="$CFLAGS -Wall -Werror"
 
 # Checks for programs.
@@ -62,10 +66,12 @@ AS_IF([test "x$enable_debug" = "xyes"], [
 AC_CONFIG_FILES([Makefile
 include/Makefile \
 libteam/Makefile \
+libteamdctl/Makefile \
 utils/Makefile \
 teamd/Makefile \
 man/Makefile \
 libteam/libteam.pc \
+libteamdctl/libteamdctl.pc \
 binding/Makefile \
 binding/python/Makefile \
 binding/python/setup.py \
