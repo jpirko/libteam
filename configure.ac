@@ -62,7 +62,7 @@ AS_IF([test "x$enable_debug" = "xyes"], [
 AC_CONFIG_FILES([Makefile
 include/Makefile \
 libteam/Makefile \
-src/Makefile \
+utils/Makefile \
 teamd/Makefile \
 man/Makefile \
 libteam/libteam.pc \
