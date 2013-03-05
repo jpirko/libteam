@@ -61,11 +61,11 @@ AS_IF([test "x$enable_debug" = "xyes"], [
 
 AC_CONFIG_FILES([Makefile
 include/Makefile \
-lib/Makefile \
+libteam/Makefile \
 src/Makefile \
 teamd/Makefile \
 man/Makefile \
-lib/libteam.pc \
+libteam/libteam.pc \
 binding/Makefile \
 binding/python/Makefile \
 binding/python/setup.py \

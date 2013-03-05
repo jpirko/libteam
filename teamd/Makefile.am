@@ -9,8 +9,8 @@ AM_CPPFLAGS='-DLOCALSTATEDIR="$(localstatedir)"'
 teamd_CFLAGS= $(LIBDAEMON_CFLAGS) $(JANSSON_CFLAGS) $(DBUS_CFLAGS) -I${top_srcdir}/include -D_GNU_SOURCE
 teamdctl_CFLAGS= $(JANSSON_CFLAGS) $(DBUS_CFLAGS) -I${top_srcdir}/include -D_GNU_SOURCE
 
-teamd_LDADD = $(top_builddir)/lib/libteam.la $(LIBDAEMON_LIBS) $(JANSSON_LIBS) $(DBUS_LIBS)
-teamdctl_LDADD = $(top_builddir)/lib/libteam.la $(JANSSON_LIBS) $(DBUS_LIBS)
+teamd_LDADD = $(top_builddir)/libteam/libteam.la $(LIBDAEMON_LIBS) $(JANSSON_LIBS) $(DBUS_LIBS)
+teamdctl_LDADD = $(top_builddir)/libteam/libteam.la $(JANSSON_LIBS) $(DBUS_LIBS)
 
 bin_PROGRAMS=teamd teamdctl
 teamd_SOURCES=teamd.c teamd_common.c teamd_events.c \
