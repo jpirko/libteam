@@ -163,6 +163,38 @@ void teamdctl_set_log_priority(struct teamdctl *tdc, int priority)
 	tdc->log_priority = priority;
 }
 
+static const struct teamdctl_cli *teamdctl_cli_list[] = {
+	&teamdctl_cli_usock,
+	&teamdctl_cli_dbus,
+};
+
+#define TEAMDCTL_CLI_LIST_SIZE ARRAY_SIZE(teamdctl_cli_list)
+
+static int cli_init(struct teamdctl *tdc, const struct teamdctl_cli *cli)
+{
+	int err;
+
+	if (cli->priv_size) {
+		tdc->cli.priv = myzalloc(cli->priv_size);
+		if (!tdc->cli.priv)
+			return -ENOMEM;
+	}
+	err = cli->init(tdc, tdc->cli.priv);
+	if (err) {
+		if (cli->priv_size)
+			free(tdc->cli.priv);
+		return err;
+	}
+	tdc->cli.cli = cli;
+	return 0;
+}
+
+static void cli_fini(struct teamdctl *tdc)
+{
+	tdc->cli.cli->fini(tdc, tdc->cli.priv);
+	free(tdc->cli.priv);
+}
+
 /**
  * teamdctl_connect:
  * @tdc: libteamdctl library context
@@ -180,6 +212,31 @@ TEAMDCTL_EXPORT
 int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
 		     const char *cli_type)
 {
+	int err = -EINVAL;
+	int i;
+
+	for (i = 0; i < TEAMDCTL_CLI_LIST_SIZE; i++) {
+		const struct teamdctl_cli *cli = teamdctl_cli_list[i];
+
+		if (cli_type && strcmp(cli_type, cli->name))
+			continue;
+		err = cli_init(tdc, cli);
+		if (cli_type) {
+			if (err) {
+				err(tdc, "Failed to connect using CLI \"%s\".",
+				    cli_type);
+				return err;
+			}
+			return 0;
+		} else if (err) {
+			dbg(tdc, "Failed to connect using CLI \"%s\".",
+			    cli_type);
+		}
+	}
+	if (!cli_type && i == TEAMDCTL_CLI_LIST_SIZE) {
+		err(tdc, "Failed to connect using all CLIs.");
+		return err;
+	}
 	return 0;
 }
 
@@ -192,4 +249,5 @@ int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
 TEAMDCTL_EXPORT
 void teamdctl_disconnect(struct teamdctl *tdc)
 {
+	cli_fini(tdc);
 }

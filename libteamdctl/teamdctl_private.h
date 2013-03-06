@@ -29,11 +29,17 @@
  * @short_description: libteamdctl context
  */
 
+struct teamdctl_cli;
+
 struct teamdctl {
 	void (*log_fn)(struct teamdctl *tdc, int priority,
 		       const char *file, int line, const char *fn,
 		       const char *format, va_list args);
 	int log_priority;
+	struct {
+		const struct teamdctl_cli *cli;
+		void *priv;
+	} cli;
 };
 
 /**
@@ -70,5 +76,16 @@ teamdctl_log_null(struct teamdctl *tdc, const char *format, ...) {}
 #  define warn(tdc, arg...) teamdctl_log_null(tdc, ## arg)
 #  define err(tdc, arg...) teamdctl_log_null(tdc, ## arg)
 #endif
+
+struct teamdctl_cli {
+	const char *name;
+	size_t priv_size;
+	int (*init)(struct teamdctl *tdc, void *priv);
+	void (*fini)(struct teamdctl *tdc, void *priv);
+};
+
+/* Cli structures */
+const struct teamdctl_cli teamdctl_cli_usock;
+const struct teamdctl_cli teamdctl_cli_dbus;
 
 #endif /* _TEAMDCTL_PRIVATE_H_ */
