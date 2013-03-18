@@ -80,8 +80,10 @@ teamdctl_log_null(struct teamdctl *tdc, const char *format, ...) {}
 struct teamdctl_cli {
 	const char *name;
 	size_t priv_size;
-	int (*init)(struct teamdctl *tdc, void *priv);
+	int (*init)(struct teamdctl *tdc, const char *team_name, void *priv);
 	void (*fini)(struct teamdctl *tdc, void *priv);
+	int (*method_call)(struct teamdctl *tdc, const char *method_name,
+			   char **p_reply, void *priv, const char *fmt, ...);
 };
 
 /* Cli structures */

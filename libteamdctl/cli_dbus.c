@@ -24,7 +24,7 @@
 struct dbus_priv {
 };
 
-static int dbus_init(struct teamdctl *tdc, void *priv)
+static int dbus_init(struct teamdctl *tdc, const char *team_name, void *priv)
 {
 	return 0;
 }

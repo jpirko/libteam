@@ -29,7 +29,7 @@
 #define TEAMD_USOCK_SUCC_PREFIX	"SUCCESS\n"
 
 static inline void teamd_usock_get_sockpath(char *sockpath, size_t sockpath_len,
-					    char *team_devname)
+					    const char *team_devname)
 {
 	snprintf(sockpath, sockpath_len, TEAMD_RUN_DIR"%s.sock", team_devname);
 }

@@ -170,7 +170,8 @@ static const struct teamdctl_cli *teamdctl_cli_list[] = {
 
 #define TEAMDCTL_CLI_LIST_SIZE ARRAY_SIZE(teamdctl_cli_list)
 
-static int cli_init(struct teamdctl *tdc, const struct teamdctl_cli *cli)
+static int cli_init(struct teamdctl *tdc, const char *team_name,
+		    const struct teamdctl_cli *cli)
 {
 	int err;
 
@@ -179,7 +180,7 @@ static int cli_init(struct teamdctl *tdc, const struct teamdctl_cli *cli)
 		if (!tdc->cli.priv)
 			return -ENOMEM;
 	}
-	err = cli->init(tdc, tdc->cli.priv);
+	err = cli->init(tdc, team_name, tdc->cli.priv);
 	if (err) {
 		if (cli->priv_size)
 			free(tdc->cli.priv);
@@ -220,7 +221,7 @@ int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
 
 		if (cli_type && strcmp(cli_type, cli->name))
 			continue;
-		err = cli_init(tdc, cli);
+		err = cli_init(tdc, team_name, cli);
 		if (cli_type) {
 			if (err) {
 				err(tdc, "Failed to connect using CLI \"%s\".",
