@@ -599,7 +599,7 @@ int team_init(struct team_handle *th, uint32_t ifindex)
  * team_free:
  * @th: libteam library context
  *
- * Do libraty context cleanup.
+ * Do library context cleanup.
  *
  **/
 TEAM_EXPORT

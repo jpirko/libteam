@@ -107,7 +107,7 @@ struct teamdctl *teamdctl_alloc(void)
  * teamdctl_free:
  * @tdc: libteam library context
  *
- * Do libraty context cleanup.
+ * Do library context cleanup.
  *
  **/
 TEAMDCTL_EXPORT
