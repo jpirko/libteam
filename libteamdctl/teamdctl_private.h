@@ -68,7 +68,7 @@ teamdctl_log_null(struct teamdctl *tdc, const char *format, ...) {}
 #    define dbg(tdc, arg...) teamdctl_log_null(tdc, ## arg)
 #  endif
 #  define info(tdc, arg...) teamdctl_log_cond(tdc, LOG_INFO, ## arg)
-#  define warn(tdc, arg...) teamdctl_log_cond(tdc, LOG_WARN, ## arg)
+#  define warn(tdc, arg...) teamdctl_log_cond(tdc, LOG_WARNING, ## arg)
 #  define err(tdc, arg...) teamdctl_log_cond(tdc, LOG_ERR, ## arg)
 #else
 #  define dbg(tdc, arg...) teamdctl_log_null(tdc, ## arg)

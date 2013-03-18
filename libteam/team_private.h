@@ -85,7 +85,7 @@ team_log_null(struct team_handle *th, const char *format, ...) {}
 #    define dbg(th, arg...) team_log_null(th, ## arg)
 #  endif
 #  define info(th, arg...) team_log_cond(th, LOG_INFO, ## arg)
-#  define warn(th, arg...) team_log_cond(th, LOG_WARN, ## arg)
+#  define warn(th, arg...) team_log_cond(th, LOG_WARNING, ## arg)
 #  define err(th, arg...) team_log_cond(th, LOG_ERR, ## arg)
 #else
 #  define dbg(th, arg...) team_log_null(th, ## arg)
