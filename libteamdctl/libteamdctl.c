@@ -94,7 +94,7 @@ struct teamdctl *teamdctl_alloc(void)
 	tdc->log_fn = log_stderr;
 	tdc->log_priority = LOG_ERR;
 	/* environment overwrites config */
-	env = getenv("TEAMD_LOG");
+	env = getenv("TEAMDCTL_LOG");
 	if (env != NULL)
 		teamdctl_set_log_priority(tdc, log_priority(env));
 
