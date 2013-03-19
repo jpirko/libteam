@@ -20,6 +20,7 @@
 #ifndef _TEAMDCTL_PRIVATE_H_
 #define _TEAMDCTL_PRIVATE_H_
 
+#include <syslog.h>
 #include <teamdctl.h>
 
 #define TEAMDCTL_EXPORT __attribute__ ((visibility("default")))
