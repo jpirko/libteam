@@ -232,6 +232,9 @@ int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
 		} else if (err) {
 			dbg(tdc, "Failed to connect using CLI \"%s\".",
 			    cli_type);
+		} else {
+			dbg(tdc, "Connected using CLI \"%s\".", cli->name);
+			return 0;
 		}
 	}
 	if (!cli_type && i == TEAMDCTL_CLI_LIST_SIZE) {
