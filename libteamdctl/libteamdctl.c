@@ -225,13 +225,13 @@ int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
 		if (cli_type) {
 			if (err) {
 				err(tdc, "Failed to connect using CLI \"%s\".",
-				    cli_type);
+				    cli->name);
 				return err;
 			}
 			return 0;
 		} else if (err) {
 			dbg(tdc, "Failed to connect using CLI \"%s\".",
-			    cli_type);
+			    cli->name);
 		} else {
 			dbg(tdc, "Connected using CLI \"%s\".", cli->name);
 			return 0;
