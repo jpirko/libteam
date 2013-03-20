@@ -271,8 +271,12 @@ int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
 			return 0;
 		}
 	}
-	if (!cli_type && i == TEAMDCTL_CLI_LIST_SIZE) {
-		err(tdc, "Failed to connect using all CLIs.");
+	if (i == TEAMDCTL_CLI_LIST_SIZE) {
+		if (!cli_type)
+			err(tdc, "Failed to connect using all CLIs.");
+		else
+			err(tdc, "Failed to connect using unknown CLI \"%s\".",
+				 cli_type);
 		return err;
 	}
 	return 0;
