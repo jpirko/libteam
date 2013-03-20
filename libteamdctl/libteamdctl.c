@@ -177,27 +177,25 @@ static int cli_method_call(struct teamdctl *tdc, const char *method_name,
 	int err;
 
 	va_start(ap, fmt);
-	err = tdc->cli.cli->method_call(tdc, method_name, p_reply,
-					tdc->cli.priv, fmt, ap);
+	err = tdc->cli->method_call(tdc, method_name, p_reply,
+				    tdc->cli_priv, fmt, ap);
 	va_end(ap);
 	return err;
 }
 
-static int cli_init(struct teamdctl *tdc, const char *team_name,
-		    const struct teamdctl_cli *cli)
+static int cli_init(struct teamdctl *tdc, const char *team_name)
 {
 	int err;
 	char *reply;
 
-	if (cli->priv_size) {
-		tdc->cli.priv = myzalloc(cli->priv_size);
-		if (!tdc->cli.priv)
+	if (tdc->cli->priv_size) {
+		tdc->cli_priv = myzalloc(tdc->cli->priv_size);
+		if (!tdc->cli_priv)
 			return -ENOMEM;
 	}
-	err = cli->init(tdc, team_name, tdc->cli.priv);
+	err = tdc->cli->init(tdc, team_name, tdc->cli_priv);
 	if (err)
 		goto free_priv;
-	tdc->cli.cli = cli;
 	err = cli_method_call(tdc, "ConfigDump", &reply, "");
 	if (err)
 		goto free_priv;
@@ -205,15 +203,15 @@ static int cli_init(struct teamdctl *tdc, const char *team_name,
 	return 0;
 
 free_priv:
-	if (cli->priv_size)
-		free(tdc->cli.priv);
+	if (tdc->cli->priv_size)
+		free(tdc->cli_priv);
 	return err;
 }
 
 static void cli_fini(struct teamdctl *tdc)
 {
-	tdc->cli.cli->fini(tdc, tdc->cli.priv);
-	free(tdc->cli.priv);
+	tdc->cli->fini(tdc, tdc->cli_priv);
+	free(tdc->cli_priv);
 }
 
 /**
@@ -241,7 +239,8 @@ int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
 
 		if (cli_type && strcmp(cli_type, cli->name))
 			continue;
-		err = cli_init(tdc, team_name, cli);
+		tdc->cli = cli;
+		err = cli_init(tdc, team_name);
 		if (cli_type) {
 			if (err) {
 				err(tdc, "Failed to connect using CLI \"%s\".",

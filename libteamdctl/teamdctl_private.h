@@ -37,10 +37,8 @@ struct teamdctl {
 		       const char *file, int line, const char *fn,
 		       const char *format, va_list args);
 	int log_priority;
-	struct {
-		const struct teamdctl_cli *cli;
-		void *priv;
-	} cli;
+	const struct teamdctl_cli *cli;
+	void *cli_priv;
 };
 
 /**
