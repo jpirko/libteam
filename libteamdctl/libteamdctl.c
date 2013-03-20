@@ -231,7 +231,7 @@ TEAMDCTL_EXPORT
 int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
 		     const char *cli_type)
 {
-	int err = -EINVAL;
+	int err;
 	int i;
 
 	for (i = 0; i < TEAMDCTL_CLI_LIST_SIZE; i++) {
@@ -260,7 +260,7 @@ int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
 			if (err) {
 				err(tdc, "Failed to connect using CLI \"%s\".",
 				    cli->name);
-				return err;
+				goto err_out;
 			}
 			return 0;
 		} else if (err) {
@@ -277,9 +277,13 @@ int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
 		else
 			err(tdc, "Failed to connect using unknown CLI \"%s\".",
 				 cli_type);
-		return err;
+		err = -EINVAL;
+		goto err_out;
 	}
 	return 0;
+err_out:
+	tdc->cli = NULL;
+	return err;
 }
 
 /**
