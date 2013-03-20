@@ -84,7 +84,8 @@ struct teamdctl_cli {
 	int (*init)(struct teamdctl *tdc, const char *team_name, void *priv);
 	void (*fini)(struct teamdctl *tdc, void *priv);
 	int (*method_call)(struct teamdctl *tdc, const char *method_name,
-			   char **p_reply, void *priv, const char *fmt, ...);
+			   char **p_reply, void *priv,
+			   const char *fmt, va_list ap);
 };
 
 /* Cli structures */

@@ -170,10 +170,24 @@ static const struct teamdctl_cli *teamdctl_cli_list[] = {
 
 #define TEAMDCTL_CLI_LIST_SIZE ARRAY_SIZE(teamdctl_cli_list)
 
+static int cli_method_call(struct teamdctl *tdc, const char *method_name,
+			   char **p_reply, const char *fmt, ...)
+{
+	va_list ap;
+	int err;
+
+	va_start(ap, fmt);
+	err = tdc->cli.cli->method_call(tdc, method_name, p_reply,
+					tdc->cli.priv, fmt, ap);
+	va_end(ap);
+	return err;
+}
+
 static int cli_init(struct teamdctl *tdc, const char *team_name,
 		    const struct teamdctl_cli *cli)
 {
 	int err;
+	char *reply;
 
 	if (cli->priv_size) {
 		tdc->cli.priv = myzalloc(cli->priv_size);
@@ -181,13 +195,19 @@ static int cli_init(struct teamdctl *tdc, const char *team_name,
 			return -ENOMEM;
 	}
 	err = cli->init(tdc, team_name, tdc->cli.priv);
-	if (err) {
-		if (cli->priv_size)
-			free(tdc->cli.priv);
-		return err;
-	}
+	if (err)
+		goto free_priv;
 	tdc->cli.cli = cli;
+	err = cli_method_call(tdc, "ConfigDump", &reply, "");
+	if (err)
+		goto free_priv;
+	free(reply);
 	return 0;
+
+free_priv:
+	if (cli->priv_size)
+		free(tdc->cli.priv);
+	return err;
 }
 
 static void cli_fini(struct teamdctl *tdc)

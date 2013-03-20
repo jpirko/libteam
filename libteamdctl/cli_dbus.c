@@ -80,10 +80,9 @@ static int cli_dbus_get_reply_str(struct teamdctl *tdc, char **p_reply,
 
 static int cli_dbus_method_call(struct teamdctl *tdc, const char *method_name,
 				char **p_reply, void *priv,
-				const char *fmt, ...)
+				const char *fmt, va_list ap)
 {
 	struct cli_dbus_priv *cli_dbus = priv;
-	va_list ap;
 	char *str;
 	DBusMessage *msg;
 	DBusMessageIter iter;
@@ -101,7 +100,6 @@ static int cli_dbus_method_call(struct teamdctl *tdc, const char *method_name,
 		return -ENOMEM;
 	}
 	dbus_message_iter_init_append(msg, &iter);
-	va_start(ap, fmt);
 	while (*fmt) {
 		switch (*fmt++) {
 		case 's': /* string */
@@ -121,7 +119,6 @@ static int cli_dbus_method_call(struct teamdctl *tdc, const char *method_name,
 			goto free_msg;
 		}
 	}
-	va_end(ap);
 
 	dbres = dbus_connection_send_with_reply(cli_dbus->conn, msg,
 						&pending, -1);

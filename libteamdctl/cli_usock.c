@@ -150,10 +150,9 @@ another:
 
 static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 				 char **p_reply, void *priv,
-				 const char *fmt, ...)
+				 const char *fmt, va_list ap)
 {
 	struct cli_usock_priv *cli_usock = priv;
-	va_list ap;
 	char *str;
 	char *msg;
 	int sock = sock;
@@ -165,7 +164,6 @@ static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 	err = asprintf(&msg, "%s\n", method_name);
 	if (err == -1)
 		return -ENOMEM;
-	va_start(ap, fmt);
 	while (*fmt) {
 		switch (*fmt++) {
 		case 's': /* string */
@@ -182,7 +180,6 @@ static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 			goto free_msg;
 		}
 	}
-	va_end(ap);
 
 	err = asprintf(&msg, "%s\n", msg);
 	if (err == -1) {
