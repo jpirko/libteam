@@ -301,3 +301,33 @@ void teamdctl_disconnect(struct teamdctl *tdc)
 	cli_fini(tdc);
 	tdc->cli = NULL;
 }
+
+/**
+ * teamdctl_port_add:
+ * @tdc: libteamdctl library context
+ * @port_devname: port device name
+ *
+ * Adds specified port to team.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAMDCTL_EXPORT
+int teamdctl_port_add(struct teamdctl *tdc, const char *port_devname)
+{
+	return cli_method_call(tdc, "PortAdd", NULL, "s", port_devname);
+}
+
+/**
+ * teamdctl_port_remove:
+ * @tdc: libteamdctl library context
+ * @port_devname: port device name
+ *
+ * Removes specified port from team.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAMDCTL_EXPORT
+int teamdctl_port_remove(struct teamdctl *tdc, const char *port_devname)
+{
+	return cli_method_call(tdc, "PortRemove", NULL, "s", port_devname);
+}
