@@ -234,6 +234,9 @@ int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
 	int err;
 	int i;
 
+	if (tdc->cli)
+		return -EBUSY;
+
 	for (i = 0; i < TEAMDCTL_CLI_LIST_SIZE; i++) {
 		const struct teamdctl_cli *cli = teamdctl_cli_list[i];
 		int orig_log_prio = teamdctl_get_log_priority(tdc);
@@ -296,4 +299,5 @@ TEAMDCTL_EXPORT
 void teamdctl_disconnect(struct teamdctl *tdc)
 {
 	cli_fini(tdc);
+	tdc->cli = NULL;
 }
