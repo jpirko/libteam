@@ -236,11 +236,26 @@ int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
 
 	for (i = 0; i < TEAMDCTL_CLI_LIST_SIZE; i++) {
 		const struct teamdctl_cli *cli = teamdctl_cli_list[i];
+		int orig_log_prio = teamdctl_get_log_priority(tdc);
 
 		if (cli_type && strcmp(cli_type, cli->name))
 			continue;
 		tdc->cli = cli;
+
+		/* In case cli_type is not specified, we will try to connect
+		 * using all avaivable clis. Once some of the cli connects,
+		 * it will be selected. In that case, silence error messages
+		 * that can appear during cli init by setting log priority to
+		 * LOG_EMERG.
+		 */
+		if (!cli_type && orig_log_prio < LOG_DEBUG)
+			teamdctl_set_log_priority(tdc, LOG_EMERG);
+
 		err = cli_init(tdc, team_name);
+
+		/* restore original log priority */
+		teamdctl_set_log_priority(tdc, orig_log_prio);
+
 		if (cli_type) {
 			if (err) {
 				err(tdc, "Failed to connect using CLI \"%s\".",
