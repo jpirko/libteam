@@ -45,8 +45,15 @@ void teamdctl_set_log_priority(struct teamdctl *tdc, int priority);
 int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
 		     const char *cli_type);
 void teamdctl_disconnect(struct teamdctl *tdc);
+int teamdctl_refresh(struct teamdctl *tdc);
 int teamdctl_port_add(struct teamdctl *tdc, const char *port_devname);
 int teamdctl_port_remove(struct teamdctl *tdc, const char *port_devname);
+int teamdctl_port_config_update_raw(struct teamdctl *tdc,
+				    const char *port_devname,
+				    const char *port_config_raw);
+char *teamdctl_config_get_raw(struct teamdctl *tdc);
+char *teamdctl_config_actual_get_raw(struct teamdctl *tdc);
+char *teamdctl_state_get_raw(struct teamdctl *tdc);
 
 #ifdef __cplusplus
 } /* extern "C" */

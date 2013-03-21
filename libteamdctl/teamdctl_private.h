@@ -39,6 +39,11 @@ struct teamdctl {
 	int log_priority;
 	const struct teamdctl_cli *cli;
 	void *cli_priv;
+	struct {
+		char *config;
+		char *config_actual;
+		char *state;
+	} cached_reply;
 };
 
 /**

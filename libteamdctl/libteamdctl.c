@@ -113,6 +113,9 @@ struct teamdctl *teamdctl_alloc(void)
 TEAMDCTL_EXPORT
 void teamdctl_free(struct teamdctl *tdc)
 {
+	free(tdc->cached_reply.config);
+	free(tdc->cached_reply.config_actual);
+	free(tdc->cached_reply.state);
 	free(tdc);
 }
 
@@ -186,7 +189,6 @@ static int cli_method_call(struct teamdctl *tdc, const char *method_name,
 static int cli_init(struct teamdctl *tdc, const char *team_name)
 {
 	int err;
-	char *reply;
 
 	if (tdc->cli->priv_size) {
 		tdc->cli_priv = myzalloc(tdc->cli->priv_size);
@@ -196,10 +198,11 @@ static int cli_init(struct teamdctl *tdc, const char *team_name)
 	err = tdc->cli->init(tdc, team_name, tdc->cli_priv);
 	if (err)
 		goto free_priv;
-	err = cli_method_call(tdc, "ConfigDump", &reply, "");
+
+	/* try to use this cli for refresh right away */
+	err = teamdctl_refresh(tdc);
 	if (err)
 		goto free_priv;
-	free(reply);
 	return 0;
 
 free_priv:
@@ -302,6 +305,34 @@ void teamdctl_disconnect(struct teamdctl *tdc)
 	tdc->cli = NULL;
 }
 
+static void replace_str(char **p_str, char *new)
+{
+	if (*p_str)
+		free(*p_str);
+	*p_str = new;
+}
+
+TEAMDCTL_EXPORT
+int teamdctl_refresh(struct teamdctl *tdc)
+{
+	char *reply;
+	int err;
+
+	err = cli_method_call(tdc, "ConfigDump", &reply, "");
+	if (err)
+		return err;
+	replace_str(&tdc->cached_reply.config, reply);
+	err = cli_method_call(tdc, "ConfigDumpActual", &reply, "");
+	if (err)
+		return err;
+	replace_str(&tdc->cached_reply.config_actual, reply);
+	err = cli_method_call(tdc, "StateDump", &reply, "");
+	if (err)
+		return err;
+	replace_str(&tdc->cached_reply.state, reply);
+	return 0;
+}
+
 /**
  * teamdctl_port_add:
  * @tdc: libteamdctl library context
@@ -330,4 +361,65 @@ TEAMDCTL_EXPORT
 int teamdctl_port_remove(struct teamdctl *tdc, const char *port_devname)
 {
 	return cli_method_call(tdc, "PortRemove", NULL, "s", port_devname);
+}
+
+/**
+ * teamdctl_port_config_update_raw:
+ * @tdc: libteamdctl library context
+ * @port_devname: port device name
+ * @port_config_raw: port config
+ *
+ * Update config for specified port.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAMDCTL_EXPORT
+int teamdctl_port_config_update_raw(struct teamdctl *tdc,
+				    const char *port_devname,
+				    const char *port_config_raw)
+{
+	return cli_method_call(tdc, "PortConfigUpdate", NULL,
+			       "ss", port_devname, port_config_raw);
+}
+
+/**
+ * teamdctl_config_get_raw:
+ * @tdc: libteamdctl library context
+ *
+ * Gets raw config string.
+ *
+ * Returns: pointer to cached config string.
+ **/
+TEAMDCTL_EXPORT
+char *teamdctl_config_get_raw(struct teamdctl *tdc)
+{
+	return tdc->cached_reply.config;
+}
+
+/**
+ * teamdctl_config_actual_get_raw:
+ * @tdc: libteamdctl library context
+ *
+ * Gets raw actual config string.
+ *
+ * Returns: pointer to cached actual config string.
+ **/
+TEAMDCTL_EXPORT
+char *teamdctl_config_actual_get_raw(struct teamdctl *tdc)
+{
+	return tdc->cached_reply.config_actual;
+}
+
+/**
+ * teamdctl_state_get_raw:
+ * @tdc: libteamdctl library context
+ *
+ * Gets raw state string.
+ *
+ * Returns: pointer to cached state string.
+ **/
+TEAMDCTL_EXPORT
+char *teamdctl_state_get_raw(struct teamdctl *tdc)
+{
+	return tdc->cached_reply.state;
 }
