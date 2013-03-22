@@ -48,7 +48,7 @@ static int cli_usock_open(struct teamdctl *tdc,
 	err = connect(sock, (struct sockaddr *) addr,
 		      strlen(addr->sun_path) + sizeof(addr->sun_family));
 	if (err == -1) {
-		err(tdc, "Failed to connect socket.");
+		err(tdc, "Failed to connect socket (%s).", addr->sun_path);
 		close(sock);
 		return -errno;
 	}
@@ -233,11 +233,17 @@ static int cli_usock_init(struct teamdctl *tdc, const char *team_name,
 {
 	struct cli_usock_priv *cli_usock = priv;
 	struct sockaddr_un *addr = &cli_usock->addr;
+	int sock;
+	int err;
 
 	memset(addr, 0, sizeof(*addr));
 	addr->sun_family = AF_UNIX;
 	teamd_usock_get_sockpath(addr->sun_path, sizeof(addr->sun_path),
 				 team_name);
+	err = cli_usock_open(tdc, cli_usock, &sock);
+	if (err)
+		return err;
+	close(sock);
 	return 0;
 }
 
