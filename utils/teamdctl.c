@@ -1,5 +1,5 @@
 /*
- *   teamdctlx.c - Network team device daemon control tool
+ *   teamdctl.c - Network team device daemon control tool
  *   Copyright (C) 2013 Jiri Pirko <jiri@resnulli.us>
  *
  *   This library is free software; you can redistribute it and/or
