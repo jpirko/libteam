@@ -198,13 +198,7 @@ static int cli_init(struct teamdctl *tdc, const char *team_name)
 	err = tdc->cli->init(tdc, team_name, tdc->cli_priv);
 	if (err)
 		goto free_priv;
-
-	/* try to use this cli for refresh right away */
-	err = teamdctl_refresh(tdc);
-	if (err)
-		goto free_priv;
 	return 0;
-
 free_priv:
 	if (tdc->cli->priv_size)
 		free(tdc->cli_priv);
@@ -262,19 +256,13 @@ int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
 		/* restore original log priority */
 		teamdctl_set_log_priority(tdc, orig_log_prio);
 
+		if (!err)
+			break; /* usable cli found */
+
 		if (cli_type) {
-			if (err) {
-				err(tdc, "Failed to connect using CLI \"%s\".",
-				    cli->name);
-				goto err_out;
-			}
-			return 0;
-		} else if (err) {
-			dbg(tdc, "Failed to connect using CLI \"%s\".",
+			err(tdc, "Failed to connect using CLI \"%s\".",
 			    cli->name);
-		} else {
-			dbg(tdc, "Connected using CLI \"%s\".", cli->name);
-			return 0;
+			goto err_out;
 		}
 	}
 	if (i == TEAMDCTL_CLI_LIST_SIZE) {
@@ -286,6 +274,12 @@ int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
 		err = -EINVAL;
 		goto err_out;
 	}
+
+	dbg(tdc, "Connected using CLI \"%s\".", tdc->cli->name);
+
+	err = teamdctl_refresh(tdc);
+	if (err)
+		goto err_out;
 	return 0;
 err_out:
 	tdc->cli = NULL;
