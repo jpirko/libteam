@@ -256,11 +256,12 @@ static int teamd_run_loop_do_callbacks(struct list_item *lcb_list, fd_set *fds,
 				       struct teamd_context *ctx)
 {
 	struct teamd_loop_callback *lcb;
+	struct teamd_loop_callback *tmp;
 	int i;
 	int events;
 	int err;
 
-	list_for_each_node_entry(lcb, lcb_list, list) {
+	list_for_each_node_entry_safe(lcb, tmp, lcb_list, list) {
 		for (i = 0; i < 3; i++) {
 			if (lcb->fd_event& (1 << i)) {
 				events = 0;
