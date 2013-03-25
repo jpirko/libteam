@@ -110,6 +110,7 @@ struct teamd_context {
 		bool			enabled;
 		int			sock;
 		struct sockaddr_un	addr;
+		struct list_item	acc_conn_list;
 	} usock;
 };
 

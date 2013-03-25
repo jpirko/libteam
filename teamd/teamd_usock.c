@@ -27,6 +27,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <private/misc.h>
+#include <private/list.h>
 #include <team.h>
 
 #include "teamd.h"
@@ -35,6 +36,11 @@
 
 struct usock_ops_priv {
 	char *rcv_msg_args;
+	int sock;
+};
+
+struct usock_acc_conn {
+	struct list_item list;
 	int sock;
 };
 
@@ -164,36 +170,92 @@ static int process_rcv_msg(struct teamd_context *ctx, int sock, char *rcv_msg)
 				     &usock_ops_priv);
 }
 
+static void acc_conn_destroy(struct teamd_context *ctx,
+			     struct usock_acc_conn *acc_conn);
+
 #define BUFLEN 2048
 
-static int teamd_usock_recv(int sock, char **pmsg)
+static int callback_usock_acc_conn(struct teamd_context *ctx, int events,
+				   void *priv)
 {
-	ssize_t len;
+	struct usock_acc_conn *acc_conn = priv;
 	char *buf;
+	ssize_t len;
+	int err;
 
 	buf = malloc(BUFLEN);
 	if (!buf)
 		return -ENOMEM;
-	len = recv(sock, buf, BUFLEN - 1, 0);
+	len = recv(acc_conn->sock, buf, BUFLEN - 1, 0);
 	switch (len) {
 	case -1:
 		free(buf);
+		teamd_log_err("usock: Failed to receive data from connection.");
 		return -errno;
 	case 0:
-	default:
-		break;
+		free(buf);
+		acc_conn_destroy(ctx, acc_conn);
+		return 0;
 	}
 	buf[len] = '\0';
-	*pmsg = buf;
+	err = process_rcv_msg(ctx, acc_conn->sock, buf);
+	free(buf);
+	return err;
+}
+
+#define USOCK_ACC_CONN_CB_NAME "usock_acc_conn"
+
+static int acc_conn_create(struct teamd_context *ctx, int sock)
+{
+	struct usock_acc_conn *acc_conn;
+	int err;
+
+	acc_conn = myzalloc(sizeof(*acc_conn));
+	if (!acc_conn) {
+		teamd_log_err("usock: No memory to allocate new connection structure.");
+		return -ENOMEM;
+	}
+	acc_conn->sock = sock;
+	err = teamd_loop_callback_fd_add(ctx, USOCK_ACC_CONN_CB_NAME, acc_conn,
+					 callback_usock_acc_conn,
+					 acc_conn->sock,
+					 TEAMD_LOOP_FD_EVENT_READ);
+	if (err)
+		goto free_acc_conn;
+	teamd_loop_callback_enable(ctx, USOCK_ACC_CONN_CB_NAME, acc_conn);
+	list_add(&ctx->usock.acc_conn_list, &acc_conn->list);
 	return 0;
+
+free_acc_conn:
+	free(acc_conn);
+	return err;
+}
+
+static void acc_conn_destroy(struct teamd_context *ctx,
+			     struct usock_acc_conn *acc_conn)
+{
+
+	teamd_loop_callback_del(ctx, USOCK_ACC_CONN_CB_NAME, acc_conn);
+	close(acc_conn->sock);
+	list_del(&acc_conn->list);
+	free(acc_conn);
+}
+
+static void acc_conn_destroy_all(struct teamd_context *ctx)
+{
+	struct usock_acc_conn *acc_conn;
+	struct usock_acc_conn *tmp;
+
+	list_for_each_node_entry_safe(acc_conn, tmp,
+				      &ctx->usock.acc_conn_list, list)
+		acc_conn_destroy(ctx, acc_conn);
 }
 
 static int callback_usock(struct teamd_context *ctx, int events, void *priv)
 {
-	int sock;
 	struct sockaddr_un addr;
 	socklen_t alen;
-	char *msg = msg;
+	int sock;
 	int err;
 
 	alen = sizeof(addr);
@@ -202,18 +264,12 @@ static int callback_usock(struct teamd_context *ctx, int events, void *priv)
 		teamd_log_err("usock: Failed to accept connection.");
 		return -errno;
 	}
-
-	err = teamd_usock_recv(sock, &msg);
+	err = acc_conn_create(ctx, sock);
 	if (err) {
-		teamd_log_err("usock: Failed to receive data from connection.");
-		goto cleanup;
+		close(sock);
+		return err;
 	}
-	err = process_rcv_msg(ctx, sock, msg);
-	free(msg);
-
-cleanup:
-	close(sock);
-	return err;
+	return 0;
 }
 
 #define USOCK_MAX_CLIENT_COUNT 10
@@ -278,15 +334,16 @@ int teamd_usock_init(struct teamd_context *ctx)
 
 	if (!ctx->usock.enabled)
 		return 0;
+	list_init(&ctx->usock.acc_conn_list);
 	err = teamd_usock_sock_open(ctx);
 	if (err)
 		return err;
 	err = teamd_loop_callback_fd_add(ctx, USOCK_CB_NAME, ctx,
 					 callback_usock, ctx->usock.sock,
 					 TEAMD_LOOP_FD_EVENT_READ);
-	teamd_loop_callback_enable(ctx, USOCK_CB_NAME, ctx);
 	if (err)
 		goto sock_close;
+	teamd_loop_callback_enable(ctx, USOCK_CB_NAME, ctx);
 	return 0;
 sock_close:
 	teamd_usock_sock_close(ctx);
@@ -297,6 +354,7 @@ void teamd_usock_fini(struct teamd_context *ctx)
 {
 	if (!ctx->usock.enabled)
 		return;
+	acc_conn_destroy_all(ctx);
 	teamd_loop_callback_del(ctx, USOCK_CB_NAME, ctx);
 	teamd_usock_sock_close(ctx);
 }
