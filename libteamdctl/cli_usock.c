@@ -29,33 +29,8 @@
 #include "../teamd/teamd_usock.h"
 
 struct cli_usock_priv {
-	struct sockaddr_un addr;
-};
-
-static int cli_usock_open(struct teamdctl *tdc,
-			  struct cli_usock_priv *cli_usock, int *p_sock)
-{
-	struct sockaddr_un *addr = &cli_usock->addr;
 	int sock;
-	int err;
-
-	sock = socket(AF_UNIX, SOCK_STREAM, 0);
-	if (sock == -1) {
-		err(tdc, "Failed to create socket.");
-		return -errno;
-	}
-
-	err = connect(sock, (struct sockaddr *) addr,
-		      strlen(addr->sun_path) + sizeof(addr->sun_family));
-	if (err == -1) {
-		err(tdc, "Failed to connect socket (%s).", addr->sun_path);
-		close(sock);
-		return -errno;
-	}
-
-	*p_sock = sock;
-	return 0;
-}
+};
 
 static int cli_usock_check_error_msg(struct teamdctl *tdc, char *msg)
 {
@@ -155,7 +130,6 @@ static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 	struct cli_usock_priv *cli_usock = priv;
 	char *str;
 	char *msg;
-	int sock = sock;
 	char *recvmsg = recvmsg;
 	char *reply;
 	int err;
@@ -187,17 +161,13 @@ static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 		goto free_msg;
 	}
 
-	err = cli_usock_open(tdc, cli_usock, &sock);
+	err = cli_usock_send(cli_usock->sock, msg);
 	if (err)
 		goto free_msg;
 
-	err = cli_usock_send(sock, msg);
+	err = cli_usock_recv(cli_usock->sock, &recvmsg);
 	if (err)
-		goto close_sock;
-
-	err = cli_usock_recv(sock, &recvmsg);
-	if (err)
-		goto close_sock;
+		goto free_msg;
 
 	err = cli_usock_check_error_msg(tdc, recvmsg);
 	if (err)
@@ -221,8 +191,6 @@ static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 
 free_recvmsg:
 	free(recvmsg);
-close_sock:
-	close(sock);
 free_msg:
 	free(msg);
 	return err;
@@ -232,23 +200,35 @@ static int cli_usock_init(struct teamdctl *tdc, const char *team_name,
 			  void *priv)
 {
 	struct cli_usock_priv *cli_usock = priv;
-	struct sockaddr_un *addr = &cli_usock->addr;
-	int sock;
+	struct sockaddr_un addr;
 	int err;
 
-	memset(addr, 0, sizeof(*addr));
-	addr->sun_family = AF_UNIX;
-	teamd_usock_get_sockpath(addr->sun_path, sizeof(addr->sun_path),
+	memset(&addr, 0, sizeof(addr));
+	addr.sun_family = AF_UNIX;
+	teamd_usock_get_sockpath(addr.sun_path, sizeof(addr.sun_path),
 				 team_name);
-	err = cli_usock_open(tdc, cli_usock, &sock);
-	if (err)
-		return err;
-	close(sock);
+
+	cli_usock->sock = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (cli_usock->sock == -1) {
+		err(tdc, "Failed to create socket.");
+		return -errno;
+	}
+
+	err = connect(cli_usock->sock, (struct sockaddr *) &addr,
+		      strlen(addr.sun_path) + sizeof(addr.sun_family));
+	if (err == -1) {
+		err(tdc, "Failed to connect socket (%s).", addr.sun_path);
+		close(cli_usock->sock);
+		return -errno;
+	}
 	return 0;
 }
 
 void cli_usock_fini(struct teamdctl *tdc, void *priv)
 {
+	struct cli_usock_priv *cli_usock = priv;
+
+	close(cli_usock->sock);
 }
 
 const struct teamdctl_cli teamdctl_cli_usock = {
