@@ -193,9 +193,13 @@ another:
 		return -ENOMEM;
 	}
 	ptr = ptr ? ptr + BUFLEN_STEP : buf;
-	len = recv(acc_conn->sock, ptr, BUFLEN_STEP, 0);
+	len = recv(acc_conn->sock, ptr, BUFLEN_STEP, MSG_DONTWAIT);
 	switch (len) {
 	case -1:
+		if (errno == EAGAIN) {
+			len = 0;
+			break;
+		}
 		free(buf);
 		teamd_log_err("usock: Failed to receive data from connection.");
 		return -errno;
