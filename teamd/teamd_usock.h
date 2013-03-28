@@ -34,4 +34,50 @@ static inline void teamd_usock_get_sockpath(char *sockpath, size_t sockpath_len,
 	snprintf(sockpath, sockpath_len, TEAMD_RUN_DIR"%s.sock", team_devname);
 }
 
+#define TEAMD_USOCK_BUFLEN_STEP 1000
+
+static inline int teamd_usock_recv_msg(int sock, char **p_str)
+{
+	ssize_t len;
+	char *buf = NULL;
+	char *ptr = NULL;
+	size_t buflen = 0;
+	fd_set rfds;
+	int fdmax;
+	int ret;
+
+	FD_ZERO(&rfds);
+	FD_SET(sock, &rfds);
+	fdmax = sock + 1;
+	ret = select(fdmax, &rfds, NULL, NULL, NULL);
+	if (ret == -1)
+		return -errno;
+another:
+	buflen += TEAMD_USOCK_BUFLEN_STEP;
+	buf = realloc(buf, buflen);
+	if (!buf) {
+		free(buf);
+		return -ENOMEM;
+	}
+	ptr = ptr ? ptr + TEAMD_USOCK_BUFLEN_STEP : buf;
+	len = recv(sock, ptr, TEAMD_USOCK_BUFLEN_STEP, MSG_DONTWAIT);
+	switch (len) {
+	case -1:
+		if (errno == EAGAIN) {
+			len = 0;
+			break;
+		}
+		free(buf);
+		return -errno;
+	case TEAMD_USOCK_BUFLEN_STEP:
+		goto another;
+	case 0:
+		free(buf);
+		/* use EPIPE to tell caller the connection was broken */
+		return -EPIPE;
+	}
+	ptr[len] = '\0';
+	*p_str = buf;
+	return 0;
+}
 #endif /* _TEAMD_USOCK_H_ */

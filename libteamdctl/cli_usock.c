@@ -90,39 +90,6 @@ static int cli_usock_send(int sock, char *msg)
 	return 0;
 }
 
-#define BUFLEN_STEP 1000
-
-static int cli_usock_recv(int sock, char **pmsg)
-{
-	ssize_t len;
-	char *buf = NULL;
-	char *ptr = NULL;
-	size_t buflen = 0;
-
-another:
-	buflen += BUFLEN_STEP;
-	buf = realloc(buf, buflen);
-	if (!buf) {
-		free(buf);
-		return -ENOMEM;
-	}
-	ptr = ptr ? ptr + BUFLEN_STEP : buf;
-	len = recv(sock, ptr, BUFLEN_STEP, 0);
-	switch (len) {
-	case -1:
-		free(buf);
-		return -errno;
-	case BUFLEN_STEP:
-		goto another;
-	case 0:
-	default:
-		break;
-	}
-	ptr[len] = '\0';
-	*pmsg = buf;
-	return 0;
-}
-
 static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 				 char **p_reply, void *priv,
 				 const char *fmt, va_list ap)
@@ -165,7 +132,7 @@ static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 	if (err)
 		goto free_msg;
 
-	err = cli_usock_recv(cli_usock->sock, &recvmsg);
+	err = teamd_usock_recv_msg(cli_usock->sock, &recvmsg);
 	if (err)
 		goto free_msg;
 

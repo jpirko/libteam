@@ -173,46 +173,23 @@ static int process_rcv_msg(struct teamd_context *ctx, int sock, char *rcv_msg)
 static void acc_conn_destroy(struct teamd_context *ctx,
 			     struct usock_acc_conn *acc_conn);
 
-#define BUFLEN_STEP 1000
-
 static int callback_usock_acc_conn(struct teamd_context *ctx, int events,
 				   void *priv)
 {
 	struct usock_acc_conn *acc_conn = priv;
-	ssize_t len;
-	char *buf = NULL;
-	char *ptr = NULL;
-	size_t buflen = 0;
+	char *msg = msg;
 	int err;
 
-another:
-	buflen += BUFLEN_STEP;
-	buf = realloc(buf, buflen);
-	if (!buf) {
-		free(buf);
-		return -ENOMEM;
-	}
-	ptr = ptr ? ptr + BUFLEN_STEP : buf;
-	len = recv(acc_conn->sock, ptr, BUFLEN_STEP, MSG_DONTWAIT);
-	switch (len) {
-	case -1:
-		if (errno == EAGAIN) {
-			len = 0;
-			break;
-		}
-		free(buf);
-		teamd_log_err("usock: Failed to receive data from connection.");
-		return -errno;
-	case BUFLEN_STEP:
-		goto another;
-	case 0:
-		free(buf);
+	err = teamd_usock_recv_msg(acc_conn->sock, &msg);
+	if (err == -EPIPE) {
 		acc_conn_destroy(ctx, acc_conn);
 		return 0;
+	} else if (err) {
+		teamd_log_err("usock: Failed to receive data from connection.");
+		return err;
 	}
-	ptr[len] = '\0';
-	err = process_rcv_msg(ctx, acc_conn->sock, buf);
-	free(buf);
+	err = process_rcv_msg(ctx, acc_conn->sock, msg);
+	free(msg);
 	return err;
 }
 
