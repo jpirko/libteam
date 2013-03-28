@@ -44,29 +44,6 @@ struct usock_acc_conn {
 	int sock;
 };
 
-static void __getarg(char *str, char **pstart, char **prest)
-{
-	char *start = NULL;
-	char *rest = NULL;
-
-	if (!str)
-		return;
-	while (1) {
-		if (*str == '\0')
-			break;
-		if ((*str != '\n') && !start)
-			start = str;
-		if ((*str == '\n') && start) {
-			*str = '\0';
-			rest = str + 1;
-			break;
-		}
-		str++;
-	}
-	*pstart = start;
-	*prest = rest;
-}
-
 static int usock_op_get_args(void *ops_priv, const char *fmt, ...)
 {
 	va_list ap;
@@ -80,7 +57,7 @@ static int usock_op_get_args(void *ops_priv, const char *fmt, ...)
 		switch (*fmt++) {
 		case 's': /* string */
 			pstr = va_arg(ap, char **);
-			__getarg(rest, &str, &rest);
+			str = teamd_usock_msg_getline(&rest);
 			if (!str) {
 				teamd_log_err("Insufficient number of arguments in message.");
 				return -EINVAL;
@@ -103,7 +80,7 @@ static int usock_op_reply_err(void *ops_priv, const char *err_code,
 	char *strbuf;
 	int err;
 
-	err = asprintf(&strbuf, "%s%s\n%s\n", TEAMD_USOCK_ERR_PREFIX,
+	err = asprintf(&strbuf, "%s\n%s\n%s\n", TEAMD_USOCK_REPLY_ERR_PREFIX,
 		       err_code, err_msg);
 	if (err == -1)
 		return -errno;
@@ -120,7 +97,7 @@ static int usock_op_reply_succ(void *ops_priv, const char *msg)
 	char *strbuf;
 	int err;
 
-	err = asprintf(&strbuf, "%s%s", TEAMD_USOCK_SUCC_PREFIX,
+	err = asprintf(&strbuf, "%s\n%s", TEAMD_USOCK_REPLY_SUCC_PREFIX,
 		       msg ? msg : "");
 	if (err == -1)
 		return -errno;
@@ -140,29 +117,31 @@ static const struct teamd_ctl_method_ops teamd_usock_ctl_method_ops = {
 static int process_rcv_msg(struct teamd_context *ctx, int sock, char *rcv_msg)
 {
 	struct usock_ops_priv usock_ops_priv;
-	char *rcv_msg_args;
 	char *str;
+	char *rest = rcv_msg;
 
-	str = strstr(rcv_msg, "\n\n");
-	if (!str || strchr(rcv_msg, '\0') < str) {
-		teamd_log_dbg("usock: Incomplete command.");
-		return 0;
-	}
-	*str = '\0';
-
-	__getarg(rcv_msg, &str, &rcv_msg_args);
+	str = teamd_usock_msg_getline(&rest);
 	if (!str) {
-		teamd_log_dbg("usock: Incomplete command.");
+		teamd_log_dbg("usock: Incomplete message.");
+		return 0;
+	}
+	if (strcmp(TEAMD_USOCK_REQUEST_PREFIX, str)) {
+		teamd_log_dbg("usock: Unsupported message type.");
 		return 0;
 	}
 
+	str = teamd_usock_msg_getline(&rest);
+	if (!str) {
+		teamd_log_dbg("usock: Incomplete message.");
+		return 0;
+	}
 	if (!teamd_ctl_method_exists(str)) {
 		teamd_log_dbg("usock: Unknown method \"%s\".", str);
 		return 0;
 	}
 
 	usock_ops_priv.sock = sock;
-	usock_ops_priv.rcv_msg_args = rcv_msg_args;
+	usock_ops_priv.rcv_msg_args = rest;
 
 	teamd_log_dbg("usock: calling method \"%s\"", str);
 

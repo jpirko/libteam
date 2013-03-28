@@ -27,8 +27,9 @@
 
 #include "teamd.h"
 
-#define TEAMD_USOCK_ERR_PREFIX	"ERROR\n"
-#define TEAMD_USOCK_SUCC_PREFIX	"SUCCESS\n"
+#define TEAMD_USOCK_REQUEST_PREFIX	"REQUEST"
+#define TEAMD_USOCK_REPLY_ERR_PREFIX	"REPLY_ERROR"
+#define TEAMD_USOCK_REPLY_SUCC_PREFIX	"REPLY_SUCCESS"
 
 static inline void teamd_usock_get_sockpath(char *sockpath, size_t sockpath_len,
 					    const char *team_devname)
@@ -64,4 +65,29 @@ static inline int teamd_usock_recv_msg(int sock, char **p_str)
 	*p_str = buf;
 	return 0;
 }
+
+static inline char *teamd_usock_msg_getline(char **p_rest)
+{
+	char *start = NULL;
+	char *rest = NULL;
+	char *str = *p_rest;
+
+	if (!str)
+		return NULL;
+	while (1) {
+		if (*str == '\0')
+			break;
+		if ((*str != '\n') && !start)
+			start = str;
+		if ((*str == '\n') && start) {
+			*str = '\0';
+			rest = str + 1;
+			break;
+		}
+		str++;
+	}
+	*p_rest = rest;
+	return start;
+}
+
 #endif /* _TEAMD_USOCK_H_ */

@@ -32,52 +32,39 @@ struct cli_usock_priv {
 	int sock;
 };
 
-static int cli_usock_check_error_msg(struct teamdctl *tdc, char *msg)
+static int cli_usock_process_msg(struct teamdctl *tdc, char *msg,
+				 char **p_replystr)
 {
 	char *str;
-	char *str2;
+	char *rest = msg;
 
-	if (!strncmp(TEAMD_USOCK_SUCC_PREFIX, msg,
-		     strlen(TEAMD_USOCK_SUCC_PREFIX)))
-		return 0;
-	if (strncmp(TEAMD_USOCK_ERR_PREFIX, msg,
-		    strlen(TEAMD_USOCK_ERR_PREFIX)))
-		goto corrupted;
+	str = teamd_usock_msg_getline(&rest);
+	if (!str) {
+		err(tdc, "usock: Incomplete message.\n");
+		return -EINVAL;;
+	}
 
-	str = strchr(msg, '\n');
-	if (!str || str[1] == '\0')
-		goto corrupted;
-	str++;
-
-	str2 = strchr(str, '\n');
-	if (!str2 || str2[1] == '\0')
-		goto corrupted;
-	str2[0] = '\0';
-	str2++;
-
-	err(tdc, "Error message received: \"%s\"", str);
-
-	str = strchr(str2, '\n');
-	if (!str)
-		goto corrupted;
-	str[0] = '\0';
-
-	err(tdc, "Error message content: \"%s\"", str2);
-
+	if (!strcmp(TEAMD_USOCK_REPLY_SUCC_PREFIX, str)) {
+		*p_replystr = rest;
+	} else if (!strcmp(TEAMD_USOCK_REPLY_ERR_PREFIX, str)) {
+		str = teamd_usock_msg_getline(&rest);
+		if (!str) {
+			err(tdc, "usock: Incomplete message.\n");
+			return -EINVAL;;
+		}
+		err(tdc, "Error message received: \"%s\"", str);
+		str = teamd_usock_msg_getline(&rest);
+		if (!str) {
+			err(tdc, "usock: Incomplete message.\n");
+			return -EINVAL;;
+		}
+		err(tdc, "Error message content: \"%s\"", str);
+		return -EINVAL;;
+	} else {
+		err(tdc, "Unsupported message type.\n");
+		return -EINVAL;
+	}
 	return 0;
-corrupted:
-	err(tdc, "Corrupted message received.");
-	return -EINVAL;
-}
-
-static char *cli_usock_get_reply_str(char *msg)
-{
-	char *str;
-
-	str = strchr(msg, '\n');
-	if (str)
-		str++;
-	return str;
 }
 
 static int cli_usock_send(int sock, char *msg)
@@ -136,11 +123,12 @@ static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 	char *str;
 	char *msg = NULL;
 	char *recvmsg = recvmsg;
-	char *reply;
+	char *replystr;
 	int err;
 
 	dbg(tdc, "Calling method \"%s\"", method_name);
-	err= myasprintf(&msg, "%s\n", method_name);
+	err= myasprintf(&msg, "%s\n%s\n", TEAMD_USOCK_REQUEST_PREFIX,
+					  method_name);
 	if (err)
 		return err;
 	while (*fmt) {
@@ -158,10 +146,6 @@ static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 		}
 	}
 
-	err = myasprintf(&msg, "%s\n", msg);
-	if (err)
-		goto free_msg;
-
 	err = cli_usock_send(cli_usock->sock, msg);
 	if (err)
 		goto free_msg;
@@ -177,24 +161,17 @@ static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 	if (err)
 		goto free_msg;
 
-	err = cli_usock_check_error_msg(tdc, recvmsg);
+	err = cli_usock_process_msg(tdc, recvmsg, &replystr);
 	if (err)
 		goto free_recvmsg;
 
-	reply = cli_usock_get_reply_str(recvmsg);
-	if (!reply) {
-		err(tdc, "Corrupted message received.");
-		err = -EINVAL;
-		goto free_recvmsg;
-	}
-
 	if (p_reply) {
-		reply = strdup(reply);
-		if (!reply) {
+		replystr = strdup(replystr);
+		if (!replystr) {
 			err = -ENOMEM;
 			goto free_recvmsg;
 		}
-		*p_reply = reply;
+		*p_reply = replystr;
 	}
 
 free_recvmsg:
