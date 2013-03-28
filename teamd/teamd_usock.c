@@ -274,7 +274,7 @@ static int teamd_usock_sock_open(struct teamd_context *ctx)
 	if (err)
 		return err;
 
-	sock = socket(AF_UNIX, SOCK_STREAM, 0);
+	sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
 	if (sock == -1) {
 		teamd_log_err("usock: Failed to create socket.");
 		return -errno;

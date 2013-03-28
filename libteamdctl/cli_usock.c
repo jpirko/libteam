@@ -175,7 +175,7 @@ static int cli_usock_init(struct teamdctl *tdc, const char *team_name,
 	teamd_usock_get_sockpath(addr.sun_path, sizeof(addr.sun_path),
 				 team_name);
 
-	cli_usock->sock = socket(AF_UNIX, SOCK_STREAM, 0);
+	cli_usock->sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
 	if (cli_usock->sock == -1) {
 		err(tdc, "Failed to create socket.");
 		return -errno;
