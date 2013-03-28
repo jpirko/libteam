@@ -181,7 +181,7 @@ static int callback_usock_acc_conn(struct teamd_context *ctx, int events,
 	int err;
 
 	err = teamd_usock_recv_msg(acc_conn->sock, &msg);
-	if (err == -EPIPE) {
+	if (err == -EPIPE || err == -ECONNRESET) {
 		acc_conn_destroy(ctx, acc_conn);
 		return 0;
 	} else if (err) {
