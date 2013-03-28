@@ -90,30 +90,44 @@ static int cli_usock_send(int sock, char *msg)
 	return 0;
 }
 
+static int myasprintf(char **p_str, const char *fmt, ...)
+{
+	char *newstr;
+	va_list ap;
+	int ret;
+
+	va_start(ap, fmt);
+	ret = vasprintf(&newstr, fmt, ap);
+	va_end(ap);
+	if (ret == -1)
+		return -ENOMEM;
+	free(*p_str);
+	*p_str = newstr;
+	return 0;
+}
+
 static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 				 char **p_reply, void *priv,
 				 const char *fmt, va_list ap)
 {
 	struct cli_usock_priv *cli_usock = priv;
 	char *str;
-	char *msg;
+	char *msg = NULL;
 	char *recvmsg = recvmsg;
 	char *reply;
 	int err;
 
 	dbg(tdc, "Calling method \"%s\"", method_name);
-	err = asprintf(&msg, "%s\n", method_name);
-	if (err == -1)
-		return -ENOMEM;
+	err= myasprintf(&msg, "%s\n", method_name);
+	if (err)
+		return err;
 	while (*fmt) {
 		switch (*fmt++) {
 		case 's': /* string */
 			str = va_arg(ap, char *);
-			err = asprintf(&msg, "%s%s\n", msg, str);
-			if (err == -1) {
-				err = -ENOMEM;
+			err = myasprintf(&msg, "%s%s\n", msg, str);
+			if (err)
 				goto free_msg;
-			}
 			break;
 		default:
 			err(tdc, "Unknown argument type requested.");
@@ -122,11 +136,9 @@ static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 		}
 	}
 
-	err = asprintf(&msg, "%s\n", msg);
-	if (err == -1) {
-		err = -ENOMEM;
+	err = myasprintf(&msg, "%s\n", msg);
+	if (err)
 		goto free_msg;
-	}
 
 	err = cli_usock_send(cli_usock->sock, msg);
 	if (err)
