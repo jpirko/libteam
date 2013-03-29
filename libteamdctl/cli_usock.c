@@ -90,6 +90,28 @@ static int cli_usock_send(int sock, char *msg)
 	return 0;
 }
 
+#define WAIT_USEC 500000
+
+static int cli_usock_wait_recv(int sock)
+{
+	fd_set rfds;
+	int fdmax;
+	int ret;
+	struct timeval tv;
+
+	tv.tv_sec = 0;
+	tv.tv_usec = WAIT_USEC;
+	FD_ZERO(&rfds);
+	FD_SET(sock, &rfds);
+	fdmax = sock + 1;
+	ret = select(fdmax, &rfds, NULL, NULL, &tv);
+	if (ret == -1)
+		return -errno;
+	if (!FD_ISSET(sock, &rfds))
+		return -ETIMEDOUT;
+	return 0;
+}
+
 static int myasprintf(char **p_str, const char *fmt, ...)
 {
 	char *newstr;
@@ -143,6 +165,13 @@ static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 	err = cli_usock_send(cli_usock->sock, msg);
 	if (err)
 		goto free_msg;
+
+	err = cli_usock_wait_recv(cli_usock->sock);
+	if (err) {
+		if (err == -ETIMEDOUT)
+			dbg(tdc, "Wait for reply timed-out.");
+		goto free_msg;
+	}
 
 	err = teamd_usock_recv_msg(cli_usock->sock, &recvmsg);
 	if (err)

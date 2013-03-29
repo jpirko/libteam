@@ -41,16 +41,7 @@ static inline int teamd_usock_recv_msg(int sock, char **p_str)
 	ssize_t len;
 	int expected_len;
 	char *buf;
-	fd_set rfds;
-	int fdmax;
 	int ret;
-
-	FD_ZERO(&rfds);
-	FD_SET(sock, &rfds);
-	fdmax = sock + 1;
-	ret = select(fdmax, &rfds, NULL, NULL, NULL);
-	if (ret == -1)
-		return -errno;
 
 	ret = ioctl(sock, SIOCINQ, &expected_len);
 	if (ret == -1)
