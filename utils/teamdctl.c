@@ -956,12 +956,13 @@ int main(int argc, char **argv)
 	err = teamdctl_connect(tdc, team_devname,
 			       force_usock ? "usock" : (force_dbus ? "dbus" : NULL));
 	if (err) {
-		pr_err("teamdctl_connect failed\n");
+		pr_err("teamdctl_connect failed (%s)\n", strerror(-err));
 		ret = EXIT_FAILURE;
 		goto teamdctl_free;
 	}
 	err = call_command(tdc, argc, argv, command_type);
 	if (err) {
+		pr_err("command call failed (%s)\n", strerror(-err));
 		ret = EXIT_FAILURE;
 		goto teamdctl_disconnect;
 	}
