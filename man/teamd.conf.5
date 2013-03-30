@@ -1,4 +1,6 @@
 .TH teamd.conf 5 "1 September 2012" "libteam"
+.SH NAME
+teamd.conf -- libteam daemon configuration file
 .SH DESCRIPTION
 .PP
 teamd uses JSON format configuration. Here comes a list of config options.
@@ -290,7 +292,7 @@ Very basic config.
   "link_watch": {"name": "ethtool"},
   "ports": {
     "eth1": {
-      "prio": -10,
+      "prio": \-10,
       "sticky": true
     },
     "eth2": {
@@ -313,7 +315,7 @@ This config uses active-backup runner with ethtool linkwatch. Port eth2 has bigg
   },
   "ports": {
     "eth1": {
-      "prio": -10,
+      "prio": \-10,
       "sticky": true
     },
     "eth2": {
@@ -338,7 +340,7 @@ Similar to the previous one. Ony difference that link changes are not proparated
   },
   "ports": {
     "eth1": {
-      "prio": -10,
+      "prio": \-10,
       "sticky": true
     },
     "eth2": {
@@ -372,7 +374,7 @@ This config uses APR ping link watch.
 ],
 "ports": {
   "eth1": {
-    "prio": -10,
+    "prio": \-10,
     "sticky": true
   },
   "eth2": {
