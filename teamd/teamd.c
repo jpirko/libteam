@@ -1440,7 +1440,7 @@ static int teamd_start(struct teamd_context *ctx)
 
 	daemon_retval_send(0);
 
-	teamd_log_info(PACKAGE_VERSION" sucessfully started.");
+	teamd_log_info(PACKAGE_VERSION" successfully started.");
 
 	err = teamd_run_loop_run(ctx);
 
