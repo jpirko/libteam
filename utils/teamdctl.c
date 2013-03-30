@@ -62,7 +62,7 @@ static void pr_out_indent_dec(void)
 #define pr_err(args...) fprintf(stderr, ##args)
 #define pr_outx(verb_level, args...) \
 	if (verb_level <= g_verbosity) { \
-		fprintf(stdout, g_indent_str); \
+		fprintf(stdout, "%s", g_indent_str); \
 		fprintf(stdout, ##args); \
 	}
 #define pr_out(args...) pr_outx(DEFAULT_VERB, ##args)
