@@ -34,6 +34,7 @@
  */
 
 struct team_handle {
+	int			event_fd;
 	struct nl_sock *	nl_sock;
 	int			nl_sock_err;
 	struct nl_sock *	nl_sock_event;

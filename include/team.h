@@ -48,6 +48,8 @@ void team_set_log_fn(struct team_handle *th,
 				    const char *format, va_list args));
 int team_get_log_priority(struct team_handle *th);
 void team_set_log_priority(struct team_handle *th, int priority);
+int team_get_event_fd(struct team_handle *th);
+int team_handle_events(struct team_handle *th);
 int team_check_events(struct team_handle *th);
 int team_get_mode_name(struct team_handle *th, char **mode_name);
 int team_set_mode_name(struct team_handle *th, const char *mode_name);
@@ -73,7 +75,7 @@ struct team_ifinfo;
 struct team_ifinfo *team_get_ifinfo(struct team_handle *th);
 
 /*
- * team_eventfd
+ * team_eventfd - DEPRECATED
  *
  * access to list of event handlers
  */
@@ -85,9 +87,11 @@ const struct team_eventfd *team_get_next_eventfd(struct team_handle *th,
 	for (eventfd = team_get_next_eventfd(th, NULL); eventfd;	\
 	     eventfd = team_get_next_eventfd(th, eventfd))
 int team_get_eventfd_fd(struct team_handle *th,
-			const struct team_eventfd *eventfd);
+			const struct team_eventfd *eventfd)
+			__attribute__((deprecated));
 int team_call_eventfd_handler(struct team_handle *th,
-			      const struct team_eventfd *eventfd);
+			      const struct team_eventfd *eventfd)
+			      __attribute__((deprecated));
 
 /*
  * team_port

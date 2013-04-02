@@ -621,9 +621,7 @@ static int callback_daemon_signal(struct teamd_context *ctx, int events,
 static int callback_libteam_event(struct teamd_context *ctx, int events,
 				  void *priv)
 {
-	const struct team_eventfd *eventfd = priv;
-
-	return team_call_eventfd_handler(ctx->th, eventfd);
+	return team_handle_events(ctx->th);
 }
 
 #define DAEMON_CB_NAME "daemon"
@@ -632,7 +630,6 @@ static int callback_libteam_event(struct teamd_context *ctx, int events,
 static int teamd_run_loop_init(struct teamd_context *ctx)
 {
 	int fds[2];
-	const struct team_eventfd *eventfd;
 	int err;
 
 	list_init(&ctx->run_loop.callback_list);
@@ -651,25 +648,21 @@ static int teamd_run_loop_init(struct teamd_context *ctx)
 		goto close_pipe;
 	}
 
-	team_for_each_event_fd(eventfd, ctx->th) {
-		int fd = team_get_eventfd_fd(ctx->th, eventfd);
-		err = teamd_loop_callback_fd_add(ctx, LIBTEAM_EVENTS_CB_NAME,
-						 (void *) eventfd,
-						 callback_libteam_event,
-						 fd, TEAMD_LOOP_FD_EVENT_READ);
-		if (err) {
-			teamd_log_err("Failed to add libteam event loop callback");
-			goto unroll_libteam_events_callbacks;
-		}
+	err = teamd_loop_callback_fd_add(ctx, LIBTEAM_EVENTS_CB_NAME, ctx,
+					 callback_libteam_event,
+					 team_get_event_fd(ctx->th),
+					 TEAMD_LOOP_FD_EVENT_READ);
+	if (err) {
+		teamd_log_err("Failed to add libteam event loop callback");
+		goto del_daemon_callback;
 	}
 
 	teamd_loop_callback_enable(ctx, DAEMON_CB_NAME, ctx);
-	teamd_loop_callback_enable(ctx, LIBTEAM_EVENTS_CB_NAME, NULL);
+	teamd_loop_callback_enable(ctx, LIBTEAM_EVENTS_CB_NAME, ctx);
 
 	return 0;
 
-unroll_libteam_events_callbacks:
-	teamd_loop_callback_del(ctx, LIBTEAM_EVENTS_CB_NAME, NULL);
+del_daemon_callback:
 	teamd_loop_callback_del(ctx, DAEMON_CB_NAME, ctx);
 
 close_pipe:

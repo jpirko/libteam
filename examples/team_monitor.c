@@ -45,17 +45,12 @@ static void do_main_loop(struct team_handle *th)
 	fd_set rfds_tmp;
 	int fdmax;
 	int ret;
-	const struct team_eventfd *eventfd;
+	int tfd;
 
 	FD_ZERO(&rfds);
-	fdmax = 0;
-	team_for_each_event_fd(eventfd, th) {
-		int fd = team_get_eventfd_fd(th, eventfd);
-		FD_SET(fd, &rfds);
-		if (fd > fdmax)
-			fdmax = fd;
-	}
-	fdmax++;
+	tfd = team_get_event_fd(th);
+	FD_SET(tfd, &rfds);
+	fdmax = tfd + 1;
 
 	while (1) {
 		rfds_tmp = rfds;
@@ -65,10 +60,8 @@ static void do_main_loop(struct team_handle *th)
 		if (ret == -1) {
 			perror("select()");
 		}
-		team_for_each_event_fd(eventfd, th) {
-			if (FD_ISSET(team_get_eventfd_fd(th, eventfd), &rfds))
-				team_call_eventfd_handler(th, eventfd);
-		}
+		if (FD_ISSET(tfd, &rfds_tmp))
+			team_handle_events(th);
 	}
 }
 

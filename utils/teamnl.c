@@ -156,9 +156,9 @@ static int run_main_loop(struct team_handle *th)
 	fd_set rfds_tmp;
 	int fdmax;
 	int ret;
-	const struct team_eventfd *eventfd;
 	sigset_t mask;
 	int sfd;
+	int tfd;
 	int err = 0;
 
 	sigemptyset(&mask);
@@ -180,13 +180,12 @@ static int run_main_loop(struct team_handle *th)
 	FD_ZERO(&rfds);
 	FD_SET(sfd, &rfds);
 	fdmax = sfd;
-	team_for_each_event_fd(eventfd, th) {
-		int fd = team_get_eventfd_fd(th, eventfd);
 
-		FD_SET(fd, &rfds);
-		if (fd > fdmax)
-			fdmax = fd;
-	}
+	tfd = team_get_event_fd(th);
+	FD_SET(tfd, &rfds);
+	if (tfd > fdmax)
+		fdmax = tfd;
+
 	fdmax++;
 
 	for (;;) {
@@ -219,13 +218,12 @@ static int run_main_loop(struct team_handle *th)
 			}
 
 		}
-		team_for_each_event_fd(eventfd, th) {
-			if (FD_ISSET(team_get_eventfd_fd(th, eventfd), &rfds_tmp))
-				err = team_call_eventfd_handler(th, eventfd);
-				if (err) {
-					fprintf(stderr, "Team eventfd handler call failed\n");
-					return err;
-				}
+		if (FD_ISSET(tfd, &rfds_tmp)) {
+			err = team_handle_events(th);
+			if (err) {
+				fprintf(stderr, "Team handle events failed\n");
+				return err;
+			}
 		}
 	}
 out:

@@ -21,8 +21,10 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <unistd.h>
 #include <syslog.h>
 #include <sys/select.h>
+#include <sys/epoll.h>
 #include <netlink/netlink.h>
 #include <netlink/genl/genl.h>
 #include <netlink/genl/ctrl.h>
@@ -301,6 +303,8 @@ static int cli_event_handler(struct nl_msg *msg, void *arg)
 	return ifinfo_event_handler(msg, arg);
 }
 
+static int team_init_event_fd(struct team_handle *th);
+
 /**
  * team_alloc:
  *
@@ -334,10 +338,10 @@ struct team_handle *team_alloc(void)
 
 	err = port_list_alloc(th);
 	if (err)
-		goto err_port_list_alloc_failed;
+		goto err_port_list_alloc;
 	err = option_list_alloc(th);
 	if (err)
-		goto err_option_list_alloc_failed;
+		goto err_option_list_alloc;
 
 	th->nl_sock = nl_socket_alloc();
 	if (!th->nl_sock)
@@ -379,10 +383,10 @@ err_sk_event_alloc:
 err_sk_alloc:
 	option_list_free(th);
 
-err_option_list_alloc_failed:
+err_option_list_alloc:
 	port_list_free(th);
 
-err_port_list_alloc_failed:
+err_port_list_alloc:
 	free(th);
 
 	return NULL;
@@ -592,6 +596,12 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 		return err;
 	}
 
+	err = team_init_event_fd(th);
+	if (err) {
+		err(th, "Failed to init event fd.");
+		return err;
+	}
+
 	return 0;
 }
 
@@ -605,6 +615,7 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 TEAM_EXPORT
 void team_free(struct team_handle *th)
 {
+	close(th->event_fd);
 	port_list_free(th);
 	option_list_free(th);
 	nl_cache_free(th->nl_cli.link_cache);
@@ -677,35 +688,8 @@ static int get_sock_event_fd(struct team_handle *th)
 	return nl_socket_get_fd(th->nl_sock_event);
 }
 
-static bool fd_read_ready(int fd)
-{
-	fd_set fds;
-	int fdmax;
-	struct timeval timeout;
-
-	memset(&timeout, 0, sizeof(timeout));
-	FD_ZERO(&fds);
-	FD_SET(fd, &fds);
-	fdmax = fd + 1;
-	while (select(fdmax, &fds, NULL, NULL, &timeout) < 0) {
-		if (errno == EINTR)
-			continue;
-		else
-			return false;
-	}
-	return FD_ISSET(fd, &fds);
-}
-
 static int sock_event_handler(struct team_handle *th)
 {
-	/* First, see if cli socket is ready. In case it is, just skip
-	 * this call what allows cli socket to be handled first. The reason is
-	 * that cli socket message may include information, like master unset,
-	 * which may be handy to have before we proceed.
-	 */
-	if (fd_read_ready(get_cli_sock_event_fd(th)))
-		return 0;
-
 	nl_recvmsgs_default(th->nl_sock_event);
 
 	/*
@@ -727,16 +711,22 @@ struct team_eventfd {
 };
 
 static const struct team_eventfd team_eventfds[] = {
-	{
-		.get_fd = get_sock_event_fd,
-		.event_handler = sock_event_handler,
-	},
+	/* Always handle cli socket first. The reason is that cli socket
+	 * message may include information, like master unset, which may be
+	 * handy to have before proceeding others.
+	 */
 	{
 		.get_fd = get_cli_sock_event_fd,
 		.event_handler = cli_sock_event_handler,
 	},
+	{
+		.get_fd = get_sock_event_fd,
+		.event_handler = sock_event_handler,
+	},
 };
 #define TEAM_EVENT_FDS_COUNT ARRAY_SIZE(team_eventfds)
+
+static const struct team_eventfd __dummy_eventfd;
 
 /**
  * team_get_next_eventfd:
@@ -746,18 +736,16 @@ static const struct team_eventfd team_eventfds[] = {
  * Get next eventfd in list.
  *
  * Returns: eventfd next to @eventfd passed.
+ *
+ * @deprecated Use of this function is deprecated.
  **/
 TEAM_EXPORT
 const struct team_eventfd *team_get_next_eventfd(struct team_handle *th,
 						 const struct team_eventfd *eventfd)
 {
 	if (!eventfd)
-		return &team_eventfds[0];
-	eventfd++;
-	if (eventfd < &team_eventfds[0] ||
-	    eventfd > &team_eventfds[TEAM_EVENT_FDS_COUNT - 1])
-		return NULL;
-	return eventfd;
+		return &__dummy_eventfd;
+	return NULL;
 }
 
 /**
@@ -768,12 +756,15 @@ const struct team_eventfd *team_get_next_eventfd(struct team_handle *th,
  * Get eventfd filedesctiptor.
  *
  * Returns: fd.
+ *
+ * @deprecated Use of this function is deprecated. User should use
+ *	       team_get_event_fd() funstion instead.
  **/
 TEAM_EXPORT
 int team_get_eventfd_fd(struct team_handle *th,
 			const struct team_eventfd *eventfd)
 {
-	return eventfd->get_fd(th);
+	return team_get_event_fd(th);
 }
 
 /**
@@ -784,12 +775,95 @@ int team_get_eventfd_fd(struct team_handle *th,
  * Call eventfd handler.
  *
  * Returns: zero on success or negative number in case of an error.
+ *
+ * @deprecated Use of this function is deprecated. User should use
+ *	       team_handle_events() funstion instead.
  **/
 TEAM_EXPORT
 int team_call_eventfd_handler(struct team_handle *th,
 			      const struct team_eventfd *eventfd)
 {
-	return eventfd->event_handler(th);
+	return team_handle_events(th);
+}
+
+static int team_init_event_fd(struct team_handle *th)
+{
+	int efd;
+	int i;
+	struct epoll_event event;
+	int err;
+
+	efd = epoll_create1(0);
+	if (efd == -1)
+		return -errno;
+	for (i = 0; i < TEAM_EVENT_FDS_COUNT; i++) {
+		int fd = team_eventfds[i].get_fd(th);
+
+		event.data.fd = fd;
+		event.events = EPOLLIN;
+		err = epoll_ctl(efd, EPOLL_CTL_ADD, fd, &event);
+		if (err == -1) {
+			err = -errno;
+			goto close_efd;
+		}
+	}
+	th->event_fd = efd;
+	return 0;
+
+close_efd:
+	close(efd);
+	return err;
+}
+
+/**
+ * team_get_event_fd:
+ * @th: libteam library context
+ *
+ * Get event filedesctiptor.
+ *
+ * Returns: fd.
+ **/
+TEAM_EXPORT
+int team_get_event_fd(struct team_handle *th)
+{
+	return th->event_fd;
+}
+
+/**
+ * team_handle_events:
+ * @th: libteam library context
+ * @eventfd: eventfd structure
+ *
+ * Handler events which happened on event filedescriptor.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_handle_events(struct team_handle *th)
+{
+	struct epoll_event events[TEAM_EVENT_FDS_COUNT];
+	int nfds;
+	int n;
+	int i;
+	int err;
+
+	nfds = epoll_wait(th->event_fd, events, TEAM_EVENT_FDS_COUNT, -1);
+	if (nfds == -1)
+		return -errno;
+
+	/* Go over list of event fds and handle them sequentially */
+	for (i = 0; i < TEAM_EVENT_FDS_COUNT; i++) {
+		const struct team_eventfd *eventfd = &team_eventfds[i];
+
+		for (n = 0; n < nfds; n++) {
+			if (events[n].data.fd == eventfd->get_fd(th)) {
+				err = eventfd->event_handler(th);
+				if (err)
+					return err;
+			}
+		}
+	}
+	return 0;
 }
 
 /**
@@ -805,37 +879,20 @@ int team_call_eventfd_handler(struct team_handle *th,
 TEAM_EXPORT
 int team_check_events(struct team_handle *th)
 {
-	int err;
 	fd_set rfds;
 	int fdmax;
 	struct timeval tv;
-	const struct team_eventfd *eventfd;
+	int fd = team_get_event_fd(th);
+	int ret;
 
-	while (true) {
-		tv.tv_sec = tv.tv_usec = 0;
-		FD_ZERO(&rfds);
-		fdmax = 0;
-		team_for_each_event_fd(eventfd, th) {
-			int fd = team_get_eventfd_fd(th, eventfd);
-			FD_SET(fd, &rfds);
-			if (fd > fdmax)
-				fdmax = fd;
-		}
-		fdmax++;
-		err = select(fdmax, &rfds, NULL, NULL, &tv);
-		if (err == -1 && errno == EINTR)
-			continue;
-		if (err == -1)
-			return -errno;
-		team_for_each_event_fd(eventfd, th) {
-			if (FD_ISSET(team_get_eventfd_fd(th, eventfd), &rfds)) {
-				err = team_call_eventfd_handler(th, eventfd);
-				if (err)
-					return err;
-			}
-		}
-	}
-	return 0;
+	memset(&tv, 0, sizeof(tv));
+	FD_ZERO(&rfds);
+	FD_SET(fd, &rfds);
+	fdmax = fd + 1;
+	ret = select(fdmax, &rfds, NULL, NULL, &tv);
+	if (ret == -1)
+		return -errno;
+	return team_handle_events(th);
 }
 
 /**
