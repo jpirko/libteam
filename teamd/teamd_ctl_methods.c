@@ -146,7 +146,7 @@ static int teamd_ctl_method_state_dump(struct teamd_context *ctx,
 	char *state;
 	int err;
 
-	err = teamd_state_json_dump(ctx, &state);
+	err = teamd_state_dump(ctx, &state);
 	if (err) {
 		teamd_log_err("Failed to dump state.");
 		return ops->reply_err(ops_priv, "StateDumpFail", "Failed to dump state.");

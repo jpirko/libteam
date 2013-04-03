@@ -896,10 +896,9 @@ static int teamd_runner_init(struct teamd_context *ctx)
 			return -ENOMEM;
 	}
 
-	if (ctx->runner->state_json_ops) {
-		err = teamd_state_json_register(ctx,
-						ctx->runner->state_json_ops,
-						ctx->runner_priv);
+	if (ctx->runner->state_ops) {
+		err = teamd_state_ops_register(ctx, ctx->runner->state_ops,
+					       ctx->runner_priv);
 		if (err)
 			goto free_runner_priv;
 	}
@@ -912,9 +911,9 @@ static int teamd_runner_init(struct teamd_context *ctx)
 	return 0;
 
 runner_state_unreg:
-	if (ctx->runner->state_json_ops)
-		teamd_state_json_unregister(ctx, ctx->runner->state_json_ops,
-					    ctx->runner_priv);
+	if (ctx->runner->state_ops)
+		teamd_state_ops_unregister(ctx, ctx->runner->state_ops,
+					   ctx->runner_priv);
 free_runner_priv:
 	free(ctx->runner_priv);
 	return err;
@@ -924,9 +923,9 @@ static void teamd_runner_fini(struct teamd_context *ctx)
 {
 	if (ctx->runner->fini)
 		ctx->runner->fini(ctx, ctx->runner_priv);
-	if (ctx->runner->state_json_ops)
-		teamd_state_json_unregister(ctx, ctx->runner->state_json_ops,
-					    ctx->runner_priv);
+	if (ctx->runner->state_ops)
+		teamd_state_ops_unregister(ctx, ctx->runner->state_ops,
+					   ctx->runner_priv);
 	free(ctx->runner_priv);
 	ctx->runner = NULL;
 }
@@ -1092,7 +1091,7 @@ static int teamd_init(struct teamd_context *ctx)
 		goto ifinfo_watch_fini;
 	}
 
-	err = teamd_state_json_init(ctx);
+	err = teamd_state_init(ctx);
 	if (err) {
 		teamd_log_err("Failed to init state json infrastructure.");
 		goto port_watch_fini;
@@ -1101,7 +1100,7 @@ static int teamd_init(struct teamd_context *ctx)
 	err = teamd_per_port_init(ctx);
 	if (err) {
 		teamd_log_err("Failed to init per-port.");
-		goto state_json_fini;
+		goto state_fini;
 	}
 
 	err = teamd_link_watch_init(ctx);
@@ -1116,7 +1115,7 @@ static int teamd_init(struct teamd_context *ctx)
 		goto link_watch_fini;
 	}
 
-	err = teamd_state_json_basics_init(ctx);
+	err = teamd_state_basics_init(ctx);
 	if (err) {
 		teamd_log_err("Failed to init state json basics.");
 		goto runner_fini;
@@ -1125,7 +1124,7 @@ static int teamd_init(struct teamd_context *ctx)
 	err = teamd_usock_init(ctx);
 	if (err) {
 		teamd_log_err("Failed to init unix domain socket.");
-		goto state_json_basics_fini;
+		goto state_basics_fini;
 	}
 
 	err = teamd_dbus_init(ctx);
@@ -1156,16 +1155,16 @@ dbus_fini:
 	teamd_dbus_fini(ctx);
 usock_fini:
 	teamd_usock_fini(ctx);
-state_json_basics_fini:
-	teamd_state_json_basics_fini(ctx);
+state_basics_fini:
+	teamd_state_basics_fini(ctx);
 runner_fini:
 	teamd_runner_fini(ctx);
 link_watch_fini:
 	teamd_link_watch_fini(ctx);
 per_port_fini:
 	teamd_per_port_fini(ctx);
-state_json_fini:
-	teamd_state_json_fini(ctx);
+state_fini:
+	teamd_state_fini(ctx);
 port_watch_fini:
 	teamd_port_watch_fini(ctx);
 ifinfo_watch_fini:
@@ -1192,7 +1191,7 @@ static void teamd_fini(struct teamd_context *ctx)
 	teamd_runner_fini(ctx);
 	teamd_link_watch_fini(ctx);
 	teamd_per_port_fini(ctx);
-	teamd_state_json_fini(ctx);
+	teamd_state_fini(ctx);
 	teamd_ifinfo_watch_fini(ctx);
 	teamd_option_watch_fini(ctx);
 	teamd_events_fini(ctx);

@@ -522,7 +522,7 @@ static int ab_state_json_dump(struct teamd_context *ctx,
 	return 0;
 }
 
-static const struct teamd_state_json_ops ab_state_ops = {
+static const struct teamd_state_ops ab_state_ops = {
 	.dump			= ab_state_json_dump,
 	.name			= TEAMD_RUNNER_STATE_JSON_NAME,
 };
@@ -533,5 +533,5 @@ const struct teamd_runner teamd_runner_activebackup = {
 	.priv_size		= sizeof(struct ab),
 	.init			= ab_init,
 	.fini			= ab_fini,
-	.state_json_ops		= &ab_state_ops,
+	.state_ops		= &ab_state_ops,
 };

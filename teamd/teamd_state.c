@@ -1,6 +1,6 @@
 /*
- *   teamd_state_json.c - State of Teamd in JSON format
- *   Copyright (C) 2012 Jiri Pirko <jpirko@redhat.com>
+ *   teamd_state.c - Teamd state
+ *   Copyright (C) 2013 Jiri Pirko <jiri@resnulli.us>
  *
  *   This library is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU Lesser General Public
@@ -29,52 +29,52 @@
 #include "teamd.h"
 #include "teamd_json.h"
 
-struct state_json_item {
+struct state_ops_item {
 	struct list_item list;
-	const struct teamd_state_json_ops *ops;
+	const struct teamd_state_ops *ops;
 	void *priv;
 };
 
-int teamd_state_json_init(struct teamd_context *ctx)
+int teamd_state_init(struct teamd_context *ctx)
 {
-	list_init(&ctx->state_json_list);
+	list_init(&ctx->state_ops_list);
 	return 0;
 }
 
-void teamd_state_json_fini(struct teamd_context *ctx)
+void teamd_state_fini(struct teamd_context *ctx)
 {
 }
 
-static struct state_json_item *__find_item(struct teamd_context *ctx,
-					   const struct teamd_state_json_ops *ops,
-					   void *priv)
+static struct state_ops_item *__find_item(struct teamd_context *ctx,
+					  const struct teamd_state_ops *ops,
+					  void *priv)
 {
-	struct state_json_item *item;
+	struct state_ops_item *item;
 
-	list_for_each_node_entry(item, &ctx->state_json_list, list) {
+	list_for_each_node_entry(item, &ctx->state_ops_list, list) {
 		if (item->ops == ops && item->priv == priv)
 			return item;
 	}
 	return NULL;
 }
 
-static struct state_json_item *__find_item_by_name(struct teamd_context *ctx,
-						   const char *name)
+static struct state_ops_item *__find_item_by_name(struct teamd_context *ctx,
+						  const char *name)
 {
-	struct state_json_item *item;
+	struct state_ops_item *item;
 
-	list_for_each_node_entry(item, &ctx->state_json_list, list) {
+	list_for_each_node_entry(item, &ctx->state_ops_list, list) {
 		if (item->ops->name == name)
 			return item;
 	}
 	return NULL;
 }
 
-int teamd_state_json_register(struct teamd_context *ctx,
-			      const struct teamd_state_json_ops *ops,
-			      void *priv)
+int teamd_state_ops_register(struct teamd_context *ctx,
+			     const struct teamd_state_ops *ops,
+			     void *priv)
 {
-	struct state_json_item *item;
+	struct state_ops_item *item;
 
 	if (__find_item_by_name(ctx, ops->name))
 		return -EBUSY;
@@ -83,15 +83,15 @@ int teamd_state_json_register(struct teamd_context *ctx,
 		return -ENOMEM;
 	item->ops = ops;
 	item->priv = priv;
-	list_add_tail(&ctx->state_json_list, &item->list);
+	list_add_tail(&ctx->state_ops_list, &item->list);
 	return 0;
 }
 
-void teamd_state_json_unregister(struct teamd_context *ctx,
-				 const struct teamd_state_json_ops *ops,
-				 void *priv)
+void teamd_state_ops_unregister(struct teamd_context *ctx,
+				const struct teamd_state_ops *ops,
+				void *priv)
 {
-	struct state_json_item *item;
+	struct state_ops_item *item;
 
 	item = __find_item(ctx, ops, priv);
 	if (!item)
@@ -100,9 +100,9 @@ void teamd_state_json_unregister(struct teamd_context *ctx,
 	free(item);
 }
 
-int teamd_state_json_dump(struct teamd_context *ctx, char **p_state_dump)
+int teamd_state_dump(struct teamd_context *ctx, char **p_state_dump)
 {
-	struct state_json_item *item;
+	struct state_ops_item *item;
 	json_t *state_json;
 	json_t *substate_json;
 	char *dump;
@@ -111,7 +111,7 @@ int teamd_state_json_dump(struct teamd_context *ctx, char **p_state_dump)
 	state_json = json_object();
 	if (!state_json)
 		return -ENOMEM;
-	list_for_each_node_entry(item, &ctx->state_json_list, list) {
+	list_for_each_node_entry(item, &ctx->state_ops_list, list) {
 		if (!item->ops->dump)
 			continue;
 		err = item->ops->dump(ctx, &substate_json, item->priv);
@@ -171,7 +171,7 @@ static int teamdev_state_dump(struct teamd_context *ctx,
 	return 0;
 }
 
-static const struct teamd_state_json_ops teamdev_state_ops = {
+static const struct teamd_state_ops teamdev_state_ops = {
 	.dump = teamdev_state_dump,
 	.name = "team_device",
 };
@@ -201,11 +201,11 @@ static json_t *__fill_tdport(struct teamd_port *tdport)
 static int __fill_per_port(struct teamd_context *ctx, json_t *tdport_json,
 			   struct teamd_port *tdport)
 {
-	struct state_json_item *item;
+	struct state_ops_item *item;
 	json_t *substate_json;
 	int err;
 
-	list_for_each_node_entry(item, &ctx->state_json_list, list) {
+	list_for_each_node_entry(item, &ctx->state_ops_list, list) {
 		if (!item->ops->per_port_dump)
 			continue;
 		err = item->ops->per_port_dump(ctx, tdport, &substate_json,
@@ -254,7 +254,7 @@ errout:
 	return -ENOMEM;
 }
 
-static const struct teamd_state_json_ops ports_state_ops = {
+static const struct teamd_state_ops ports_state_ops = {
 	.dump = ports_state_dump,
 	.name = "ports",
 };
@@ -279,36 +279,36 @@ static int setup_state_dump(struct teamd_context *ctx,
 	return 0;
 }
 
-static const struct teamd_state_json_ops setup_state_ops = {
+static const struct teamd_state_ops setup_state_ops = {
 	.dump = setup_state_dump,
 	.name = "setup",
 };
 
-int teamd_state_json_basics_init(struct teamd_context *ctx)
+int teamd_state_basics_init(struct teamd_context *ctx)
 {
 	int err;
 
-	err = teamd_state_json_register(ctx, &teamdev_state_ops, ctx);
+	err = teamd_state_ops_register(ctx, &teamdev_state_ops, ctx);
 	if (err)
 		return err;
-	err = teamd_state_json_register(ctx, &ports_state_ops, ctx);
+	err = teamd_state_ops_register(ctx, &ports_state_ops, ctx);
 	if (err)
 		goto teamdev_state_unreg;
-	err = teamd_state_json_register(ctx, &setup_state_ops, ctx);
+	err = teamd_state_ops_register(ctx, &setup_state_ops, ctx);
 	if (err)
 		goto ports_state_unreg;
 	return 0;
 
 ports_state_unreg:
-	teamd_state_json_unregister(ctx, &ports_state_ops, ctx);
+	teamd_state_ops_unregister(ctx, &ports_state_ops, ctx);
 teamdev_state_unreg:
-	teamd_state_json_unregister(ctx, &teamdev_state_ops, ctx);
+	teamd_state_ops_unregister(ctx, &teamdev_state_ops, ctx);
 	return err;
 }
 
-void teamd_state_json_basics_fini(struct teamd_context *ctx)
+void teamd_state_basics_fini(struct teamd_context *ctx)
 {
-	teamd_state_json_unregister(ctx, &setup_state_ops, ctx);
-	teamd_state_json_unregister(ctx, &ports_state_ops, ctx);
-	teamd_state_json_unregister(ctx, &teamdev_state_ops, ctx);
+	teamd_state_ops_unregister(ctx, &setup_state_ops, ctx);
+	teamd_state_ops_unregister(ctx, &ports_state_ops, ctx);
+	teamd_state_ops_unregister(ctx, &teamdev_state_ops, ctx);
 }

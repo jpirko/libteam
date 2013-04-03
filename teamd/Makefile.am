@@ -11,9 +11,9 @@ teamd_CFLAGS= $(LIBDAEMON_CFLAGS) $(JANSSON_CFLAGS) $(DBUS_CFLAGS) -I${top_srcdi
 teamd_LDADD = $(top_builddir)/libteam/libteam.la $(LIBDAEMON_LIBS) $(JANSSON_LIBS) $(DBUS_LIBS)
 
 bin_PROGRAMS=teamd
-teamd_SOURCES=teamd.c teamd_common.c teamd_config.c teamd_events.c \
-	      teamd_per_port.c teamd_option_watch.c teamd_ifinfo_watch.c \
-	      teamd_link_watch.c teamd_state_json.c \
+teamd_SOURCES=teamd.c teamd_common.c teamd_config.c teamd_state.c \
+	      teamd_events.c teamd_per_port.c teamd_option_watch.c \
+	      teamd_ifinfo_watch.c teamd_link_watch.c \
 	      teamd_ctl_methods.c teamd_dbus.c teamd_usock.c \
 	      teamd_bpf_chef.c teamd_hash_func.c teamd_balancer.c \
 	      teamd_runner_basic_ones.c teamd_runner_activebackup.c \

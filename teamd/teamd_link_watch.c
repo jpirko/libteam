@@ -1396,7 +1396,7 @@ errout:
 	return -ENOMEM;
 }
 
-static const struct teamd_state_json_ops link_watch_state_ops = {
+static const struct teamd_state_ops link_watch_state_ops = {
 	.per_port_dump = link_watch_state_per_port_dump,
 	.name = "link_watches",
 };
@@ -1410,7 +1410,7 @@ int teamd_link_watch_init(struct teamd_context *ctx)
 		teamd_log_err("Failed to register event watch.");
 		return err;
 	}
-	err = teamd_state_json_register(ctx, &link_watch_state_ops, ctx);
+	err = teamd_state_ops_register(ctx, &link_watch_state_ops, ctx);
 	if (err)
 		goto event_watch_unregister;
 	return 0;

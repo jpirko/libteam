@@ -91,7 +91,7 @@ struct teamd_context {
 	unsigned int			port_obj_list_count;
 	struct list_item                option_watch_list;
 	struct list_item		event_watch_list;
-	struct list_item		state_json_list;
+	struct list_item		state_ops_list;
 	uint32_t			ifindex;
 	struct team_ifinfo *		ifinfo;
 	char *				hwaddr;
@@ -121,7 +121,7 @@ struct teamd_port {
 	struct team_ifinfo *		team_ifinfo;
 };
 
-struct teamd_state_json_ops;
+struct teamd_state_ops;
 
 struct teamd_runner {
 	const char *name;
@@ -129,7 +129,7 @@ struct teamd_runner {
 	size_t priv_size;
 	int (*init)(struct teamd_context *ctx, void *priv);
 	void (*fini)(struct teamd_context *ctx, void *priv);
-	const struct teamd_state_json_ops *state_json_ops;
+	const struct teamd_state_ops *state_ops;
 };
 
 struct teamd_event_watch_ops {
@@ -177,7 +177,7 @@ void teamd_event_watch_unregister(struct teamd_context *ctx,
 
 #define TEAMD_RUNNER_STATE_JSON_NAME "runner"
 
-struct teamd_state_json_ops {
+struct teamd_state_ops {
 	int (*dump)(struct teamd_context *ctx,
 		    json_t **pstate_json, void *priv);
 	int (*per_port_dump)(struct teamd_context *ctx,
@@ -186,18 +186,18 @@ struct teamd_state_json_ops {
 	char *name;
 };
 
-int teamd_state_json_init(struct teamd_context *ctx);
-void teamd_state_json_fini(struct teamd_context *ctx);
-int teamd_state_json_register(struct teamd_context *ctx,
-			      const struct teamd_state_json_ops *ops,
-			      void *priv);
-void teamd_state_json_unregister(struct teamd_context *ctx,
-				 const struct teamd_state_json_ops *ops,
-				 void *priv);
-int teamd_state_json_dump(struct teamd_context *ctx, char **p_state_dump);
+int teamd_state_init(struct teamd_context *ctx);
+void teamd_state_fini(struct teamd_context *ctx);
+int teamd_state_ops_register(struct teamd_context *ctx,
+			     const struct teamd_state_ops *ops,
+			     void *priv);
+void teamd_state_ops_unregister(struct teamd_context *ctx,
+				const struct teamd_state_ops *ops,
+				void *priv);
+int teamd_state_dump(struct teamd_context *ctx, char **p_state_dump);
 
-int teamd_state_json_basics_init(struct teamd_context *ctx);
-void teamd_state_json_basics_fini(struct teamd_context *ctx);
+int teamd_state_basics_init(struct teamd_context *ctx);
+void teamd_state_basics_fini(struct teamd_context *ctx);
 
 /* Main loop callbacks */
 #define TEAMD_LOOP_FD_EVENT_READ	(1 << 0)
