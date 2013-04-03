@@ -331,10 +331,9 @@ static int tb_option_change_handler_func(struct team_handle *th, void *priv,
 static bool tb_get_enable_tx_balancing(struct teamd_context *ctx)
 {
 	int err;
-	char *tx_balancer_name;
+	const char *tx_balancer_name;
 
-	err = json_unpack(ctx->config_json, "{s:{s:{s:s}}}", "runner",
-			  "tx_balancer", "name", &tx_balancer_name);
+	err = teamd_config_string_get(ctx, &tx_balancer_name, "$.runner.tx_balancer.name");
 	if (err)
 		return false; /* disabled by default */
 	if (!strcmp(tx_balancer_name, "basic"))
@@ -347,8 +346,7 @@ static uint32_t tb_get_balancing_interval(struct teamd_context *ctx)
 	int err;
 	int balancing_interval;
 
-	err = json_unpack(ctx->config_json, "{s:{s:i}}", "runner",
-			  "balancing_interval", &balancing_interval);
+	err = teamd_config_int_get(ctx, &balancing_interval, "$.runner.tx_balancer.balancing_interval");
 	if (err || balancing_interval < 0)
 		return 50; /* 5sec is default */
 	return balancing_interval;

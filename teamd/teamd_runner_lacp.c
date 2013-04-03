@@ -214,7 +214,7 @@ static const char *lacp_get_agg_select_policy_name(struct lacp *lacp)
 }
 
 static int lacp_assign_agg_select_policy(struct lacp *lacp,
-					 char *agg_select_policy_name)
+					 const char *agg_select_policy_name)
 {
 	int i = LACP_CFG_DFLT_AGG_SELECT_POLICY;
 
@@ -234,15 +234,14 @@ static int lacp_load_config(struct teamd_context *ctx, struct lacp *lacp)
 {
 	int err;
 	int tmp;
-	char *agg_select_policy_name;
+	const char *agg_select_policy_name;
 
-	err = json_unpack(ctx->config_json, "{s:{s:b}}", "runner", "active",
-			  &tmp);
-	lacp->cfg.active = err ? LACP_CFG_DFLT_ACTIVE : !!tmp;
+	err = teamd_config_bool_get(ctx, &lacp->cfg.active, "$.runner.active");
+	if (err)
+		lacp->cfg.active =  LACP_CFG_DFLT_ACTIVE;
 	teamd_log_dbg("Using active \"%d\".", lacp->cfg.active);
 
-	err = json_unpack(ctx->config_json, "{s:{s:i}}", "runner", "sys_prio",
-			  &tmp);
+	err = teamd_config_int_get(ctx, &tmp, "$.runner.sys_prio");
 	if (err) {
 		lacp->cfg.sys_prio = LACP_CFG_DFLT_SYS_PRIO;
 	} else if (tmp < 0 || tmp > USHRT_MAX) {
@@ -253,13 +252,12 @@ static int lacp_load_config(struct teamd_context *ctx, struct lacp *lacp)
 	}
 	teamd_log_dbg("Using sys_prio \"%d\".", lacp->cfg.sys_prio);
 
-	err = json_unpack(ctx->config_json, "{s:{s:b}}", "runner", "fast_rate",
-			  &tmp);
-	lacp->cfg.fast_rate = err ? LACP_CFG_DFLT_FAST_RATE : !!tmp;
+	err = teamd_config_bool_get(ctx, &lacp->cfg.fast_rate, "$.runner.fast_rate");
+	if (err)
+		lacp->cfg.fast_rate = LACP_CFG_DFLT_FAST_RATE;
 	teamd_log_dbg("Using fast_rate \"%d\".", lacp->cfg.fast_rate);
 
-	err = json_unpack(ctx->config_json, "{s:{s:i}}", "runner", "min_ports",
-			  &tmp);
+	err = teamd_config_int_get(ctx, &tmp, "$.runner.min_ports");
 	if (err) {
 		lacp->cfg.min_ports = LACP_CFG_DFLT_MIN_PORTS;
 	} else if (tmp < 1 || tmp > UCHAR_MAX) {
@@ -270,8 +268,7 @@ static int lacp_load_config(struct teamd_context *ctx, struct lacp *lacp)
 	}
 	teamd_log_dbg("Using min_ports \"%d\".", lacp->cfg.min_ports);
 
-	err = json_unpack(ctx->config_json, "{s:{s:s}}", "runner",
-			  "agg_select_policy", &agg_select_policy_name);
+	err = teamd_config_string_get(ctx, &agg_select_policy_name, "$.runner.agg_select_policy");
 	if (err)
 		agg_select_policy_name = NULL;
 	err = lacp_assign_agg_select_policy(lacp, agg_select_policy_name);
@@ -1138,8 +1135,8 @@ static int lacp_port_load_config(struct teamd_context *ctx,
 	int err;
 	int tmp;
 
-	err = json_unpack(ctx->config_json, "{s:{s:{s:i}}}", "ports", port_name,
-							     "lacp_prio", &tmp);
+	err = teamd_config_int_get(ctx, &tmp,
+				   "$.ports.%s.lacp_prio", port_name);
 	if (err) {
 		lacp_port->cfg.lacp_prio = LACP_PORT_CFG_DFLT_LACP_PRIO;
 	} else if (tmp < 0 || tmp > USHRT_MAX) {
@@ -1152,8 +1149,8 @@ static int lacp_port_load_config(struct teamd_context *ctx,
 	teamd_log_dbg("%s: Using lacp_prio \"%d\".", port_name,
 		      lacp_port->cfg.lacp_prio);
 
-	err = json_unpack(ctx->config_json, "{s:{s:{s:i}}}", "ports", port_name,
-							     "lacp_key", &tmp);
+	err = teamd_config_int_get(ctx, &tmp,
+				   "$.ports.%s.lacp_key", port_name);
 	if (err) {
 		lacp_port->cfg.lacp_key = LACP_PORT_CFG_DFLT_LACP_KEY;
 	} else if (tmp < 0 || tmp > USHRT_MAX) {
@@ -1166,9 +1163,10 @@ static int lacp_port_load_config(struct teamd_context *ctx,
 	teamd_log_dbg("%s: Using lacp_key \"%d\".", port_name,
 		      lacp_port->cfg.lacp_key);
 
-	err = json_unpack(ctx->config_json, "{s:{s:{s:b}}}", "ports", port_name,
-							     "sticky", &tmp);
-	lacp_port->cfg.sticky = err ? LACP_PORT_CFG_DFLT_STICKY : !!tmp;
+	err = teamd_config_bool_get(ctx, &lacp_port->cfg.sticky,
+				    "$.ports.%s.sticky", port_name);
+	if (err)
+		lacp_port->cfg.sticky = LACP_PORT_CFG_DFLT_STICKY;
 	teamd_log_dbg("%s: Using sticky \"%d\".", port_name,
 		      lacp_port->cfg.sticky);
 	return 0;

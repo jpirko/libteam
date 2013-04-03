@@ -767,7 +767,7 @@ static int teamd_check_change_hwaddr(struct teamd_context *ctx)
 	char *hwaddr;
 	unsigned int hwaddr_len;
 
-	err = json_unpack(ctx->config_json, "{s:s}", "hwaddr", &hwaddr_str);
+	err = teamd_config_string_get(ctx, &hwaddr_str, "$.hwaddr");
 	if (err)
 		return 0; /* addr is not defined in config, no change needed */
 
@@ -1016,11 +1016,10 @@ static int teamd_runner_init(struct teamd_context *ctx)
 	int err;
 	const char *runner_name;
 
-	err = json_unpack(ctx->config_json, "{s:{s:s}}", "runner", "name",
-							 &runner_name);
+	err = teamd_config_string_get(ctx, &runner_name, "$.runner.name");
 	if (err) {
 		teamd_log_err("Failed to get team runner name from config.");
-		return -EINVAL;
+		return err;
 	}
 	teamd_log_dbg("Using team runner \"%s\".", runner_name);
 	ctx->runner = teamd_find_runner(runner_name);
@@ -1457,10 +1456,10 @@ static int teamd_get_devname(struct teamd_context *ctx)
 	if (!ctx->team_devname) {
 		const char *team_name;
 
-		err = json_unpack(ctx->config_json, "{s:s}", "device", &team_name);
+		err = teamd_config_string_get(ctx, &team_name, "$.device");
 		if (err) {
 			teamd_log_err("Failed to get team device name.");
-			return -EINVAL;
+			return err;
 		}
 		ctx->team_devname = strdup(team_name);
 		if (!ctx->team_devname) {

@@ -205,7 +205,8 @@ static const struct ab_hwaddr_policy *ab_hwaddr_policy_list[] = {
 
 #define AB_HWADDR_POLICY_LIST_SIZE ARRAY_SIZE(ab_hwaddr_policy_list)
 
-static int ab_assign_hwaddr_policy(struct ab *ab, char *hwaddr_policy_name)
+static int ab_assign_hwaddr_policy(struct ab *ab,
+				   const char *hwaddr_policy_name)
 {
 	int i = 0;
 
@@ -380,11 +381,11 @@ static int ab_port_load_config(struct teamd_context *ctx,
 {
 	const char *port_name = ab_port->tdport->ifname;
 	int err;
-	int tmp;
 
-	err = json_unpack(ctx->config_json, "{s:{s:{s:b}}}", "ports", port_name,
-							     "sticky", &tmp);
-	ab_port->cfg.sticky = err ? AB_DFLT_PORT_STICKY : !!tmp;
+	err = teamd_config_bool_get(ctx, &ab_port->cfg.sticky,
+				    "$.ports.%s.sticky", port_name);
+	if (err)
+		ab_port->cfg.sticky = AB_DFLT_PORT_STICKY;
 	teamd_log_dbg("%s: Using sticky \"%d\".", port_name,
 		      ab_port->cfg.sticky);
 	return 0;
@@ -464,10 +465,9 @@ static const struct teamd_event_watch_ops ab_event_watch_ops = {
 static int ab_load_config(struct teamd_context *ctx, struct ab *ab)
 {
 	int err;
-	char *hwaddr_policy_name;
+	const char *hwaddr_policy_name;
 
-	err = json_unpack(ctx->config_json, "{s:{s:s}}", "runner", "hwaddr_policy",
-			  &hwaddr_policy_name);
+	err = teamd_config_string_get(ctx, &hwaddr_policy_name, "$.runner.hwaddr_policy");
 	if (err)
 		hwaddr_policy_name = NULL;
 	err = ab_assign_hwaddr_policy(ab, hwaddr_policy_name);
