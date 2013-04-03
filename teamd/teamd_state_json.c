@@ -27,6 +27,7 @@
 #include <private/misc.h>
 
 #include "teamd.h"
+#include "teamd_json.h"
 
 struct state_json_item {
 	struct list_item list;
@@ -99,11 +100,12 @@ void teamd_state_json_unregister(struct teamd_context *ctx,
 	free(item);
 }
 
-int teamd_state_json_dump(struct teamd_context *ctx, json_t **pstate_json)
+int teamd_state_json_dump(struct teamd_context *ctx, char **p_state_dump)
 {
 	struct state_json_item *item;
 	json_t *state_json;
 	json_t *substate_json;
+	char *dump;
 	int err;
 
 	state_json = json_object();
@@ -122,7 +124,11 @@ int teamd_state_json_dump(struct teamd_context *ctx, json_t **pstate_json)
 			goto errout;
 		}
 	}
-	*pstate_json = state_json;
+	dump = json_dumps(state_json, TEAMD_JSON_DUMPS_FLAGS);
+	json_decref(state_json);
+	if (!dump)
+		return -ENOMEM;
+	*p_state_dump = dump;
 	return 0;
 errout:
 	json_decref(state_json);

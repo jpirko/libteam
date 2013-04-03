@@ -26,7 +26,6 @@
 #include <private/misc.h>
 
 #include "teamd.h"
-#include "teamd_json.h"
 #include "teamd_ctl_methods.h"
 
 static int teamd_ctl_method_port_config_update(struct teamd_context *ctx,
@@ -144,18 +143,11 @@ static int teamd_ctl_method_state_dump(struct teamd_context *ctx,
 				       const struct teamd_ctl_method_ops *ops,
 				       void *ops_priv)
 {
-	json_t *state_json;
 	char *state;
 	int err;
 
-	err = teamd_state_json_dump(ctx, &state_json);
+	err = teamd_state_json_dump(ctx, &state);
 	if (err) {
-		teamd_log_err("Failed to get state.");
-		return ops->reply_err(ops_priv, "StateDumpFail", "Failed to get state.");
-	}
-	state = json_dumps(state_json, TEAMD_JSON_DUMPS_FLAGS);
-	json_decref(state_json);
-	if (!state) {
 		teamd_log_err("Failed to dump state.");
 		return ops->reply_err(ops_priv, "StateDumpFail", "Failed to dump state.");
 	}

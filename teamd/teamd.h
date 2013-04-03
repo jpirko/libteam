@@ -194,7 +194,7 @@ int teamd_state_json_register(struct teamd_context *ctx,
 void teamd_state_json_unregister(struct teamd_context *ctx,
 				 const struct teamd_state_json_ops *ops,
 				 void *priv);
-int teamd_state_json_dump(struct teamd_context *ctx, json_t **pstate_json);
+int teamd_state_json_dump(struct teamd_context *ctx, char **p_state_dump);
 
 int teamd_state_json_basics_init(struct teamd_context *ctx);
 void teamd_state_json_basics_fini(struct teamd_context *ctx);
