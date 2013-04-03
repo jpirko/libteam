@@ -360,4 +360,11 @@ static inline bool timespec_is_zero(struct timespec *ts)
 	return !ts->tv_sec && !ts->tv_nsec;
 }
 
+int teamd_config_string_get(struct teamd_context *ctx, const char **p_str_val,
+			    const char *fmt, ...);
+int teamd_config_int_get(struct teamd_context *ctx, int *p_int_val,
+			 const char *fmt, ...);
+int teamd_config_bool_get(struct teamd_context *ctx, bool *p_bool_val,
+			  const char *fmt, ...);
+
 #endif /* _TEAMD_H_ */
