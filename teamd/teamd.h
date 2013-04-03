@@ -199,10 +199,6 @@ int teamd_state_json_dump(struct teamd_context *ctx, json_t **pstate_json);
 int teamd_state_json_basics_init(struct teamd_context *ctx);
 void teamd_state_json_basics_fini(struct teamd_context *ctx);
 
-int teamd_get_actual_config(struct teamd_context *ctx, json_t **pactual_json);
-int teamd_update_port_config(struct teamd_context *ctx, const char *port_name,
-			     const char *json_port_cfg_str);
-
 /* Main loop callbacks */
 #define TEAMD_LOOP_FD_EVENT_READ	(1 << 0)
 #define TEAMD_LOOP_FD_EVENT_WRITE	(1 << 1)
@@ -362,6 +358,9 @@ static inline bool timespec_is_zero(struct timespec *ts)
 
 int teamd_config_load(struct teamd_context *ctx);
 void teamd_config_free(struct teamd_context *ctx);
+int teamd_config_get_actual(struct teamd_context *ctx, json_t **pactual_json);
+int teamd_config_port_update(struct teamd_context *ctx, const char *port_name,
+			     const char *json_port_cfg_str);
 int teamd_config_string_get(struct teamd_context *ctx, const char **p_str_val,
 			    const char *fmt, ...);
 int teamd_config_int_get(struct teamd_context *ctx, int *p_int_val,

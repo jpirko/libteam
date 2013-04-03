@@ -49,7 +49,7 @@ static int teamd_ctl_method_port_config_update(struct teamd_context *ctx,
 		teamd_log_err("Device \"%s\" does not exist.", port_devname);
 		return ops->reply_err(ops_priv, "NoSuchDev", "No such device.");
 	}
-	err = teamd_update_port_config(ctx, port_devname, port_config);
+	err = teamd_config_port_update(ctx, port_devname, port_config);
 	if (err) {
 		teamd_log_err("Failed to update config for port \"%s\".",
 			      port_devname);
@@ -133,7 +133,7 @@ static int teamd_ctl_method_config_dump_actual(struct teamd_context *ctx,
 	json_t *actual_json;
 	int err;
 
-	err = teamd_get_actual_config(ctx, &actual_json);
+	err = teamd_config_get_actual(ctx, &actual_json);
 	if (err) {
 		teamd_log_err("Failed to get actual config.");
 		return ops->reply_err(ops_priv, "ConfigDumpActualFail", "Failed to get actual config.");
