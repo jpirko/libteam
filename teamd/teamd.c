@@ -679,42 +679,6 @@ static void teamd_run_loop_fini(struct teamd_context *ctx)
 	close(ctx->run_loop.ctrl_pipe_w);
 }
 
-#define TEAMD_IMPLICIT_CONFIG "{\"device\": \"team0\", \"runner\": {\"name\": \"roundrobin\"}}"
-
-static int config_load(struct teamd_context *ctx)
-{
-	json_error_t jerror;
-	size_t jflags = JSON_REJECT_DUPLICATES;
-
-	if (!ctx->config_text && !ctx->config_file) {
-		ctx->config_text = strdup(TEAMD_IMPLICIT_CONFIG);
-		if (!ctx->config_text)
-			return -ENOMEM;
-		teamd_log_warn("No config passed, using implicit one.");
-	}
-	if (ctx->config_text) {
-		if (ctx->config_file)
-			teamd_log_warn("Command line config string is present, ignoring given config file.");
-		ctx->config_json = json_loads(ctx->config_text, jflags,
-					      &jerror);
-	} else if (ctx->config_file) {
-		ctx->config_json = json_load_file(ctx->config_file, jflags,
-						  &jerror);
-	}
-	if (!ctx->config_json) {
-		teamd_log_err("Failed to parse config: %s on line %d, column %d",
-			      jerror.text, jerror.line, jerror.column);
-		return -EIO;
-	}
-
-	return 0;
-}
-
-static void config_free(struct teamd_context *ctx)
-{
-	json_decref(ctx->config_json);
-}
-
 static int parse_hwaddr(const char *hwaddr_str, char **phwaddr,
 			unsigned int *plen)
 {
@@ -1541,7 +1505,7 @@ int main(int argc, char **argv)
 	ctx->argv0 = daemon_ident_from_argv0(argv[0]);
 	daemon_log_ident = ctx->argv0;
 
-	err = config_load(ctx);
+	err = teamd_config_load(ctx);
 	if (err) {
 		teamd_log_err("Failed to load config.");
 		goto context_fini;
@@ -1590,7 +1554,7 @@ int main(int argc, char **argv)
 	}
 
 config_free:
-	config_free(ctx);
+	teamd_config_free(ctx);
 context_fini:
 	teamd_context_fini(ctx);
 	return ret;

@@ -24,6 +24,42 @@
 
 #include "teamd.h"
 
+#define TEAMD_IMPLICIT_CONFIG "{\"device\": \"team0\", \"runner\": {\"name\": \"roundrobin\"}}"
+
+int teamd_config_load(struct teamd_context *ctx)
+{
+	json_error_t jerror;
+	size_t jflags = JSON_REJECT_DUPLICATES;
+
+	if (!ctx->config_text && !ctx->config_file) {
+		ctx->config_text = strdup(TEAMD_IMPLICIT_CONFIG);
+		if (!ctx->config_text)
+			return -ENOMEM;
+		teamd_log_warn("No config passed, using implicit one.");
+	}
+	if (ctx->config_text) {
+		if (ctx->config_file)
+			teamd_log_warn("Command line config string is present, ignoring given config file.");
+		ctx->config_json = json_loads(ctx->config_text, jflags,
+					      &jerror);
+	} else if (ctx->config_file) {
+		ctx->config_json = json_load_file(ctx->config_file, jflags,
+						  &jerror);
+	}
+	if (!ctx->config_json) {
+		teamd_log_err("Failed to parse config: %s on line %d, column %d",
+			      jerror.text, jerror.line, jerror.column);
+		return -EIO;
+	}
+
+	return 0;
+}
+
+void teamd_config_free(struct teamd_context *ctx)
+{
+	json_decref(ctx->config_json);
+}
+
 static int __json_path_lite(json_t **p_json_obj, json_t *json_root,
 			    const char *fmt, va_list ap)
 {
