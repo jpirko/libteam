@@ -22,11 +22,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
-#include <jansson.h>
 #include <team.h>
 #include <private/misc.h>
 
 #include "teamd.h"
+#include "teamd_json.h"
 #include "teamd_ctl_methods.h"
 
 static int teamd_ctl_method_port_config_update(struct teamd_context *ctx,
@@ -106,8 +106,6 @@ static int teamd_ctl_method_port_remove(struct teamd_context *ctx,
 	return ops->reply_succ(ops_priv, NULL);
 }
 
-#define JSON_DUMPS_FLAGS (JSON_INDENT(4) | JSON_ENSURE_ASCII | JSON_SORT_KEYS)
-
 static int teamd_ctl_method_config_dump(struct teamd_context *ctx,
 					const struct teamd_ctl_method_ops *ops,
 					void *ops_priv)
@@ -115,8 +113,8 @@ static int teamd_ctl_method_config_dump(struct teamd_context *ctx,
 	char *cfg;
 	int err;
 
-	cfg = json_dumps(ctx->config_json, JSON_DUMPS_FLAGS);
-	if (!cfg) {
+	err = teamd_config_dump(ctx, &cfg);
+	if (err) {
 		teamd_log_err("Failed to dump config.");
 		return ops->reply_err(ops_priv, "ConfigDumpFail", "Failed to dump config.");
 	}
@@ -130,17 +128,10 @@ static int teamd_ctl_method_config_dump_actual(struct teamd_context *ctx,
 					       void *ops_priv)
 {
 	char *cfg;
-	json_t *actual_json;
 	int err;
 
-	err = teamd_config_get_actual(ctx, &actual_json);
+	err = teamd_config_actual_dump(ctx, &cfg);
 	if (err) {
-		teamd_log_err("Failed to get actual config.");
-		return ops->reply_err(ops_priv, "ConfigDumpActualFail", "Failed to get actual config.");
-	}
-	cfg = json_dumps(actual_json, JSON_DUMPS_FLAGS);
-	json_decref(actual_json);
-	if (!cfg) {
 		teamd_log_err("Failed to dump actual config.");
 		return ops->reply_err(ops_priv, "ConfigDumpActualFail", "Failed to dump actual config.");
 	}
@@ -162,7 +153,7 @@ static int teamd_ctl_method_state_dump(struct teamd_context *ctx,
 		teamd_log_err("Failed to get state.");
 		return ops->reply_err(ops_priv, "StateDumpFail", "Failed to get state.");
 	}
-	state = json_dumps(state_json, JSON_DUMPS_FLAGS);
+	state = json_dumps(state_json, TEAMD_JSON_DUMPS_FLAGS);
 	json_decref(state_json);
 	if (!state) {
 		teamd_log_err("Failed to dump state.");

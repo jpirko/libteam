@@ -23,6 +23,7 @@
 #include <jansson.h>
 
 #include "teamd.h"
+#include "teamd_json.h"
 
 #define TEAMD_IMPLICIT_CONFIG "{\"device\": \"team0\", \"runner\": {\"name\": \"roundrobin\"}}"
 
@@ -60,6 +61,17 @@ void teamd_config_free(struct teamd_context *ctx)
 	json_decref(ctx->config_json);
 }
 
+int teamd_config_dump(struct teamd_context *ctx, char **p_config_dump)
+{
+	char *dump;
+
+	dump = json_dumps(ctx->config_json, TEAMD_JSON_DUMPS_FLAGS);
+	if (!dump)
+		return -ENOMEM;
+	*p_config_dump = dump;
+	return 0;
+}
+
 static int get_port_obj(json_t **pport_obj, json_t *config_json,
 			const char *port_name)
 {
@@ -94,12 +106,13 @@ static int get_port_obj(json_t **pport_obj, json_t *config_json,
 	return 0;
 }
 
-int teamd_config_get_actual(struct teamd_context *ctx, json_t **pactual_json)
+int teamd_config_actual_dump(struct teamd_context *ctx, char **p_config_dump)
 {
 	json_t *actual_json;
 	struct teamd_port *tdport;
 	json_t *ports_obj;
 	void *iter;
+	char *dump;
 	int err;
 
 	actual_json = json_deep_copy(ctx->config_json);
@@ -132,7 +145,11 @@ int teamd_config_get_actual(struct teamd_context *ctx, json_t **pactual_json)
 			json_object_del(ports_obj, port_name);
 	}
 
-	*pactual_json = actual_json;
+	dump = json_dumps(actual_json, TEAMD_JSON_DUMPS_FLAGS);
+	json_decref(actual_json);
+	if (!dump)
+		return -ENOMEM;
+	*p_config_dump = dump;
 	return 0;
 
 errout:
