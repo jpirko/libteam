@@ -218,6 +218,11 @@ static int __json_path_lite(json_t **p_json_obj, json_t *json_root,
 			if (end)
 				*end = '\0';
 			json_obj = json_object_get(json_obj, ptr);
+			if (end)
+				*end = '.';
+			else
+				end = ptr + strlen(ptr);
+			ptr = end;
 		} else if (*ptr == '[') {
 			int i;
 
@@ -230,12 +235,12 @@ static int __json_path_lite(json_t **p_json_obj, json_t *json_root,
 				if (!isdigit(ptr[i]))
 					return -EINVAL;
 			json_obj = json_array_get(json_obj, atoi(ptr));
+			ptr = end + 1;
 		} else {
 			return -EINVAL;
 		}
 		if (!json_obj)
 			return -ENOENT;
-		ptr = end + 1;
 	}
 	*p_json_obj = json_obj;
 	return 0;
