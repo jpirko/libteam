@@ -784,22 +784,13 @@ int teamd_port_remove(struct teamd_context *ctx, const char *port_name)
 static int teamd_add_ports(struct teamd_context *ctx)
 {
 	int err;
-	json_t *ports_obj;
-	void *iter;
+	const char *key;
 
 	if (ctx->init_no_ports)
 		return 0;
 
-	err = json_unpack(ctx->config_json, "{s:o}", "ports", &ports_obj);
-	if (err) {
-		teamd_log_dbg("No ports found in config.");
-		return 0;
-	}
-	for (iter = json_object_iter(ports_obj); iter;
-	     iter = json_object_iter_next(ports_obj, iter)) {
-		const char *port_name = json_object_iter_key(iter);
-
-		err = teamd_port_add(ctx, port_name);
+	teamd_config_for_each_key(key, ctx, "$.ports") {
+		err = teamd_port_add(ctx, key);
 		if (err)
 			return err;
 	}
