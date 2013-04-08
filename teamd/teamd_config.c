@@ -324,3 +324,25 @@ int teamd_config_bool_get(struct teamd_context *ctx, bool *p_bool_val,
 	*p_bool_val = json_is_true(json_obj) ? true : false;
 	return 0;
 }
+
+const char *teamd_config_next_key(struct teamd_context *ctx, const char *key,
+				  const char *fmt, ...)
+{
+	va_list ap;
+	json_t *json_obj = json_obj;
+	void *iter;
+	int err;
+
+	va_start(ap, fmt);
+	err = teamd_config_object_get(ctx, &json_obj, fmt, ap);
+	va_end(ap);
+	if (err)
+		return NULL;
+	if (key) {
+		iter = json_object_key_to_iter(key);
+		iter = json_object_iter_next(json_obj, iter);
+	} else {
+		iter = json_object_iter(json_obj);
+	}
+	return json_object_iter_key(iter);
+}

@@ -36,5 +36,11 @@ int teamd_config_int_get(struct teamd_context *ctx, int *p_int_val,
 			 const char *fmt, ...);
 int teamd_config_bool_get(struct teamd_context *ctx, bool *p_bool_val,
 			  const char *fmt, ...);
+const char *teamd_config_next_key(struct teamd_context *ctx, const char *key,
+				  const char *fmt, ...);
+
+#define teamd_config_for_each_key(key, ctx, args...)			\
+	for (key = teamd_config_next_key(ctx, NULL, ##args); key;	\
+	     key = teamd_config_next_key(ctx, key, ##args))
 
 #endif /* _TEAMD_CONFIG_H_ */
