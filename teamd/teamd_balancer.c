@@ -26,6 +26,7 @@
 #include <team.h>
 
 #include "teamd.h"
+#include "teamd_config.h"
 
 struct tb_stats {
 	uint64_t last_bytes;

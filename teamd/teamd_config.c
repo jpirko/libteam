@@ -23,6 +23,7 @@
 #include <jansson.h>
 
 #include "teamd.h"
+#include "teamd_config.h"
 #include "teamd_json.h"
 
 #define TEAMD_IMPLICIT_CONFIG "{\"device\": \"team0\", \"runner\": {\"name\": \"roundrobin\"}}"

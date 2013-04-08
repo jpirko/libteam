@@ -356,17 +356,4 @@ static inline bool timespec_is_zero(struct timespec *ts)
 	return !ts->tv_sec && !ts->tv_nsec;
 }
 
-int teamd_config_load(struct teamd_context *ctx);
-void teamd_config_free(struct teamd_context *ctx);
-int teamd_config_dump(struct teamd_context *ctx, char **p_config_dump);
-int teamd_config_actual_dump(struct teamd_context *ctx, char **p_config_dump);
-int teamd_config_port_update(struct teamd_context *ctx, const char *port_name,
-			     const char *json_port_cfg_str);
-int teamd_config_string_get(struct teamd_context *ctx, const char **p_str_val,
-			    const char *fmt, ...);
-int teamd_config_int_get(struct teamd_context *ctx, int *p_int_val,
-			 const char *fmt, ...);
-int teamd_config_bool_get(struct teamd_context *ctx, bool *p_bool_val,
-			  const char *fmt, ...);
-
 #endif /* _TEAMD_H_ */
