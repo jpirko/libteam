@@ -38,7 +38,6 @@
 #include <libdaemon/dsignal.h>
 #include <libdaemon/dlog.h>
 #include <libdaemon/dpid.h>
-#include <jansson.h>
 #include <private/list.h>
 #include <private/misc.h>
 #include <team.h>
@@ -801,15 +800,10 @@ static int teamd_event_watch_port_added(struct teamd_context *ctx,
 					struct teamd_port *tdport, void *priv)
 {
 	int err;
-	json_t *port_obj;
 	int tmp;
 
-	err = json_unpack(ctx->config_json, "{s:{s:o}}",
-			  "ports", tdport->ifname, &port_obj);
-	if (err)
-		return 0; /* no config found */
-
-	err = json_unpack(port_obj, "{s:i}", "queue_id", &tmp);
+	err = teamd_config_int_get(ctx, &tmp, "$.ports.%s.queue_id",
+				   tdport->ifname);
 	if (!err) {
 		uint32_t queue_id;
 
@@ -827,7 +821,8 @@ static int teamd_event_watch_port_added(struct teamd_context *ctx,
 			return err;
 		}
 	}
-	err = json_unpack(port_obj, "{s:i}", "prio", &tmp);
+	err = teamd_config_int_get(ctx, &tmp, "$.ports.%s.prio",
+				   tdport->ifname);
 	if (err)
 		tmp = 0;
 	err = team_set_port_priority(ctx->th, tdport->ifindex, tmp);
