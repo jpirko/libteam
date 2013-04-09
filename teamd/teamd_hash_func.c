@@ -19,11 +19,11 @@
 
 #include <string.h>
 #include <linux/filter.h>
-#include <jansson.h>
 #include <private/misc.h>
 #include <team.h>
 
 #include "teamd.h"
+#include "teamd_config.h"
 #include "teamd_bpf_chef.h"
 
 static const struct teamd_bpf_hash_field eth_hdr_hash_field[] = {
@@ -148,19 +148,19 @@ static const struct teamd_bpf_desc_frag *__find_frag(const char *frag_name)
 	return NULL;
 }
 
-static int teamd_hash_func_init(struct sock_fprog *fprog, json_t *tx_hash_obj)
+static int teamd_hash_func_init(struct teamd_context *ctx, struct sock_fprog *fprog)
 {
 	int i;
-	int arr_siz = json_array_size(tx_hash_obj);
 	int err;
 
 	teamd_bpf_desc_compile_start(fprog);
-	for (i = 0; i < arr_siz; i++) {
+	teamd_config_for_each_arr_index(i, ctx, "$.runner.tx_hash") {
 		const struct teamd_bpf_desc_frag *frag;
-		json_t *obj = json_array_get(tx_hash_obj, i);
-		const char *frag_name = json_string_value(obj);
+		const char *frag_name;
 
-		if (!frag_name)
+		err = teamd_config_string_get(ctx, &frag_name,
+					      "$.runner.tx_hash[%d]", i);
+		if (err)
 			continue;
 
 		frag = __find_frag(frag_name);
@@ -190,17 +190,14 @@ static void teamd_hash_func_fini(struct sock_fprog *fprog)
 
 int teamd_hash_func_set(struct teamd_context *ctx)
 {
-	json_t *tx_hash_obj;
 	struct sock_fprog fprog;
 	int err;
 
-	err = json_unpack(ctx->config_json, "{s:{s:o}}", "runner", "tx_hash",
-			  &tx_hash_obj);
-	if (err) {
+	if (!teamd_config_path_exists(ctx, "$.runner.tx_hash")) {
 		teamd_log_warn("No Tx hash recipe found in config.");
 		return 0;
 	}
-	err = teamd_hash_func_init(&fprog, tx_hash_obj);
+	err = teamd_hash_func_init(ctx, &fprog);
 	if (err) {
 		teamd_log_err("Failed to init hash function.");
 		return err;
