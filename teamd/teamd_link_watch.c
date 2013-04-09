@@ -38,6 +38,7 @@
 #include <team.h>
 
 #include "teamd.h"
+#include "teamd_config.h"
 
 struct lw_common_port_priv {
 	const struct teamd_link_watch *link_watch;
@@ -45,7 +46,7 @@ struct lw_common_port_priv {
 	struct teamd_port *tdport;
 	bool link_up;
 	bool forced_send;
-	json_t *link_watch_json;
+	struct teamd_config_path_cookie *cpcookie;
 };
 
 struct teamd_link_watch {
@@ -239,11 +240,11 @@ static int lw_ethtool_load_options(struct teamd_context *ctx,
 				   struct teamd_port *tdport,
 				   struct lw_ethtool_port_priv *ethtool_ppriv)
 {
-	json_t *link_watch_json = ethtool_ppriv->common.link_watch_json;
+	struct teamd_config_path_cookie *cpcookie = ethtool_ppriv->common.cpcookie;
 	int err;
 	int tmp;
 
-	err = json_unpack(link_watch_json, "{s:i}", "delay_up", &tmp);
+	err = teamd_config_int_get(ctx, &tmp, "@.queue_id", cpcookie);
 	if (!err) {
 		if (tmp < 0) {
 			teamd_log_err("\"delay_up\" must not be negative number.");
@@ -252,7 +253,7 @@ static int lw_ethtool_load_options(struct teamd_context *ctx,
 		teamd_log_dbg("delay_up \"%d\".", tmp);
 		ms_to_timespec(&ethtool_ppriv->delay_up, tmp);
 	}
-	err = json_unpack(link_watch_json, "{s:i}", "delay_down", &tmp);
+	err = teamd_config_int_get(ctx, &tmp, "@.delay_down", cpcookie);
 	if (!err) {
 		if (tmp < 0) {
 			teamd_log_err("\"delay_down\" must not be negative number.");
@@ -407,11 +408,11 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 			       struct teamd_port *tdport,
 			       struct lw_psr_port_priv *psr_ppriv)
 {
-	json_t *link_watch_json = psr_ppriv->common.link_watch_json;
+	struct teamd_config_path_cookie *cpcookie = psr_ppriv->common.cpcookie;
 	int err;
 	int tmp;
 
-	err = json_unpack(link_watch_json, "{s:i}", "interval", &tmp);
+	err = teamd_config_int_get(ctx, &tmp, "@.interval", cpcookie);
 	if (err) {
 		teamd_log_err("Failed to get \"interval\" link-watch option.");
 		return -EINVAL;
@@ -419,7 +420,7 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 	teamd_log_dbg("interval \"%d\".", tmp);
 	ms_to_timespec(&psr_ppriv->interval, tmp);
 
-	err = json_unpack(link_watch_json, "{s:i}", "init_wait", &tmp);
+	err = teamd_config_int_get(ctx, &tmp, "@.init_wait", cpcookie);
 	if (!err)
 		ms_to_timespec(&psr_ppriv->init_wait, tmp);
 	/* if init_wait is set to 0, use default_init_wait */
@@ -427,7 +428,7 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 		psr_ppriv->init_wait = lw_psr_default_init_wait;
 	teamd_log_dbg("init_wait \"%d\".", timespec_to_ms(&psr_ppriv->init_wait));
 
-	err = json_unpack(link_watch_json, "{s:i}", "missed_max", &tmp);
+	err = teamd_config_int_get(ctx, &tmp, "@.missed_max", cpcookie);
 	if (err) {
 		teamd_log_err("Failed to get \"missed_max\" link-watch option.");
 		return -EINVAL;
@@ -626,12 +627,12 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 			      struct lw_psr_port_priv *psr_ppriv)
 {
 	struct lw_ap_port_priv *ap_ppriv = lw_ap_ppriv_get(psr_ppriv);
-	json_t *link_watch_json = psr_ppriv->common.link_watch_json;
-	char *host;
+	struct teamd_config_path_cookie *cpcookie = psr_ppriv->common.cpcookie;
+	const char *host;
 	int tmp;
 	int err;
 
-	err = json_unpack(link_watch_json, "{s:s}", "source_host", &host);
+	err = teamd_config_string_get(ctx, &host, "@.source_host", cpcookie);
 	if (err) {
 		teamd_log_err("Failed to get \"source_host\" link-watch option.");
 		return -EINVAL;
@@ -642,7 +643,7 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 	teamd_log_dbg("source address \"%s\".",
 		      str_in_addr(&ap_ppriv->src));
 
-	err = json_unpack(link_watch_json, "{s:s}", "target_host", &host);
+	err = teamd_config_string_get(ctx, &host, "@.target_host", cpcookie);
 	if (err) {
 		teamd_log_err("Failed to get \"target_host\" link-watch option.");
 		return -EINVAL;
@@ -652,19 +653,25 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 		return err;
 	teamd_log_dbg("target address \"%s\".", str_in_addr(&ap_ppriv->dst));
 
-	err = json_unpack(link_watch_json, "{s:b}",  "validate_active", &tmp);
-	ap_ppriv->validate_active = err ? false : !!tmp;
+	err = teamd_config_bool_get(ctx, &ap_ppriv->validate_active,
+				    "@.validate_active", cpcookie);
+	if (err)
+		ap_ppriv->validate_active = false;
 	teamd_log_dbg("validate_active \"%d\".", ap_ppriv->validate_active);
 
-	err = json_unpack(link_watch_json, "{s:b}",  "validate_inactive", &tmp);
-	ap_ppriv->validate_inactive = err ? false : !!tmp;
+	err = teamd_config_bool_get(ctx, &ap_ppriv->validate_inactive,
+				    "@.validate_inactive", cpcookie);
+	if (err)
+		ap_ppriv->validate_inactive = false;
 	teamd_log_dbg("validate_inactive \"%d\".", ap_ppriv->validate_inactive);
 
-	err = json_unpack(link_watch_json, "{s:b}",  "send_always", &tmp);
-	ap_ppriv->send_always = err ? false : !!tmp;
+	err = teamd_config_bool_get(ctx, &ap_ppriv->send_always,
+				    "@.send_always", cpcookie);
+	if (err)
+		ap_ppriv->send_always = false;
 	teamd_log_dbg("send_always \"%d\".", ap_ppriv->send_always);
 
-	err = json_unpack(link_watch_json, "{s:i}", "vlanid", &tmp);
+	err = teamd_config_int_get(ctx, &tmp, "@.vlanid", cpcookie);
 	if (!err) {
 		if (tmp < 0 || tmp >= 4096) {
 			teamd_log_err("Wrong \"vlanid\" option value.");
@@ -674,10 +681,6 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 		ap_ppriv->vlanid = tmp;
 		teamd_log_dbg("vlan id \"%u\".", ap_ppriv->vlanid);
 	}
-	err = set_in_addr(&ap_ppriv->dst, host);
-	if (err)
-		return err;
-	teamd_log_dbg("target address \"%s\".", str_in_addr(&ap_ppriv->dst));
 
 	return 0;
 }
@@ -977,11 +980,11 @@ static int lw_nsnap_load_options(struct teamd_context *ctx,
 				 struct lw_psr_port_priv *psr_ppriv)
 {
 	struct lw_nsnap_port_priv *nsnap_ppriv = lw_nsnap_ppriv_get(psr_ppriv);
-	json_t *link_watch_json = psr_ppriv->common.link_watch_json;
-	char *host;
+	struct teamd_config_path_cookie *cpcookie = psr_ppriv->common.cpcookie;
+	const char *host;
 	int err;
 
-	err = json_unpack(link_watch_json, "{s:s}", "target_host", &host);
+	err = teamd_config_string_get(ctx, &host, "@.target_host", cpcookie);
 	if (err) {
 		teamd_log_err("Failed to get \"target_host\" link-watch option.");
 		return -EINVAL;
@@ -1189,21 +1192,21 @@ static int teamd_link_watch_refresh_user_linkup(struct teamd_context *ctx,
 	return 0;
 }
 
-static int link_watch_load_one_json_obj(struct teamd_context *ctx,
-					struct teamd_port *tdport,
-					json_t *link_watch_obj)
+static int link_watch_load_config_one(struct teamd_context *ctx,
+				      struct teamd_port *tdport,
+				      struct teamd_config_path_cookie *cpcookie)
 {
-	int ret;
 	int err;
 	const char *link_watch_name;
 	const struct teamd_link_watch *link_watch;
 	struct lw_common_port_priv *common_ppriv;
 
-	ret = json_unpack(link_watch_obj, "{s:s}", "name", &link_watch_name);
-	if (ret) {
+	err = teamd_config_string_get(ctx, &link_watch_name,
+				      "@.name", cpcookie);
+	if (err) {
 		teamd_log_err("%s: Failed to get link watch name.",
 			      tdport->ifname);
-		return -EINVAL;
+		return err;
 	}
 	link_watch = teamd_find_link_watch(link_watch_name);
 	if (!link_watch) {
@@ -1219,24 +1222,26 @@ static int link_watch_load_one_json_obj(struct teamd_context *ctx,
 	common_ppriv->link_watch = link_watch;
 	common_ppriv->ctx = ctx;
 	common_ppriv->tdport = tdport;
-	common_ppriv->link_watch_json = link_watch_obj;
+	common_ppriv->cpcookie = cpcookie;
 	return 0;
 }
 
-static int link_watch_load_json_obj(struct teamd_context *ctx,
-				    struct teamd_port *tdport,
-				    json_t *link_watch_obj)
+static int link_watch_load_config(struct teamd_context *ctx,
+				  struct teamd_port *tdport,
+				  struct teamd_config_path_cookie *cpcookie)
 {
-	size_t i;
+	int i;
 	int err;
 
-	if (!json_is_array(link_watch_obj))
-		return link_watch_load_one_json_obj(ctx, tdport,
-						    link_watch_obj);
-	for (i = 0; i < json_array_size(link_watch_obj); i++) {
-		json_t *obj = json_array_get(link_watch_obj, i);
+	if (!teamd_config_path_is_arr(ctx, "@", cpcookie))
+		return link_watch_load_config_one(ctx, tdport, cpcookie);
 
-		err = link_watch_load_one_json_obj(ctx, tdport, obj);
+	teamd_config_for_each_arr_index(i, ctx, "@", cpcookie) {
+		struct teamd_config_path_cookie *item_cpcookie;
+
+		item_cpcookie = teamd_config_path_cookie_get(ctx, "@[%d]",
+							     cpcookie, i);
+		err = link_watch_load_config_one(ctx, tdport, item_cpcookie);
 		if (err)
 			return err;
 	}
@@ -1247,25 +1252,23 @@ static int link_watch_event_watch_port_added(struct teamd_context *ctx,
 					     struct teamd_port *tdport,
 					     void *priv)
 {
-	int ret;
+	struct teamd_config_path_cookie *cpcookie;
 	int err;
-	json_t *link_watch_obj;
 
-	ret = json_unpack(ctx->config_json, "{s:{s:{s:o}}}", "ports",
-			  tdport->ifname, "link_watch", &link_watch_obj);
-	if (!ret) {
+	cpcookie = teamd_config_path_cookie_get(ctx, "$.ports.%s.link_watch",
+						tdport->ifname);
+	if (cpcookie) {
 		teamd_log_dbg("%s: Got link watch from port config.",
 			      tdport->ifname);
-		err = link_watch_load_json_obj(ctx, tdport, link_watch_obj);
+		err = link_watch_load_config(ctx, tdport, cpcookie);
 		if (err)
 			return err;
 	}
 
-	ret = json_unpack(ctx->config_json, "{s:o}", "link_watch",
-			  &link_watch_obj);
-	if (!ret) {
+	cpcookie = teamd_config_path_cookie_get(ctx, "$.link_watch");
+	if (cpcookie) {
 		teamd_log_dbg("Got link watch from global config.");
-		err = link_watch_load_json_obj(ctx, tdport, link_watch_obj);
+		err = link_watch_load_config(ctx, tdport, cpcookie);
 		if (err)
 			return err;
 	}
