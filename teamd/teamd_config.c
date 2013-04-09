@@ -214,7 +214,7 @@ static int __json_path_lite(json_t **p_json_obj, json_t *json_root,
 	json_t *json_obj = json_root;
 	char *ptr;
 	char *end;
-	char path[128];
+	char path[TEAMD_CONFIG_PATH_MAXLEN];
 	size_t pathlen;
 	int ret;
 

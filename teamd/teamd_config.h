@@ -24,6 +24,8 @@
 
 #include "teamd.h"
 
+#define TEAMD_CONFIG_PATH_MAXLEN 128
+
 int teamd_config_load(struct teamd_context *ctx);
 void teamd_config_free(struct teamd_context *ctx);
 int teamd_config_dump(struct teamd_context *ctx, char **p_config_dump);
