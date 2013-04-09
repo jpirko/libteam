@@ -218,6 +218,12 @@ static int __json_path_lite(json_t **p_json_obj, json_t *json_root,
 	size_t pathlen;
 	int ret;
 
+	if (*fmt == '@')
+		json_obj = va_arg(ap, void *);
+	else if (*fmt != '$')
+		return -EINVAL;
+	fmt++;
+
 	ret = vsnprintf(path, sizeof(path), fmt, ap);
 	if (ret < 0 || ret >= sizeof(path))
 		return -EINVAL;
@@ -225,9 +231,6 @@ static int __json_path_lite(json_t **p_json_obj, json_t *json_root,
 	pathlen = strlen(path);
 	ptr = path;
 
-	if (*ptr != '$')
-		return -EINVAL;
-	ptr++;
 	while (ptr - path < pathlen) {
 		if (*ptr == '.') {
 			char tmp;
@@ -280,6 +283,21 @@ static int teamd_config_object_get(struct teamd_context *ctx,
 		return err;
 	}
 	return 0;
+}
+
+struct teamd_config_path_cookie *
+teamd_config_path_cookie_get(struct teamd_context *ctx, const char *fmt, ...)
+{
+	va_list ap;
+	json_t *json_obj = json_obj;
+	int err;
+
+	va_start(ap, fmt);
+	err = teamd_config_object_get(ctx, &json_obj, fmt, ap);
+	va_end(ap);
+	if (err)
+		return NULL;
+	return (struct teamd_config_path_cookie *) json_obj;
 }
 
 bool teamd_config_path_exists(struct teamd_context *ctx, const char *fmt, ...)
