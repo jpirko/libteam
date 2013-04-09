@@ -346,3 +346,17 @@ const char *teamd_config_next_key(struct teamd_context *ctx, const char *key,
 	}
 	return json_object_iter_key(iter);
 }
+
+size_t teamd_config_arr_size(struct teamd_context *ctx, const char *fmt, ...)
+{
+	va_list ap;
+	json_t *json_obj = json_obj;
+	int err;
+
+	va_start(ap, fmt);
+	err = teamd_config_object_get(ctx, &json_obj, fmt, ap);
+	va_end(ap);
+	if (err)
+		return 0;
+	return json_array_size(json_obj);
+}

@@ -43,4 +43,9 @@ const char *teamd_config_next_key(struct teamd_context *ctx, const char *key,
 	for (key = teamd_config_next_key(ctx, NULL, ##args); key;	\
 	     key = teamd_config_next_key(ctx, key, ##args))
 
+size_t teamd_config_arr_size(struct teamd_context *ctx, const char *fmt, ...);
+
+#define teamd_config_for_each_arr_index(index, ctx, args...)	\
+	for (index = 0; index < teamd_config_arr_size(ctx, ##args); index++)
+
 #endif /* _TEAMD_CONFIG_H_ */
