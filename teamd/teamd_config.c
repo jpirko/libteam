@@ -192,6 +192,22 @@ new_port_decref:
 	return err;
 }
 
+static char *__strchrs(char *str, char *chars)
+{
+	char *tmp;
+
+	while (*str != '\0') {
+		tmp = chars;
+		while (*tmp != '\0') {
+			if (*tmp == *str)
+				return str;
+			tmp++;
+		}
+		str++;
+	}
+	return NULL;
+}
+
 static int __json_path_lite(json_t **p_json_obj, json_t *json_root,
 			    const char *fmt, va_list ap)
 {
@@ -214,13 +230,17 @@ static int __json_path_lite(json_t **p_json_obj, json_t *json_root,
 	ptr++;
 	while (ptr - path < pathlen) {
 		if (*ptr == '.') {
+			char tmp;
+
 			ptr++;
-			end = strchr(ptr, '.');
-			if (end)
+			end = __strchrs(ptr, ".[");
+			if (end) {
+				tmp = *end;
 				*end = '\0';
+			}
 			json_obj = json_object_get(json_obj, ptr);
 			if (end)
-				*end = '.';
+				*end = tmp;
 			else
 				end = ptr + strlen(ptr);
 			ptr = end;
