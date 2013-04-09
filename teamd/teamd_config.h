@@ -38,6 +38,7 @@ struct teamd_config_path_cookie *
 teamd_config_path_cookie_get(struct teamd_context *ctx, const char *fmt, ...);
 
 bool teamd_config_path_exists(struct teamd_context *ctx, const char *fmt, ...);
+bool teamd_config_path_is_arr(struct teamd_context *ctx, const char *fmt, ...);
 int teamd_config_string_get(struct teamd_context *ctx, const char **p_str_val,
 			    const char *fmt, ...);
 int teamd_config_int_get(struct teamd_context *ctx, int *p_int_val,

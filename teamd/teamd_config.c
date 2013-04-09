@@ -312,6 +312,18 @@ bool teamd_config_path_exists(struct teamd_context *ctx, const char *fmt, ...)
 	return err ? false : true;
 }
 
+bool teamd_config_path_is_arr(struct teamd_context *ctx, const char *fmt, ...)
+{
+	va_list ap;
+	json_t *json_obj = json_obj;
+	int err;
+
+	va_start(ap, fmt);
+	err = teamd_config_object_get(ctx, &json_obj, fmt, ap);
+	va_end(ap);
+	return !err && json_is_array(json_obj) ? true : false;
+}
+
 int teamd_config_string_get(struct teamd_context *ctx, const char **p_str_val,
 			    const char *fmt, ...)
 {
