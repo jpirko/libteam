@@ -262,6 +262,18 @@ static int teamd_config_object_get(struct teamd_context *ctx,
 	return 0;
 }
 
+bool teamd_config_path_exists(struct teamd_context *ctx, const char *fmt, ...)
+{
+	va_list ap;
+	json_t *json_obj = json_obj;
+	int err;
+
+	va_start(ap, fmt);
+	err = teamd_config_object_get(ctx, &json_obj, fmt, ap);
+	va_end(ap);
+	return err ? false : true;
+}
+
 int teamd_config_string_get(struct teamd_context *ctx, const char **p_str_val,
 			    const char *fmt, ...)
 {
