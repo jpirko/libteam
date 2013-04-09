@@ -39,6 +39,7 @@
 
 #include "teamd.h"
 #include "teamd_config.h"
+#include "teamd_state.h"
 
 struct lw_common_port_priv {
 	const struct teamd_link_watch *link_watch;

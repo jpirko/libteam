@@ -121,8 +121,6 @@ struct teamd_port {
 	struct team_ifinfo *		team_ifinfo;
 };
 
-struct teamd_state_ops;
-
 struct teamd_runner {
 	const char *name;
 	const char *team_mode_name;
@@ -174,30 +172,6 @@ int teamd_event_watch_register(struct teamd_context *ctx,
 void teamd_event_watch_unregister(struct teamd_context *ctx,
 				  const struct teamd_event_watch_ops *ops,
 				  void *priv);
-
-#define TEAMD_RUNNER_STATE_JSON_NAME "runner"
-
-struct teamd_state_ops {
-	int (*dump)(struct teamd_context *ctx,
-		    json_t **pstate_json, void *priv);
-	int (*per_port_dump)(struct teamd_context *ctx,
-			     struct teamd_port *tdport,
-			     json_t **pstate_json, void *priv);
-	char *name;
-};
-
-int teamd_state_init(struct teamd_context *ctx);
-void teamd_state_fini(struct teamd_context *ctx);
-int teamd_state_ops_register(struct teamd_context *ctx,
-			     const struct teamd_state_ops *ops,
-			     void *priv);
-void teamd_state_ops_unregister(struct teamd_context *ctx,
-				const struct teamd_state_ops *ops,
-				void *priv);
-int teamd_state_dump(struct teamd_context *ctx, char **p_state_dump);
-
-int teamd_state_basics_init(struct teamd_context *ctx);
-void teamd_state_basics_fini(struct teamd_context *ctx);
 
 /* Main loop callbacks */
 #define TEAMD_LOOP_FD_EVENT_READ	(1 << 0)

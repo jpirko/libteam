@@ -33,6 +33,7 @@
 
 #include "teamd.h"
 #include "teamd_config.h"
+#include "teamd_state.h"
 
 /*
  * Packet format for LACPDU described in

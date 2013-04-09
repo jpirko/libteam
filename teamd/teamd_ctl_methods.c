@@ -27,6 +27,7 @@
 
 #include "teamd.h"
 #include "teamd_config.h"
+#include "teamd_state.h"
 #include "teamd_ctl_methods.h"
 
 static int teamd_ctl_method_port_config_update(struct teamd_context *ctx,

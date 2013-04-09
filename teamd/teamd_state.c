@@ -27,6 +27,7 @@
 #include <private/misc.h>
 
 #include "teamd.h"
+#include "teamd_state.h"
 #include "teamd_json.h"
 
 struct state_ops_item {
