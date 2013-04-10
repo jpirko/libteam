@@ -30,6 +30,171 @@
 #include "teamd_state.h"
 #include "teamd_json.h"
 
+struct teamd_state_vg_item {
+	struct list_item list;
+	char *subpath;
+	const struct teamd_state_val_group *vg;
+	void *priv;
+};
+
+static struct teamd_state_vg_item *
+__find_vg_item(struct teamd_context *ctx,
+	       const struct teamd_state_val_group *vg, void *priv)
+{
+	struct teamd_state_vg_item *item;
+
+	list_for_each_node_entry(item, &ctx->state_vg_list, list) {
+		if (item->vg == vg && item->priv == priv)
+			return item;
+	}
+	return NULL;
+}
+
+int teamd_state_val_group_register(struct teamd_context *ctx,
+				   const struct teamd_state_val_group *vg,
+				   void *priv, const char *fmt, ...)
+{
+	va_list ap;
+	struct teamd_state_vg_item *item;
+	char *subpath;
+	int ret;
+
+	if (__find_vg_item(ctx, vg, priv))
+		return -EEXIST;
+	va_start(ap, fmt);
+	ret = vasprintf(&subpath, fmt, ap);
+	va_end(ap);
+	if (ret == -1)
+		return -ENOMEM;
+
+	item = malloc(sizeof(*item));
+	if (!item) {
+		free(subpath);
+		return -ENOMEM;
+	}
+	item->subpath = subpath;
+	item->vg = vg;
+	item->priv = priv;
+	list_add_tail(&ctx->state_vg_list, &item->list);
+	return 0;
+}
+
+void teamd_state_val_group_unregister(struct teamd_context *ctx,
+				      const struct teamd_state_val_group *vg,
+				      void *priv)
+{
+	struct teamd_state_vg_item *item;
+
+	item = __find_vg_item(ctx, vg, priv);
+	if (!item)
+		return;
+	list_del(&item->list);
+	free(item->subpath);
+	free(item);
+}
+
+static int teamd_state_build_val_group_subpath(json_t **p_vg_json_obj,
+					       json_t *root_json_obj,
+					       struct teamd_port *tdport,
+					       const char *subpath)
+{
+	char *path;
+	int ret;
+	int err;
+
+	if (tdport)
+		ret = asprintf(&path, "$.ports.%s.%s", tdport->ifname, subpath);
+	else
+		ret = asprintf(&path, "$.%s", subpath);
+	if (ret == -1)
+		return -ENOMEM;
+	err = teamd_json_path_lite_build(p_vg_json_obj, root_json_obj, path);
+	free(path);
+	return err;
+}
+
+static int teamd_state_val_group_dump(struct teamd_context *ctx,
+				      json_t *root_json_obj,
+				      struct teamd_port *tdport,
+				      const char *subpath,
+				      const struct teamd_state_val_group *vg,
+				      void *priv)
+{
+	const struct teamd_state_val *val;
+	struct team_state_val_gsetter_ctx gsc;
+	json_t *val_json_obj = val_json_obj;
+	json_t *vg_json_obj = vg_json_obj;
+	int i;
+	int err;
+	int ret;
+
+	err = teamd_state_build_val_group_subpath(&vg_json_obj, root_json_obj,
+						  tdport, subpath);
+	if (err)
+		return err;
+
+	for (i = 0; i < vg->vals_count; i++) {
+		val = &vg->vals[i];
+		memset(&gsc, 0, sizeof(gsc));
+		gsc.info.tdport = tdport;
+		err = val->getter(ctx, &gsc, priv);
+		if (err)
+			return err;
+		switch (val->type) {
+		case TEAMD_STATE_ITEM_TYPE_INT:
+			val_json_obj = json_integer(gsc.data.int_val);
+			break;
+		case TEAMD_STATE_ITEM_TYPE_STRING:
+			val_json_obj = json_string(gsc.data.str_val.ptr);
+			if (gsc.data.str_val.free)
+				free((void *) gsc.data.str_val.ptr);
+			break;
+		case TEAMD_STATE_ITEM_TYPE_BOOL:
+			val_json_obj = json_boolean(gsc.data.bool_val);
+		}
+		if (!val_json_obj)
+			return -ENOMEM;
+		ret = json_object_set_new(vg_json_obj, val->subpath, val_json_obj);
+		if (ret)
+			return -EINVAL;
+	}
+	return 0;
+}
+
+static int teamd_state_val_groups_dump(struct teamd_context *ctx,
+				       json_t *root_json_obj)
+{
+	struct teamd_state_vg_item *item;
+	int err;
+
+	list_for_each_node_entry(item, &ctx->state_vg_list, list) {
+		if (item->vg->per_port) {
+			struct teamd_port *tdport;
+
+			teamd_for_each_tdport(tdport, ctx) {
+				err = teamd_state_val_group_dump(ctx,
+								 root_json_obj,
+								 tdport,
+								 item->subpath,
+								 item->vg,
+								 item->priv);
+				if (err)
+					return err;
+			}
+		} else {
+			err = teamd_state_val_group_dump(ctx,
+							 root_json_obj,
+							 NULL,
+							 item->subpath,
+							 item->vg,
+							 item->priv);
+			if (err)
+				return err;
+		}
+	}
+	return 0;
+}
+
 struct state_ops_item {
 	struct list_item list;
 	const struct teamd_state_ops *ops;
@@ -39,6 +204,7 @@ struct state_ops_item {
 int teamd_state_init(struct teamd_context *ctx)
 {
 	list_init(&ctx->state_ops_list);
+	list_init(&ctx->state_vg_list);
 	return 0;
 }
 
@@ -112,6 +278,7 @@ int teamd_state_dump(struct teamd_context *ctx, char **p_state_dump)
 	state_json = json_object();
 	if (!state_json)
 		return -ENOMEM;
+
 	list_for_each_node_entry(item, &ctx->state_ops_list, list) {
 		if (!item->ops->dump)
 			continue;
@@ -125,6 +292,9 @@ int teamd_state_dump(struct teamd_context *ctx, char **p_state_dump)
 			goto errout;
 		}
 	}
+	err = teamd_state_val_groups_dump(ctx, state_json);
+	if (err)
+		goto errout;
 	dump = json_dumps(state_json, TEAMD_JSON_DUMPS_FLAGS);
 	json_decref(state_json);
 	if (!dump)

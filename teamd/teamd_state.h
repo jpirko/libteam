@@ -24,6 +24,48 @@
 
 #define TEAMD_RUNNER_STATE_JSON_NAME "runner"
 
+enum teamd_state_val_type {
+	TEAMD_STATE_ITEM_TYPE_INT,
+	TEAMD_STATE_ITEM_TYPE_STRING,
+	TEAMD_STATE_ITEM_TYPE_BOOL,
+};
+
+struct team_state_val_gsetter_ctx {
+	union {
+		int int_val;
+		struct {
+			const char *ptr;
+			bool free;
+		} str_val;
+		bool bool_val;
+	} data;
+	struct {
+		struct teamd_port *tdport;
+	} info;
+};
+struct teamd_state_val {
+	const char *subpath;
+	enum teamd_state_val_type type;
+	int (*getter)(struct teamd_context *ctx,
+		      struct team_state_val_gsetter_ctx *gsc, void *priv);
+	int (*setter)(struct teamd_context *ctx,
+		      struct team_state_val_gsetter_ctx *gsc, void *priv);
+};
+
+struct teamd_state_val_group {
+	const struct teamd_state_val *vals;
+	unsigned int vals_count;
+	bool per_port;
+};
+
+int teamd_state_val_group_register(struct teamd_context *ctx,
+				   const struct teamd_state_val_group *vg,
+				   void *priv, const char *fmt, ...);
+
+void teamd_state_val_group_unregister(struct teamd_context *ctx,
+				      const struct teamd_state_val_group *vg,
+				      void *priv);
+
 struct teamd_state_ops {
 	int (*dump)(struct teamd_context *ctx,
 		    json_t **pstate_json, void *priv);

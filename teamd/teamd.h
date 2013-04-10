@@ -92,6 +92,7 @@ struct teamd_context {
 	struct list_item                option_watch_list;
 	struct list_item		event_watch_list;
 	struct list_item		state_ops_list;
+	struct list_item		state_vg_list;
 	uint32_t			ifindex;
 	struct team_ifinfo *		ifinfo;
 	char *				hwaddr;
