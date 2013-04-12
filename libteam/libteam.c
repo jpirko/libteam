@@ -1328,6 +1328,10 @@ int team_carrier_set(struct team_handle *th, bool carrier_up)
 	err = -nl2syserr(err);
 
 	rtnl_link_put(link);
+	if (err == -EINVAL) {
+		warn(th, "Failed to set carrier. Kernel probably does not support setting carrier");
+		return 0;
+	}
 	return err;
 }
 
