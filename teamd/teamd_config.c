@@ -192,91 +192,13 @@ new_port_decref:
 	return err;
 }
 
-static char *__strchrs(char *str, char *chars)
-{
-	char *tmp;
-
-	while (*str != '\0') {
-		tmp = chars;
-		while (*tmp != '\0') {
-			if (*tmp == *str)
-				return str;
-			tmp++;
-		}
-		str++;
-	}
-	return NULL;
-}
-
-static int __json_path_lite(json_t **p_json_obj, json_t *json_root,
-			    const char *fmt, va_list ap)
-{
-	json_t *json_obj = json_root;
-	char *ptr;
-	char *end;
-	char path[TEAMD_CONFIG_PATH_MAXLEN];
-	size_t pathlen;
-	int ret;
-
-	if (*fmt == '@')
-		json_obj = va_arg(ap, void *);
-	else if (*fmt != '$')
-		return -EINVAL;
-	fmt++;
-
-	ret = vsnprintf(path, sizeof(path), fmt, ap);
-	if (ret < 0 || ret >= sizeof(path))
-		return -EINVAL;
-
-	pathlen = strlen(path);
-	ptr = path;
-
-	while (ptr - path < pathlen) {
-		if (*ptr == '.') {
-			char tmp;
-
-			ptr++;
-			end = __strchrs(ptr, ".[");
-			if (end) {
-				tmp = *end;
-				*end = '\0';
-			}
-			json_obj = json_object_get(json_obj, ptr);
-			if (end)
-				*end = tmp;
-			else
-				end = ptr + strlen(ptr);
-			ptr = end;
-		} else if (*ptr == '[') {
-			int i;
-
-			ptr++;
-			end = strchr(ptr, ']');
-			if (!end)
-				return -EINVAL;
-			*end = '\0';
-			for (i = 0; i < strlen(ptr); i++)
-				if (!isdigit(ptr[i]))
-					return -EINVAL;
-			json_obj = json_array_get(json_obj, atoi(ptr));
-			ptr = end + 1;
-		} else {
-			return -EINVAL;
-		}
-		if (!json_obj)
-			return -ENOENT;
-	}
-	*p_json_obj = json_obj;
-	return 0;
-}
-
 static int teamd_config_object_get(struct teamd_context *ctx,
 				   json_t **p_json_obj,
 				   const char *fmt, va_list ap)
 {
 	int err;
 
-	err = __json_path_lite(p_json_obj, ctx->config_json, fmt, ap);
+	err = teamd_json_path_lite_va(p_json_obj, ctx->config_json, fmt, ap);
 	if (err) {
 		if (err == -EINVAL)
 			teamd_log_err("Failed to get value from config: Wrong path format");
