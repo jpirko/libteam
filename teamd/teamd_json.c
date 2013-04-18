@@ -19,6 +19,7 @@
 
 #include <string.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <ctype.h>
 #include <errno.h>
 #include <jansson.h>
@@ -43,10 +44,11 @@ static char *__strchrs(char *str, char *chars)
 
 #define TEAMD_JSON_PATH_MAXLEN 128
 
-int teamd_json_path_lite_va(json_t **p_json_obj, json_t *json_root,
-			    const char *fmt, va_list ap)
+int __teamd_json_path_lite_va(json_t **p_json_obj, json_t *json_root,
+			      bool build, const char *fmt, va_list ap)
 {
 	json_t *json_obj = json_root;
+	json_t *prev_json_obj;
 	char *ptr;
 	char *end;
 	char path[TEAMD_JSON_PATH_MAXLEN];
@@ -76,7 +78,17 @@ int teamd_json_path_lite_va(json_t **p_json_obj, json_t *json_root,
 				tmp = *end;
 				*end = '\0';
 			}
-			json_obj = json_object_get(json_obj, ptr);
+			prev_json_obj = json_obj;
+			json_obj = json_object_get(prev_json_obj, ptr);
+			if (!json_obj && build) {
+				json_obj = json_object();
+				if (!json_obj)
+					return -ENOMEM;
+				ret = json_object_set_new(prev_json_obj, ptr,
+							  json_obj);
+				if (ret)
+					return -EINVAL;
+			}
 			if (end)
 				*end = tmp;
 			else
@@ -105,6 +117,12 @@ int teamd_json_path_lite_va(json_t **p_json_obj, json_t *json_root,
 	return 0;
 }
 
+int teamd_json_path_lite_va(json_t **p_json_obj, json_t *json_root,
+			    const char *fmt, va_list ap)
+{
+	return __teamd_json_path_lite_va(p_json_obj, json_root, false, fmt, ap);
+}
+
 int teamd_json_path_lite(json_t **p_json_obj, json_t *json_root,
 			 const char *fmt, ...)
 {
@@ -113,6 +131,24 @@ int teamd_json_path_lite(json_t **p_json_obj, json_t *json_root,
 
 	va_start(ap, fmt);
 	err = teamd_json_path_lite_va(p_json_obj, json_root, fmt, ap);
+	va_end(ap);
+	return err;
+}
+
+int teamd_json_path_lite_build_va(json_t **p_json_obj, json_t *json_root,
+				  const char *fmt, va_list ap)
+{
+	return __teamd_json_path_lite_va(p_json_obj, json_root, true, fmt, ap);
+}
+
+int teamd_json_path_lite_build(json_t **p_json_obj, json_t *json_root,
+			       const char *fmt, ...)
+{
+	va_list ap;
+	int err;
+
+	va_start(ap, fmt);
+	err = teamd_json_path_lite_build_va(p_json_obj, json_root, fmt, ap);
 	va_end(ap);
 	return err;
 }
