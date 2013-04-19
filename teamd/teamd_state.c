@@ -311,24 +311,20 @@ errout:
  * state basics
  */
 
-static json_t *__fill_ifinfo(struct team_ifinfo *ifinfo)
+static struct team_ifinfo *__get_ifinfo(struct teamd_context *ctx,
+					struct team_state_val_gsetter_ctx *gsc)
 {
-	size_t hwaddr_len = team_get_ifinfo_hwaddr_len(ifinfo);
-	char addr_str[hwaddr_str_len(hwaddr_len)];
-
-	hwaddr_str(addr_str, team_get_ifinfo_hwaddr(ifinfo), hwaddr_len);
-	return json_pack("{s:i, s:s, s:s, s:i}",
-			 "ifindex", team_get_ifinfo_ifindex(ifinfo),
-			 "ifname", team_get_ifinfo_ifname(ifinfo),
-			 "dev_addr", addr_str,
-			 "dev_addr_len", team_get_ifinfo_hwaddr_len(ifinfo));
+	if (gsc->info.tdport)
+		return gsc->info.tdport->team_ifinfo;
+	else
+		return team_get_ifinfo(ctx->th);
 }
 
 static int ifinfo_state_ifindex_get(struct teamd_context *ctx,
 				    struct team_state_val_gsetter_ctx *gsc,
 				    void *priv)
 {
-	gsc->data.int_val = team_get_ifinfo_ifindex(team_get_ifinfo(ctx->th));
+	gsc->data.int_val = team_get_ifinfo_ifindex(__get_ifinfo(ctx, gsc));
 	return 0;
 }
 
@@ -336,7 +332,7 @@ static int ifinfo_state_ifname_get(struct teamd_context *ctx,
 				   struct team_state_val_gsetter_ctx *gsc,
 				   void *priv)
 {
-	gsc->data.str_val.ptr = team_get_ifinfo_ifname(team_get_ifinfo(ctx->th));
+	gsc->data.str_val.ptr = team_get_ifinfo_ifname(__get_ifinfo(ctx, gsc));
 	return 0;
 }
 
@@ -344,7 +340,7 @@ static int ifinfo_state_dev_addr_len_get(struct teamd_context *ctx,
 					 struct team_state_val_gsetter_ctx *gsc,
 					 void *priv)
 {
-	gsc->data.int_val = team_get_ifinfo_hwaddr_len(team_get_ifinfo(ctx->th));
+	gsc->data.int_val = team_get_ifinfo_hwaddr_len(__get_ifinfo(ctx, gsc));
 	return 0;
 }
 
@@ -353,7 +349,7 @@ static int ifinfo_state_dev_addr_get(struct teamd_context *ctx,
 				     struct team_state_val_gsetter_ctx *gsc,
 				     void *priv)
 {
-	struct team_ifinfo *ifinfo = team_get_ifinfo(ctx->th);
+	struct team_ifinfo *ifinfo = __get_ifinfo(ctx, gsc);
 	char *addr_str;
 
 	addr_str = a_hwaddr_str(team_get_ifinfo_hwaddr(ifinfo),
@@ -393,25 +389,23 @@ static const struct teamd_state_val_group teamdev_ifinfo_state_vg = {
 	.vals_count = ARRAY_SIZE(ifinfo_state_vals),
 };
 
+static const struct teamd_state_val_group ports_ifinfo_state_vg = {
+	.vals = ifinfo_state_vals,
+	.vals_count = ARRAY_SIZE(ifinfo_state_vals),
+	.per_port = true,
+};
+
 static json_t *__fill_tdport(struct teamd_port *tdport)
 {
 	struct team_port *port = tdport->team_port;
-	json_t *ifinfo_json;
 	json_t *tdport_json;
 
-	ifinfo_json = __fill_ifinfo(tdport->team_ifinfo);
-	if (!ifinfo_json)
-		return NULL;
-
-	tdport_json = json_pack("{s:o, s:{s:b, s:i, s:s}}",
-				"ifinfo", ifinfo_json,
+	tdport_json = json_pack("{s:{s:b, s:i, s:s}}",
 				"link", "up",
 				team_is_port_link_up(port),
 				"speed", team_get_port_speed(port),
 				"duplex",
 				team_get_port_duplex(port) ? "full" : "half");
-	if (!tdport_json)
-		json_decref(ifinfo_json);
 	return tdport_json;
 }
 
@@ -586,17 +580,24 @@ int teamd_state_basics_init(struct teamd_context *ctx)
 
 	err = teamd_state_ops_register(ctx, &ports_state_ops, ctx);
 	if (err)
-		goto teamdev_state_unreg;
+		goto teamdev_ifinfo_state_unreg;
+
+	err = teamd_state_val_group_register(ctx, &ports_ifinfo_state_vg, ctx,
+					     "ifinfo");
+	if (err)
+		goto ports_state_unreg;
 
 	err = teamd_state_val_group_register(ctx, &setup_state_vg, ctx,
 					     "setup");
 	if (err)
-		goto ports_state_unreg;
+		goto ports_ifinfo_state_unreg;
 	return 0;
 
+ports_ifinfo_state_unreg:
+	teamd_state_val_group_unregister(ctx, &ports_ifinfo_state_vg, ctx);
 ports_state_unreg:
 	teamd_state_ops_unregister(ctx, &ports_state_ops, ctx);
-teamdev_state_unreg:
+teamdev_ifinfo_state_unreg:
 	teamd_state_val_group_unregister(ctx, &teamdev_ifinfo_state_vg, ctx);
 	return err;
 }
@@ -604,6 +605,7 @@ teamdev_state_unreg:
 void teamd_state_basics_fini(struct teamd_context *ctx)
 {
 	teamd_state_val_group_unregister(ctx, &setup_state_vg, ctx);
+	teamd_state_val_group_unregister(ctx, &ports_ifinfo_state_vg, ctx);
 	teamd_state_ops_unregister(ctx, &ports_state_ops, ctx);
 	teamd_state_val_group_unregister(ctx, &teamdev_ifinfo_state_vg, ctx);
 }
