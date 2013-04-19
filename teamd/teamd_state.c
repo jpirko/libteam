@@ -324,27 +324,73 @@ static json_t *__fill_ifinfo(struct team_ifinfo *ifinfo)
 			 "dev_addr_len", team_get_ifinfo_hwaddr_len(ifinfo));
 }
 
-static int teamdev_state_dump(struct teamd_context *ctx,
-			      json_t **pstate_json, void *priv)
+static int ifinfo_state_ifindex_get(struct teamd_context *ctx,
+				    struct team_state_val_gsetter_ctx *gsc,
+				    void *priv)
 {
-	json_t *state_json;
-	json_t *ifinfo_json;
-
-	ifinfo_json = __fill_ifinfo(team_get_ifinfo(ctx->th));
-	if (!ifinfo_json)
-		return -ENOMEM;
-	state_json = json_pack("{s:o}", "ifinfo", ifinfo_json);
-	if (!state_json) {
-		json_decref(ifinfo_json);
-		return -ENOMEM;
-	}
-	*pstate_json = state_json;
+	gsc->data.int_val = team_get_ifinfo_ifindex(team_get_ifinfo(ctx->th));
 	return 0;
 }
 
-static const struct teamd_state_ops teamdev_state_ops = {
-	.dump = teamdev_state_dump,
-	.name = "team_device",
+static int ifinfo_state_ifname_get(struct teamd_context *ctx,
+				   struct team_state_val_gsetter_ctx *gsc,
+				   void *priv)
+{
+	gsc->data.str_val.ptr = team_get_ifinfo_ifname(team_get_ifinfo(ctx->th));
+	return 0;
+}
+
+static int ifinfo_state_dev_addr_len_get(struct teamd_context *ctx,
+					 struct team_state_val_gsetter_ctx *gsc,
+					 void *priv)
+{
+	gsc->data.int_val = team_get_ifinfo_hwaddr_len(team_get_ifinfo(ctx->th));
+	return 0;
+}
+
+
+static int ifinfo_state_dev_addr_get(struct teamd_context *ctx,
+				     struct team_state_val_gsetter_ctx *gsc,
+				     void *priv)
+{
+	struct team_ifinfo *ifinfo = team_get_ifinfo(ctx->th);
+	char *addr_str;
+
+	addr_str = a_hwaddr_str(team_get_ifinfo_hwaddr(ifinfo),
+				team_get_ifinfo_hwaddr_len(ifinfo));
+	if (!addr_str)
+		return -ENOMEM;
+	gsc->data.str_val.ptr = addr_str;
+	gsc->data.str_val.free = true;
+	return 0;
+}
+
+static const struct teamd_state_val ifinfo_state_vals[] = {
+	{
+		.subpath = "ifindex",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = ifinfo_state_ifindex_get,
+	},
+	{
+		.subpath = "ifname",
+		.type = TEAMD_STATE_ITEM_TYPE_STRING,
+		.getter = ifinfo_state_ifname_get,
+	},
+	{
+		.subpath = "dev_addr",
+		.type = TEAMD_STATE_ITEM_TYPE_STRING,
+		.getter = ifinfo_state_dev_addr_get,
+	},
+	{
+		.subpath = "dev_addr_len",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = ifinfo_state_dev_addr_len_get,
+	},
+};
+
+static const struct teamd_state_val_group teamdev_ifinfo_state_vg = {
+	.vals = ifinfo_state_vals,
+	.vals_count = ARRAY_SIZE(ifinfo_state_vals),
 };
 
 static json_t *__fill_tdport(struct teamd_port *tdport)
@@ -459,9 +505,11 @@ int teamd_state_basics_init(struct teamd_context *ctx)
 {
 	int err;
 
-	err = teamd_state_ops_register(ctx, &teamdev_state_ops, ctx);
+	err = teamd_state_val_group_register(ctx, &teamdev_ifinfo_state_vg, ctx,
+					     "team_device.ifinfo");
 	if (err)
 		return err;
+
 	err = teamd_state_ops_register(ctx, &ports_state_ops, ctx);
 	if (err)
 		goto teamdev_state_unreg;
@@ -473,7 +521,7 @@ int teamd_state_basics_init(struct teamd_context *ctx)
 ports_state_unreg:
 	teamd_state_ops_unregister(ctx, &ports_state_ops, ctx);
 teamdev_state_unreg:
-	teamd_state_ops_unregister(ctx, &teamdev_state_ops, ctx);
+	teamd_state_val_group_unregister(ctx, &teamdev_ifinfo_state_vg, ctx);
 	return err;
 }
 
@@ -481,5 +529,5 @@ void teamd_state_basics_fini(struct teamd_context *ctx)
 {
 	teamd_state_ops_unregister(ctx, &setup_state_ops, ctx);
 	teamd_state_ops_unregister(ctx, &ports_state_ops, ctx);
-	teamd_state_ops_unregister(ctx, &teamdev_state_ops, ctx);
+	teamd_state_val_group_unregister(ctx, &teamdev_ifinfo_state_vg, ctx);
 }
