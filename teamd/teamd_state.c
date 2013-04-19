@@ -476,29 +476,103 @@ static const struct teamd_state_ops ports_state_ops = {
 	.name = "ports",
 };
 
-static int setup_state_dump(struct teamd_context *ctx,
-			    json_t **pstate_json, void *priv)
+static int setup_state_runner_name_get(struct teamd_context *ctx,
+				       struct team_state_val_gsetter_ctx *gsc,
+				       void *priv)
 {
-	json_t *state_json;
-
-	state_json = json_pack("{s:s, s:s, s:b, s:i, s:b, s:i, s:s}",
-			       "runner_name", ctx->runner->name,
-			       "kernel_team_mode_name", ctx->runner->team_mode_name,
-			       "dbus_enabled", ctx->dbus.enabled,
-			       "debug_level", ctx->debug,
-			       "daemonized", ctx->daemonize,
-			       "pid", getpid(),
-			       "pid_file", ctx->pid_file ? ctx->pid_file : "");
-	if (!state_json) {
-		return -ENOMEM;
-	}
-	*pstate_json = state_json;
+	gsc->data.str_val.ptr = ctx->runner->name;
 	return 0;
 }
 
-static const struct teamd_state_ops setup_state_ops = {
-	.dump = setup_state_dump,
-	.name = "setup",
+static int setup_state_kernel_team_mode_name_get(struct teamd_context *ctx,
+						 struct team_state_val_gsetter_ctx *gsc,
+						 void *priv)
+{
+	gsc->data.str_val.ptr = ctx->runner->team_mode_name;
+	return 0;
+}
+
+static int setup_state_dbus_enabled_get(struct teamd_context *ctx,
+					struct team_state_val_gsetter_ctx *gsc,
+					void *priv)
+{
+	gsc->data.bool_val = ctx->dbus.enabled;
+	return 0;
+}
+
+static int setup_state_debug_level_get(struct teamd_context *ctx,
+				       struct team_state_val_gsetter_ctx *gsc,
+				       void *priv)
+{
+	gsc->data.int_val = ctx->debug;
+	return 0;
+}
+
+static int setup_state_daemonized_get(struct teamd_context *ctx,
+				      struct team_state_val_gsetter_ctx *gsc,
+				      void *priv)
+{
+	gsc->data.bool_val = ctx->daemonize;
+	return 0;
+}
+
+static int setup_state_pid_get(struct teamd_context *ctx,
+			       struct team_state_val_gsetter_ctx *gsc,
+			       void *priv)
+{
+	gsc->data.int_val = getpid();
+	return 0;
+}
+
+static int setup_state_pid_file_get(struct teamd_context *ctx,
+				    struct team_state_val_gsetter_ctx *gsc,
+				    void *priv)
+{
+	gsc->data.str_val.ptr = ctx->pid_file ? ctx->pid_file : "";
+	return 0;
+}
+
+static const struct teamd_state_val setup_state_vals[] = {
+	{
+		.subpath = "runner_name",
+		.type = TEAMD_STATE_ITEM_TYPE_STRING,
+		.getter = setup_state_runner_name_get,
+	},
+	{
+		.subpath = "kernel_team_mode_name",
+		.type = TEAMD_STATE_ITEM_TYPE_STRING,
+		.getter = setup_state_kernel_team_mode_name_get,
+	},
+	{
+		.subpath = "dbus_enabled",
+		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
+		.getter = setup_state_dbus_enabled_get,
+	},
+	{
+		.subpath = "debug_level",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = setup_state_debug_level_get,
+	},
+	{
+		.subpath = "daemonized",
+		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
+		.getter = setup_state_daemonized_get,
+	},
+	{
+		.subpath = "pid",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = setup_state_pid_get,
+	},
+	{
+		.subpath = "pid_file",
+		.type = TEAMD_STATE_ITEM_TYPE_STRING,
+		.getter = setup_state_pid_file_get,
+	},
+};
+
+static const struct teamd_state_val_group setup_state_vg = {
+	.vals = setup_state_vals,
+	.vals_count = ARRAY_SIZE(setup_state_vals),
 };
 
 int teamd_state_basics_init(struct teamd_context *ctx)
@@ -513,7 +587,9 @@ int teamd_state_basics_init(struct teamd_context *ctx)
 	err = teamd_state_ops_register(ctx, &ports_state_ops, ctx);
 	if (err)
 		goto teamdev_state_unreg;
-	err = teamd_state_ops_register(ctx, &setup_state_ops, ctx);
+
+	err = teamd_state_val_group_register(ctx, &setup_state_vg, ctx,
+					     "setup");
 	if (err)
 		goto ports_state_unreg;
 	return 0;
@@ -527,7 +603,7 @@ teamdev_state_unreg:
 
 void teamd_state_basics_fini(struct teamd_context *ctx)
 {
-	teamd_state_ops_unregister(ctx, &setup_state_ops, ctx);
+	teamd_state_val_group_unregister(ctx, &setup_state_vg, ctx);
 	teamd_state_ops_unregister(ctx, &ports_state_ops, ctx);
 	teamd_state_val_group_unregister(ctx, &teamdev_ifinfo_state_vg, ctx);
 }
