@@ -46,4 +46,15 @@ static inline size_t hwaddr_str_len(size_t len)
 	return len * 3 + 1;
 }
 
+static inline char *a_hwaddr_str(char *hwaddr, size_t len)
+{
+	char *str;
+
+	str = malloc(sizeof(char) * hwaddr_str_len(len));
+	if (!str)
+		return NULL;
+	hwaddr_str(str, hwaddr, len);
+	return str;
+}
+
 #endif /* _T_MISC_H_ */
