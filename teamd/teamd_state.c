@@ -395,19 +395,55 @@ static const struct teamd_state_val_group ports_ifinfo_state_vg = {
 	.per_port = true,
 };
 
-static json_t *__fill_tdport(struct teamd_port *tdport)
+static int port_link_state_up_get(struct teamd_context *ctx,
+				  struct team_state_val_gsetter_ctx *gsc,
+				  void *priv)
 {
-	struct team_port *port = tdport->team_port;
-	json_t *tdport_json;
-
-	tdport_json = json_pack("{s:{s:b, s:i, s:s}}",
-				"link", "up",
-				team_is_port_link_up(port),
-				"speed", team_get_port_speed(port),
-				"duplex",
-				team_get_port_duplex(port) ? "full" : "half");
-	return tdport_json;
+	gsc->data.bool_val = team_is_port_link_up(gsc->info.tdport->team_port);
+	return 0;
 }
+
+static int port_link_state_speed_get(struct teamd_context *ctx,
+				     struct team_state_val_gsetter_ctx *gsc,
+				     void *priv)
+{
+	gsc->data.int_val = team_get_port_speed(gsc->info.tdport->team_port);
+	return 0;
+}
+
+static int port_link_state_duplex_get(struct teamd_context *ctx,
+				      struct team_state_val_gsetter_ctx *gsc,
+				      void *priv)
+{
+	gsc->data.str_val.ptr =
+		team_get_port_duplex(gsc->info.tdport->team_port) ? "full" : "half";
+	return 0;
+}
+
+
+static const struct teamd_state_val port_link_state_vals[] = {
+	{
+		.subpath = "up",
+		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
+		.getter = port_link_state_up_get,
+	},
+	{
+		.subpath = "speed",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = port_link_state_speed_get,
+	},
+	{
+		.subpath = "duplex",
+		.type = TEAMD_STATE_ITEM_TYPE_STRING,
+		.getter = port_link_state_duplex_get,
+	},
+};
+
+static const struct teamd_state_val_group ports_link_state_vg = {
+	.vals = port_link_state_vals,
+	.vals_count = ARRAY_SIZE(port_link_state_vals),
+	.per_port = true,
+};
 
 static int __fill_per_port(struct teamd_context *ctx, json_t *tdport_json,
 			   struct teamd_port *tdport)
@@ -444,7 +480,7 @@ static int ports_state_dump(struct teamd_context *ctx,
 		return -ENOMEM;
 
 	teamd_for_each_tdport(tdport, ctx) {
-		tdport_json = __fill_tdport(tdport);
+		tdport_json = json_object();
 		if (!tdport_json)
 			goto errout;
 		err = json_object_set_new(state_json, tdport->ifname,
@@ -587,12 +623,19 @@ int teamd_state_basics_init(struct teamd_context *ctx)
 	if (err)
 		goto ports_state_unreg;
 
+	err = teamd_state_val_group_register(ctx, &ports_link_state_vg, ctx,
+					     "link");
+	if (err)
+		goto ports_ifinfo_state_unreg;
+
 	err = teamd_state_val_group_register(ctx, &setup_state_vg, ctx,
 					     "setup");
 	if (err)
-		goto ports_ifinfo_state_unreg;
+		goto ports_link_state_unreg;
 	return 0;
 
+ports_link_state_unreg:
+	teamd_state_val_group_unregister(ctx, &ports_link_state_vg, ctx);
 ports_ifinfo_state_unreg:
 	teamd_state_val_group_unregister(ctx, &ports_ifinfo_state_vg, ctx);
 ports_state_unreg:
@@ -605,6 +648,7 @@ teamdev_ifinfo_state_unreg:
 void teamd_state_basics_fini(struct teamd_context *ctx)
 {
 	teamd_state_val_group_unregister(ctx, &setup_state_vg, ctx);
+	teamd_state_val_group_unregister(ctx, &ports_link_state_vg, ctx);
 	teamd_state_val_group_unregister(ctx, &ports_ifinfo_state_vg, ctx);
 	teamd_state_ops_unregister(ctx, &ports_state_ops, ctx);
 	teamd_state_val_group_unregister(ctx, &teamdev_ifinfo_state_vg, ctx);
