@@ -1,52 +1,47 @@
-.TH teamd 8 "1 September 2012" "libteam"
+.TH TEAMD 8 "2013-04-01" "libteam" "Team daemon"
 .SH NAME
 teamd \(em team network device control daemon
 .SH SYNOPSIS
 .B teamd
-.B \-h
-.TP
-.B teamd
-.B \-V
-.TP
-.B teamd
 .B \-k
-.RB [ "\-p pid_file" ]
+.RB [ \-p
+.IR pid_file ]
 .RB [ \-g ]
-.TP
+.br
 .B teamd
 .B \-e
-.RB [ "\-p pid_file" ]
+.RB [ \-p
+.IR pid_file ]
 .RB [ \-g ]
-.TP
+.br
 .B teamd
-.B "\-c config_text"
-.RB [ "\-p pid_file" ]
-.RB [ \-g ]
-.RB [ \-d ]
-.RB [ \-r ]
-.RB [ \-D ]
-.TP
+.BI \-c " config_text"
+.RB [ \-p
+.IR pid_file ]
+.RB [ \-gdrD ]
+.br
 .B teamd
-.B "\-f config_file"
-.RB [ "\-p pid_file" ]
-.RB [ \-g ]
-.RB [ \-d ]
-.RB [ \-r ]
-.RB [ \-D ]
+.BI \-f " config_file"
+.RB [ \-p
+.IR pid_file ]
+.RB [ \-gdrD ]
+.br
+.B teamd
+.BR  \-h | \-V
 .SH DESCRIPTION
 .PP
-teamd is a daemon which job is to "puppet control" given team network device.
-Using libteam it communicates with kernel team device instance via Netlink
-sockets. The behaviour depends on selected runner and its configuration.
-This daemon is part of libteam project.
-
+teamd is a daemon to control a given team network device, during runtime,
+as a puppeteer controls a puppet. It uses libteam to communicate with the
+kernel team device instance via Netlink sockets. The behaviour depends on
+the selected runner and its configuration. This daemon is part of the
+libteam project.
 .SH OPTIONS
 .TP
 .B "\-h, \-\-help"
 Print help text to console and exit.
 .TP
 .B "\-V, \-\-version"
-Print versioning information to console and exit.
+Print version information to console and exit.
 .TP
 .B "\-d, \-\-daemonize"
 Daemonize after startup.
@@ -57,14 +52,14 @@ Kill running daemon instance.
 .B "\-e, \-\-check"
 Return 0 if a daemon is already running.
 .TP
-.B "\-f filename, \-\-config-file filename"
+.BI "\-f " filename ", \-\-config-file " filename
 Load the specified configuration file.
 .TP
-.B "\-c text, \-\-config text"
+.BI "\-c " text ", \-\-config "text
 Use given config string. If this option is present then \-f option will be
 ignored.
 .TP
-.B "\-p filename, \-\-pid-file filename"
+.BI "\-p " filename ", \-\-pid-file " filename
 Use the specified PID file.
 .TP
 .B "\-g, \-\-debug"
@@ -73,7 +68,7 @@ Turns on debugging messages. Repeating the option increases verbosity.
 .B "\-r, \-\-force-recreate"
 Force team device recreation in case it already exists.
 .TP
-.B "\-t devicename, \-\-team-dev devicename"
+.BI "\-t " devicename ", \-\-team-dev " devicename
 Use the specified team device name (overrides "device" key in config).
 .TP
 .B "\-n, \-\-no-ports"
@@ -84,12 +79,10 @@ Enable D-Bus interface.
 .TP
 .B "\-U, \-\-usock-enable"
 Enable UNIX domain socket interface.
-
 .SH SEE ALSO
-.BR teamdctl (8)
-.BR teamd.conf (8)
-.BR teamdnl (8)
-
+.BR teamdctl (8),
+.BR teamd.conf (5),
+.BR teamnl (8)
 .SH AUTHOR
 .PP
 Jiri Pirko is the original author and current maintainer of libteam.
