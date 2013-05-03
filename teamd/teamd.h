@@ -128,7 +128,6 @@ struct teamd_runner {
 	size_t priv_size;
 	int (*init)(struct teamd_context *ctx, void *priv);
 	void (*fini)(struct teamd_context *ctx, void *priv);
-	const struct teamd_state_ops *state_ops;
 };
 
 struct teamd_event_watch_ops {

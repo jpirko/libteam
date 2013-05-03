@@ -884,24 +884,13 @@ static int teamd_runner_init(struct teamd_context *ctx)
 			return -ENOMEM;
 	}
 
-	if (ctx->runner->state_ops) {
-		err = teamd_state_ops_register(ctx, ctx->runner->state_ops,
-					       ctx->runner_priv);
-		if (err)
-			goto free_runner_priv;
-	}
-
 	if (ctx->runner->init) {
 		err = ctx->runner->init(ctx, ctx->runner_priv);
 		if (err)
-			goto runner_state_unreg;
+			goto free_runner_priv;
 	}
 	return 0;
 
-runner_state_unreg:
-	if (ctx->runner->state_ops)
-		teamd_state_ops_unregister(ctx, ctx->runner->state_ops,
-					   ctx->runner_priv);
 free_runner_priv:
 	free(ctx->runner_priv);
 	return err;
@@ -911,9 +900,6 @@ static void teamd_runner_fini(struct teamd_context *ctx)
 {
 	if (ctx->runner->fini)
 		ctx->runner->fini(ctx, ctx->runner_priv);
-	if (ctx->runner->state_ops)
-		teamd_state_ops_unregister(ctx, ctx->runner->state_ops,
-					   ctx->runner_priv);
 	free(ctx->runner_priv);
 	ctx->runner = NULL;
 }
