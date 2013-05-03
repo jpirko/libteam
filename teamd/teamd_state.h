@@ -22,8 +22,6 @@
 
 #include "teamd.h"
 
-#define TEAMD_RUNNER_STATE_JSON_NAME "runner"
-
 enum teamd_state_val_type {
 	TEAMD_STATE_ITEM_TYPE_INT,
 	TEAMD_STATE_ITEM_TYPE_STRING,

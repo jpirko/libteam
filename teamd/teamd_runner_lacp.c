@@ -1344,6 +1344,358 @@ static int lacp_carrier_fini(struct teamd_context *ctx, struct lacp *lacp)
 	return 0;
 }
 
+static int lacp_state_active_get(struct teamd_context *ctx,
+				 struct team_state_val_gsetter_ctx *gsc,
+				 void *priv)
+{
+	struct lacp *lacp = priv;
+
+	gsc->data.bool_val = lacp->cfg.active;
+	return 0;
+}
+
+static int lacp_state_sys_prio_get(struct teamd_context *ctx,
+				   struct team_state_val_gsetter_ctx *gsc,
+				   void *priv)
+{
+	struct lacp *lacp = priv;
+
+	gsc->data.int_val = lacp->cfg.sys_prio;
+	return 0;
+}
+
+static int lacp_state_fast_rate_get(struct teamd_context *ctx,
+				    struct team_state_val_gsetter_ctx *gsc,
+				    void *priv)
+{
+	struct lacp *lacp = priv;
+
+	gsc->data.bool_val = lacp->cfg.fast_rate;
+	return 0;
+}
+
+static const struct teamd_state_val lacp_state_vals[] = {
+	{
+		.subpath = "active",
+		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
+		.getter = lacp_state_active_get,
+	},
+	{
+		.subpath = "sys_prio",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lacp_state_sys_prio_get,
+	},
+	{
+		.subpath = "fast_rate",
+		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
+		.getter = lacp_state_fast_rate_get,
+	},
+};
+
+static const struct teamd_state_val_group lacp_state_vg = {
+	.subpath = "runner",
+	.vals = lacp_state_vals,
+	.vals_count = ARRAY_SIZE(lacp_state_vals),
+};
+
+static struct lacp_port *lacp_port_gsc(struct team_state_val_gsetter_ctx *gsc,
+				       void *priv)
+{
+	struct lacp *lacp = priv;
+
+	return lacp_port_get(lacp, gsc->info.tdport);
+}
+
+static int lacp_port_state_selected_get(struct teamd_context *ctx,
+					struct team_state_val_gsetter_ctx *gsc,
+					void *priv)
+{
+	gsc->data.bool_val = lacp_port_selected(lacp_port_gsc(gsc, priv));
+	return 0;
+}
+
+static int lacp_port_state_aggregator_id_get(struct teamd_context *ctx,
+					     struct team_state_val_gsetter_ctx *gsc,
+					     void *priv)
+{
+	gsc->data.int_val = lacp_port_agg_id(lacp_port_gsc(gsc, priv));
+	return 0;
+}
+
+static int lacp_port_state_state_get(struct teamd_context *ctx,
+				     struct team_state_val_gsetter_ctx *gsc,
+				     void *priv)
+{
+	gsc->data.str_val.ptr =
+		lacp_port_state_name[lacp_port_gsc(gsc, priv)->state];
+	return 0;
+}
+
+static int lacp_port_state_key_get(struct teamd_context *ctx,
+				   struct team_state_val_gsetter_ctx *gsc,
+				   void *priv)
+{
+	gsc->data.int_val = lacp_port_gsc(gsc, priv)->cfg.lacp_key;
+	return 0;
+}
+
+static int lacp_port_state_prio_get(struct teamd_context *ctx,
+				    struct team_state_val_gsetter_ctx *gsc,
+				    void *priv)
+{
+	gsc->data.int_val = lacp_port_gsc(gsc, priv)->cfg.lacp_prio;
+	return 0;
+}
+
+static const struct teamd_state_val lacp_port_state_vals[] = {
+	{
+		.subpath = "selected",
+		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
+		.getter = lacp_port_state_selected_get,
+	},
+	{
+		.subpath = "aggregator_id",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lacp_port_state_aggregator_id_get,
+	},
+	{
+		.subpath = "state",
+		.type = TEAMD_STATE_ITEM_TYPE_STRING,
+		.getter = lacp_port_state_state_get,
+	},
+	{
+		.subpath = "key",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lacp_port_state_key_get,
+	},
+	{
+		.subpath = "prio",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lacp_port_state_prio_get,
+	},
+};
+
+static const struct teamd_state_val_group lacp_port_state_vg = {
+	.subpath = "runner",
+	.vals = lacp_port_state_vals,
+	.vals_count = ARRAY_SIZE(lacp_port_state_vals),
+	.per_port = true,
+};
+
+static struct lacpdu_info *lacp_port_actor_gsc(struct team_state_val_gsetter_ctx *gsc,
+					       void *priv)
+{
+	return &lacp_port_gsc(gsc, priv)->actor;
+}
+
+static int lacp_port_actor_state_system_priority_get(struct teamd_context *ctx,
+						     struct team_state_val_gsetter_ctx *gsc,
+						     void *priv)
+{
+	gsc->data.int_val =
+		ntohs(lacp_port_actor_gsc(gsc, priv)->system_priority);
+	return 0;
+}
+
+static int lacp_port_actor_state_system_get(struct teamd_context *ctx,
+					    struct team_state_val_gsetter_ctx *gsc,
+					    void *priv)
+{
+	char *addr = (char *) lacp_port_actor_gsc(gsc, priv)->system;
+	char *addr_str;
+
+	addr_str = a_hwaddr_str(addr, ETH_ALEN);
+	if (!addr_str)
+		return -ENOMEM;
+	gsc->data.str_val.ptr = addr_str;
+	gsc->data.str_val.free = true;
+	return 0;
+}
+
+static int lacp_port_actor_state_key_get(struct teamd_context *ctx,
+					 struct team_state_val_gsetter_ctx *gsc,
+					 void *priv)
+{
+	gsc->data.int_val = ntohs(lacp_port_actor_gsc(gsc, priv)->key);
+	return 0;
+}
+
+static int lacp_port_actor_state_port_priority_get(struct teamd_context *ctx,
+						   struct team_state_val_gsetter_ctx *gsc,
+						   void *priv)
+{
+	gsc->data.int_val =
+		ntohs(lacp_port_actor_gsc(gsc, priv)->port_priority);
+	return 0;
+}
+
+static int lacp_port_actor_state_port_get(struct teamd_context *ctx,
+					  struct team_state_val_gsetter_ctx *gsc,
+					  void *priv)
+{
+	gsc->data.int_val = ntohs(lacp_port_actor_gsc(gsc, priv)->port);
+	return 0;
+}
+
+static int lacp_port_actor_state_state_get(struct teamd_context *ctx,
+					   struct team_state_val_gsetter_ctx *gsc,
+					   void *priv)
+{
+	gsc->data.int_val = lacp_port_actor_gsc(gsc, priv)->state;
+	return 0;
+}
+
+static const struct teamd_state_val lacp_port_actor_state_vals[] = {
+	{
+		.subpath = "system_priority",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lacp_port_actor_state_system_priority_get,
+	},
+	{
+		.subpath = "system",
+		.type = TEAMD_STATE_ITEM_TYPE_STRING,
+		.getter = lacp_port_actor_state_system_get,
+	},
+	{
+		.subpath = "key",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lacp_port_actor_state_key_get,
+	},
+	{
+		.subpath = "port_priority",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lacp_port_actor_state_port_priority_get,
+	},
+	{
+		.subpath = "port",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lacp_port_actor_state_port_get,
+	},
+	{
+		.subpath = "state",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lacp_port_actor_state_state_get,
+	},
+};
+
+static const struct teamd_state_val_group lacp_port_actor_state_vg = {
+	.subpath = "runner.actor_lacpdu_info",
+	.vals = lacp_port_actor_state_vals,
+	.vals_count = ARRAY_SIZE(lacp_port_actor_state_vals),
+	.per_port = true,
+};
+
+static struct lacpdu_info *lacp_port_partner_gsc(struct team_state_val_gsetter_ctx *gsc,
+						 void *priv)
+{
+	return &lacp_port_gsc(gsc, priv)->partner;
+}
+
+static int lacp_port_partner_state_system_priority_get(struct teamd_context *ctx,
+						       struct team_state_val_gsetter_ctx *gsc,
+						       void *priv)
+{
+	gsc->data.int_val =
+		ntohs(lacp_port_partner_gsc(gsc, priv)->system_priority);
+	return 0;
+}
+
+static int lacp_port_partner_state_system_get(struct teamd_context *ctx,
+					      struct team_state_val_gsetter_ctx *gsc,
+					      void *priv)
+{
+	char *addr = (char *) lacp_port_partner_gsc(gsc, priv)->system;
+	char *addr_str;
+
+	addr_str = a_hwaddr_str(addr, ETH_ALEN);
+	if (!addr_str)
+		return -ENOMEM;
+	gsc->data.str_val.ptr = addr_str;
+	gsc->data.str_val.free = true;
+	return 0;
+}
+
+static int lacp_port_partner_state_key_get(struct teamd_context *ctx,
+					   struct team_state_val_gsetter_ctx *gsc,
+					   void *priv)
+{
+	gsc->data.int_val = ntohs(lacp_port_partner_gsc(gsc, priv)->key);
+	return 0;
+}
+
+static int lacp_port_partner_state_port_priority_get(struct teamd_context *ctx,
+						     struct team_state_val_gsetter_ctx *gsc,
+						     void *priv)
+{
+	gsc->data.int_val =
+		ntohs(lacp_port_partner_gsc(gsc, priv)->port_priority);
+	return 0;
+}
+
+static int lacp_port_partner_state_port_get(struct teamd_context *ctx,
+					    struct team_state_val_gsetter_ctx *gsc,
+					    void *priv)
+{
+	gsc->data.int_val = ntohs(lacp_port_partner_gsc(gsc, priv)->port);
+	return 0;
+}
+
+static int lacp_port_partner_state_state_get(struct teamd_context *ctx,
+					     struct team_state_val_gsetter_ctx *gsc,
+					     void *priv)
+{
+	gsc->data.int_val = lacp_port_partner_gsc(gsc, priv)->state;
+	return 0;
+}
+
+static const struct teamd_state_val lacp_port_partner_state_vals[] = {
+	{
+		.subpath = "system_priority",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lacp_port_partner_state_system_priority_get,
+	},
+	{
+		.subpath = "system",
+		.type = TEAMD_STATE_ITEM_TYPE_STRING,
+		.getter = lacp_port_partner_state_system_get,
+	},
+	{
+		.subpath = "key",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lacp_port_partner_state_key_get,
+	},
+	{
+		.subpath = "port_priority",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lacp_port_partner_state_port_priority_get,
+	},
+	{
+		.subpath = "port",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lacp_port_partner_state_port_get,
+	},
+	{
+		.subpath = "state",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lacp_port_partner_state_state_get,
+	},
+};
+
+
+static const struct teamd_state_val_group lacp_port_partner_state_vg = {
+	.subpath = "runner.partner_lacpdu_info",
+	.vals = lacp_port_partner_state_vals,
+	.vals_count = ARRAY_SIZE(lacp_port_partner_state_vals),
+	.per_port = true,
+};
+
+static const struct teamd_state_val_group *lacp_state_vgs[] = {
+	&lacp_state_vg,
+	&lacp_port_state_vg,
+	&lacp_port_actor_state_vg,
+	&lacp_port_partner_state_vg,
+};
+
 static int lacp_init(struct teamd_context *ctx, void *priv)
 {
 	struct lacp *lacp = priv;
@@ -1378,7 +1730,17 @@ static int lacp_init(struct teamd_context *ctx, void *priv)
 		teamd_log_err("Failed to init balanced.");
 		goto event_watch_unregister;
 	}
+	err = teamd_state_val_group_register_many(ctx, lacp_state_vgs,
+						  ARRAY_SIZE(lacp_state_vgs),
+						  lacp);
+	if (err) {
+		teamd_log_err("Failed to register state groups.");
+		goto balancer_fini;
+	}
 	return 0;
+
+balancer_fini:
+	teamd_balancer_fini(lacp->tb);
 event_watch_unregister:
 	teamd_event_watch_unregister(ctx, &lacp_port_watch_ops, lacp);
 	return err;
@@ -1388,135 +1750,13 @@ static void lacp_fini(struct teamd_context *ctx, void *priv)
 {
 	struct lacp *lacp = priv;
 
+	teamd_state_val_group_unregister_many(ctx, lacp_state_vgs,
+					      ARRAY_SIZE(lacp_state_vgs),
+					      lacp);
 	teamd_balancer_fini(lacp->tb);
 	teamd_event_watch_unregister(ctx, &lacp_port_watch_ops, lacp);
 	lacp_carrier_fini(ctx, lacp);
 }
-
-static json_t *__fill_lacpdu_info(struct lacpdu_info *lacpdu_info)
-{
-	char addr_str[hwaddr_str_len(ETH_ALEN)];
-
-	hwaddr_str(addr_str, (char *) lacpdu_info->system, ETH_ALEN);
-	return json_pack("{s:i, s:s, s:i, s:i, s:i, s:i}",
-			 "system_priority", ntohs(lacpdu_info->system_priority),
-			 "system", addr_str,
-			 "key", ntohs(lacpdu_info->key),
-			 "port_priority", ntohs(lacpdu_info->port_priority),
-			 "port", ntohs(lacpdu_info->port),
-			 "state", lacpdu_info->state);
-}
-
-static json_t *__fill_lacp_port(struct lacp_port *lacp_port)
-{
-	json_t *s_json;
-	json_t *actor_json;
-	json_t *partner_json;
-
-	actor_json = __fill_lacpdu_info(&lacp_port->actor);
-	if (!actor_json)
-		return NULL;
-
-	partner_json = __fill_lacpdu_info(&lacp_port->partner);
-	if (!partner_json) {
-		json_decref(actor_json);
-		return NULL;
-	}
-
-	s_json = json_pack("{s:b, s:i, s:s, s:i, s:i, s:o, s:o}",
-			   "selected", lacp_port_selected(lacp_port),
-			   "aggregator_id", lacp_port_agg_id(lacp_port),
-			   "state", lacp_port_state_name[lacp_port->state],
-			   "key", lacp_port->cfg.lacp_key,
-			   "prio", lacp_port->cfg.lacp_prio,
-			   "actor_lacpdu_info", actor_json,
-			   "partner_lacpdu_info", partner_json);
-	if (!s_json) {
-		json_decref(actor_json);
-		json_decref(partner_json);
-		return NULL;
-	}
-	return s_json;
-}
-
-static int lacp_state_json_per_port_dump(struct teamd_context *ctx,
-					 struct teamd_port *tdport,
-					 json_t **pstate_json, void *priv)
-{
-	struct lacp *lacp = priv;
-	json_t *state_json;
-
-	state_json = __fill_lacp_port(lacp_port_get(lacp, tdport));
-	if (!state_json)
-		return -ENOMEM;
-	*pstate_json = state_json;
-	return 0;
-}
-
-static json_t *__fill_aggregator(struct lacp *lacp, struct lacp_port *agg_lead)
-{
-	return json_pack("{s:i, s:b}",
-			 "id", lacp_agg_id(agg_lead),
-			 "selected", lacp->selected_agg_lead == agg_lead);
-}
-
-static json_t *__fill_aggregators(struct lacp *lacp)
-{
-	struct teamd_port *tdport;
-	struct lacp_port *lacp_port;
-	json_t *aggs_json;
-	json_t *agg_json;
-	int err;
-
-	aggs_json = json_array();
-	if (!aggs_json)
-		return NULL;
-	teamd_for_each_tdport(tdport, lacp->ctx) {
-		lacp_port = lacp_port_get(lacp, tdport);
-		if (!lacp_port_is_agg_lead(lacp_port))
-			continue;
-		agg_json = __fill_aggregator(lacp, lacp_port);
-		if (!agg_json)
-			goto errout;
-		err = json_array_append_new(aggs_json, agg_json);
-		if (err)
-			goto errout;
-	}
-	return aggs_json;
-errout:
-	json_decref(aggs_json);
-	return NULL;
-}
-
-static int lacp_state_json_dump(struct teamd_context *ctx,
-				json_t **pstate_json, void *priv)
-{
-	struct lacp *lacp = priv;
-	json_t *state_json;
-	json_t *aggs_json;
-
-	aggs_json = __fill_aggregators(lacp);
-	if (!aggs_json)
-		return -ENOMEM;
-
-	state_json = json_pack("{s:o, s:b, s:i, s:b}",
-			       "aggregators", aggs_json,
-			       "active", lacp->cfg.active,
-			       "sys_prio", lacp->cfg.sys_prio,
-			       "fast_rate", lacp->cfg.fast_rate);
-	if (!state_json) {
-		json_decref(aggs_json);
-		return -ENOMEM;
-	}
-	*pstate_json = state_json;
-	return 0;
-}
-
-static const struct teamd_state_ops lacp_state_ops = {
-	.dump			= lacp_state_json_dump,
-	.per_port_dump		= lacp_state_json_per_port_dump,
-	.name			= TEAMD_RUNNER_STATE_JSON_NAME,
-};
 
 const struct teamd_runner teamd_runner_lacp = {
 	.name			= "lacp",
@@ -1524,5 +1764,4 @@ const struct teamd_runner teamd_runner_lacp = {
 	.priv_size		= sizeof(struct lacp),
 	.init			= lacp_init,
 	.fini			= lacp_fini,
-	.state_ops		= &lacp_state_ops,
 };
