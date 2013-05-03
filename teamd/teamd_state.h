@@ -53,15 +53,18 @@ struct teamd_state_val {
 };
 
 struct teamd_state_val_group {
+	const char *subpath;
 	const struct teamd_state_val *vals;
 	unsigned int vals_count;
 	bool per_port;
 };
 
+int teamd_state_val_group_register_subpath(struct teamd_context *ctx,
+					   const struct teamd_state_val_group *vg,
+					   void *priv, const char *fmt, ...);
 int teamd_state_val_group_register(struct teamd_context *ctx,
 				   const struct teamd_state_val_group *vg,
-				   void *priv, const char *fmt, ...);
-
+				   void *priv);
 void teamd_state_val_group_unregister(struct teamd_context *ctx,
 				      const struct teamd_state_val_group *vg,
 				      void *priv);

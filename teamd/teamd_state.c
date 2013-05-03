@@ -50,9 +50,9 @@ __find_vg_item(struct teamd_context *ctx,
 	return NULL;
 }
 
-int teamd_state_val_group_register(struct teamd_context *ctx,
-				   const struct teamd_state_val_group *vg,
-				   void *priv, const char *fmt, ...)
+int teamd_state_val_group_register_subpath(struct teamd_context *ctx,
+					   const struct teamd_state_val_group *vg,
+					   void *priv, const char *fmt, ...)
 {
 	va_list ap;
 	struct teamd_state_vg_item *item;
@@ -77,6 +77,16 @@ int teamd_state_val_group_register(struct teamd_context *ctx,
 	item->priv = priv;
 	list_add_tail(&ctx->state_vg_list, &item->list);
 	return 0;
+}
+
+int teamd_state_val_group_register(struct teamd_context *ctx,
+				   const struct teamd_state_val_group *vg,
+				   void *priv)
+{
+	if (!vg->subpath)
+		return -EINVAL;
+	return teamd_state_val_group_register_subpath(ctx, vg,
+						      priv, vg->subpath);
 }
 
 void teamd_state_val_group_unregister(struct teamd_context *ctx,
@@ -385,11 +395,13 @@ static const struct teamd_state_val ifinfo_state_vals[] = {
 };
 
 static const struct teamd_state_val_group teamdev_ifinfo_state_vg = {
+	.subpath = "team_device.ifinfo",
 	.vals = ifinfo_state_vals,
 	.vals_count = ARRAY_SIZE(ifinfo_state_vals),
 };
 
 static const struct teamd_state_val_group ports_ifinfo_state_vg = {
+	.subpath = "ifinfo",
 	.vals = ifinfo_state_vals,
 	.vals_count = ARRAY_SIZE(ifinfo_state_vals),
 	.per_port = true,
@@ -440,6 +452,7 @@ static const struct teamd_state_val port_link_state_vals[] = {
 };
 
 static const struct teamd_state_val_group ports_link_state_vg = {
+	.subpath = "link",
 	.vals = port_link_state_vals,
 	.vals_count = ARRAY_SIZE(port_link_state_vals),
 	.per_port = true,
@@ -601,6 +614,7 @@ static const struct teamd_state_val setup_state_vals[] = {
 };
 
 static const struct teamd_state_val_group setup_state_vg = {
+	.subpath = "setup",
 	.vals = setup_state_vals,
 	.vals_count = ARRAY_SIZE(setup_state_vals),
 };
@@ -609,8 +623,7 @@ int teamd_state_basics_init(struct teamd_context *ctx)
 {
 	int err;
 
-	err = teamd_state_val_group_register(ctx, &teamdev_ifinfo_state_vg, ctx,
-					     "team_device.ifinfo");
+	err = teamd_state_val_group_register(ctx, &teamdev_ifinfo_state_vg, ctx);
 	if (err)
 		return err;
 
@@ -618,18 +631,15 @@ int teamd_state_basics_init(struct teamd_context *ctx)
 	if (err)
 		goto teamdev_ifinfo_state_unreg;
 
-	err = teamd_state_val_group_register(ctx, &ports_ifinfo_state_vg, ctx,
-					     "ifinfo");
+	err = teamd_state_val_group_register(ctx, &ports_ifinfo_state_vg, ctx);
 	if (err)
 		goto ports_state_unreg;
 
-	err = teamd_state_val_group_register(ctx, &ports_link_state_vg, ctx,
-					     "link");
+	err = teamd_state_val_group_register(ctx, &ports_link_state_vg, ctx);
 	if (err)
 		goto ports_ifinfo_state_unreg;
 
-	err = teamd_state_val_group_register(ctx, &setup_state_vg, ctx,
-					     "setup");
+	err = teamd_state_val_group_register(ctx, &setup_state_vg, ctx);
 	if (err)
 		goto ports_link_state_unreg;
 	return 0;
