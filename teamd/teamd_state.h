@@ -43,6 +43,7 @@ struct team_state_val_gsetter_ctx {
 		struct teamd_port *tdport;
 	} info;
 };
+
 struct teamd_state_val {
 	const char *subpath;
 	enum teamd_state_val_type type;
@@ -68,6 +69,12 @@ int teamd_state_val_group_register(struct teamd_context *ctx,
 void teamd_state_val_group_unregister(struct teamd_context *ctx,
 				      const struct teamd_state_val_group *vg,
 				      void *priv);
+int teamd_state_val_group_register_many(struct teamd_context *ctx,
+					const struct teamd_state_val_group **vg,
+					unsigned int vg_count, void *priv);
+void teamd_state_val_group_unregister_many(struct teamd_context *ctx,
+					   const struct teamd_state_val_group **vg,
+					   unsigned int vg_count, void *priv);
 
 struct teamd_state_ops {
 	int (*dump)(struct teamd_context *ctx,

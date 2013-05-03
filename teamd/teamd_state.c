@@ -103,6 +103,36 @@ void teamd_state_val_group_unregister(struct teamd_context *ctx,
 	free(item);
 }
 
+int teamd_state_val_group_register_many(struct teamd_context *ctx,
+					const struct teamd_state_val_group **vg,
+					unsigned int vg_count, void *priv)
+{
+	int i;
+	int err;
+
+	for (i = 0; i < vg_count; i++) {
+		err = teamd_state_val_group_register(ctx, vg[i], priv);
+		if (err)
+			goto rollback;
+	}
+	return 0;
+
+rollback:
+	while (--i >= 0)
+		teamd_state_val_group_unregister(ctx, vg[i], priv);
+	return err;
+}
+
+void teamd_state_val_group_unregister_many(struct teamd_context *ctx,
+					   const struct teamd_state_val_group **vg,
+					   unsigned int vg_count, void *priv)
+{
+	int i;
+
+	for (i = 0; i < vg_count; i++)
+		teamd_state_val_group_unregister(ctx, vg[i], priv);
+}
+
 static int teamd_state_build_val_group_subpath(json_t **p_vg_json_obj,
 					       json_t *root_json_obj,
 					       struct teamd_port *tdport,
@@ -619,6 +649,12 @@ static const struct teamd_state_val_group setup_state_vg = {
 	.vals_count = ARRAY_SIZE(setup_state_vals),
 };
 
+static const struct teamd_state_val_group *state_vgs[] = {
+	&ports_ifinfo_state_vg,
+	&ports_link_state_vg,
+	&setup_state_vg,
+};
+
 int teamd_state_basics_init(struct teamd_context *ctx)
 {
 	int err;
@@ -631,23 +667,13 @@ int teamd_state_basics_init(struct teamd_context *ctx)
 	if (err)
 		goto teamdev_ifinfo_state_unreg;
 
-	err = teamd_state_val_group_register(ctx, &ports_ifinfo_state_vg, ctx);
+	err = teamd_state_val_group_register_many(ctx, state_vgs,
+						  ARRAY_SIZE(state_vgs), ctx);
 	if (err)
 		goto ports_state_unreg;
 
-	err = teamd_state_val_group_register(ctx, &ports_link_state_vg, ctx);
-	if (err)
-		goto ports_ifinfo_state_unreg;
-
-	err = teamd_state_val_group_register(ctx, &setup_state_vg, ctx);
-	if (err)
-		goto ports_link_state_unreg;
 	return 0;
 
-ports_link_state_unreg:
-	teamd_state_val_group_unregister(ctx, &ports_link_state_vg, ctx);
-ports_ifinfo_state_unreg:
-	teamd_state_val_group_unregister(ctx, &ports_ifinfo_state_vg, ctx);
 ports_state_unreg:
 	teamd_state_ops_unregister(ctx, &ports_state_ops, ctx);
 teamdev_ifinfo_state_unreg:
@@ -657,9 +683,8 @@ teamdev_ifinfo_state_unreg:
 
 void teamd_state_basics_fini(struct teamd_context *ctx)
 {
-	teamd_state_val_group_unregister(ctx, &setup_state_vg, ctx);
-	teamd_state_val_group_unregister(ctx, &ports_link_state_vg, ctx);
-	teamd_state_val_group_unregister(ctx, &ports_ifinfo_state_vg, ctx);
+	teamd_state_val_group_unregister_many(ctx, state_vgs,
+					      ARRAY_SIZE(state_vgs), ctx);
 	teamd_state_ops_unregister(ctx, &ports_state_ops, ctx);
 	teamd_state_val_group_unregister(ctx, &teamdev_ifinfo_state_vg, ctx);
 }
