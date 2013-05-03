@@ -24,7 +24,6 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <linux/netdevice.h>
-#include <jansson.h>
 #include <limits.h>
 #include <private/misc.h>
 #include <team.h>
@@ -482,6 +481,32 @@ static int ab_load_config(struct teamd_context *ctx, struct ab *ab)
 	return 0;
 }
 
+static int ab_state_active_port_get(struct teamd_context *ctx,
+				    struct team_state_val_gsetter_ctx *gsc,
+				    void *priv)
+{
+	struct ab *ab = priv;
+	struct teamd_port *active_tdport;
+
+	active_tdport = teamd_get_port(ctx, ab->active_ifindex);
+	gsc->data.str_val.ptr = active_tdport ? active_tdport->ifname : "";
+	return 0;
+}
+
+static const struct teamd_state_val ab_state_vals[] = {
+	{
+		.subpath = "active_port",
+		.type = TEAMD_STATE_ITEM_TYPE_STRING,
+		.getter = ab_state_active_port_get,
+	},
+};
+
+static const struct teamd_state_val_group ab_state_vg = {
+	.subpath = "runner",
+	.vals = ab_state_vals,
+	.vals_count = ARRAY_SIZE(ab_state_vals),
+};
+
 static int ab_init(struct teamd_context *ctx, void *priv)
 {
 	struct ab *ab = priv;
@@ -497,37 +522,25 @@ static int ab_init(struct teamd_context *ctx, void *priv)
 		teamd_log_err("Failed to register event watch.");
 		return err;
 	}
+	err = teamd_state_val_group_register(ctx, &ab_state_vg, ab);
+	if (err) {
+		teamd_log_err("Failed to register state group.");
+		goto event_watch_unregister;
+	}
 	return 0;
+
+event_watch_unregister:
+	teamd_event_watch_unregister(ctx, &ab_event_watch_ops, ab);
+	return err;
 }
 
 static void ab_fini(struct teamd_context *ctx, void *priv)
 {
 	struct ab *ab = priv;
 
+	teamd_state_val_group_unregister(ctx, &ab_state_vg, ab);
 	teamd_event_watch_unregister(ctx, &ab_event_watch_ops, ab);
 }
-
-static int ab_state_json_dump(struct teamd_context *ctx,
-			       json_t **pstate_json, void *priv)
-{
-	struct ab *ab = priv;
-	struct teamd_port *active_tdport;
-	json_t *state_json;
-	char *active_port;
-
-	active_tdport = teamd_get_port(ctx, ab->active_ifindex);
-	active_port = active_tdport ? active_tdport->ifname : "";
-	state_json = json_pack("{s:s}", "active_port", active_port);
-	if (!state_json)
-		return -ENOMEM;
-	*pstate_json = state_json;
-	return 0;
-}
-
-static const struct teamd_state_ops ab_state_ops = {
-	.dump			= ab_state_json_dump,
-	.name			= TEAMD_RUNNER_STATE_JSON_NAME,
-};
 
 const struct teamd_runner teamd_runner_activebackup = {
 	.name			= "activebackup",
@@ -535,5 +548,4 @@ const struct teamd_runner teamd_runner_activebackup = {
 	.priv_size		= sizeof(struct ab),
 	.init			= ab_init,
 	.fini			= ab_fini,
-	.state_ops		= &ab_state_ops,
 };
