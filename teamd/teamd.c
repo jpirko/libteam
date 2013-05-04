@@ -97,7 +97,8 @@ static void print_help(const struct teamd_context *ctx) {
             "    -t --team-dev=DEVNAME    Use the specified team device\n"
             "    -n --no-ports            Start without ports\n"
             "    -D --dbus-enable         Enable D-Bus interface\n"
-            "    -U --usock-enable        Enable UNIX domain socket interface\n",
+            "    -U --usock-enable        Enable UNIX domain socket interface\n"
+            "    -u --usock-disable       Disable UNIX domain socket interface\n",
             ctx->argv0);
 	printf("Available runners: ");
 	for (i = 0; i < TEAMD_RUNNER_LIST_SIZE; i++) {
@@ -126,10 +127,11 @@ static int parse_command_line(struct teamd_context *ctx,
 		{ "no-ports",		no_argument,		NULL, 'n' },
 		{ "dbus-enable",	no_argument,		NULL, 'D' },
 		{ "usock-enable",	no_argument,		NULL, 'U' },
+		{ "usock-disable",	no_argument,		NULL, 'u' },
 		{ NULL, 0, NULL, 0 }
 	};
 
-	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:grt:nDU",
+	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:grt:nDUu",
 				  long_options, NULL)) >= 0) {
 
 		switch(opt) {
@@ -183,6 +185,9 @@ static int parse_command_line(struct teamd_context *ctx,
 			break;
 		case 'U':
 			ctx->usock.enabled = true;
+			break;
+		case 'u':
+			ctx->usock.enabled = false;
 			break;
 		default:
 			return -1;
@@ -1329,6 +1334,9 @@ static int teamd_context_init(struct teamd_context **pctx)
 		return -ENOMEM;
 	*pctx = ctx;
 	__g_pid_file = &ctx->pid_file;
+
+	/* Enable usock by default */
+	ctx->usock.enabled = true;
 	return 0;
 }
 

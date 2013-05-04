@@ -78,7 +78,10 @@ Start without ports, even if they are listed in config.
 Enable D-Bus interface.
 .TP
 .B "\-U, \-\-usock-enable"
-Enable UNIX domain socket interface.
+Enable UNIX domain socket interface. This is enabled by default.
+.TP
+.B "\-u, \-\-usock-disable"
+Disable UNIX domain socket interface.
 .SH SEE ALSO
 .BR teamdctl (8),
 .BR teamd.conf (5),
