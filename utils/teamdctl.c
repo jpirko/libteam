@@ -887,7 +887,12 @@ int main(int argc, char **argv)
 			g_oneline = true;
 			break;
 		case 'D':
+#ifndef ENABLE_DBUS
+			fprintf(stderr, "D-Bus support is not compiled-in\n");
+			return EXIT_FAILURE;
+#else
 			force_dbus = true;
+#endif
 			break;
 		case 'U':
 			force_usock = true;

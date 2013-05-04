@@ -39,7 +39,6 @@ LT_INIT
 PKG_CHECK_MODULES([LIBNL], [libnl-3.0 libnl-genl-3.0 libnl-route-3.0 >= 3.2.19 libnl-cli-3.0])
 PKG_CHECK_MODULES([LIBDAEMON], [libdaemon])
 PKG_CHECK_MODULES([JANSSON], [jansson])
-PKG_CHECK_MODULES([DBUS], [dbus-1])
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdint.h stdlib.h])
@@ -62,6 +61,13 @@ AC_ARG_ENABLE([debug],
 	[], [enable_debug=no])
 AS_IF([test "x$enable_debug" = "xyes"], [
 	AC_DEFINE(ENABLE_DEBUG, [1], [Debug messages.])
+])
+
+AC_ARG_ENABLE([dbus],
+	AS_HELP_STRING([--disable-dbus], [disable D-Bus API @<:@default=enabled@:>@]),
+	[], enable_dbus=yes)
+AS_IF([test "x$enable_dbus" = "xyes"], [
+	PKG_CHECK_MODULES([DBUS], [dbus-1], [AC_DEFINE(ENABLE_DBUS, [1], [D-Bus API.])], enable_dbus=no)
 ])
 
 AC_CONFIG_FILES([Makefile

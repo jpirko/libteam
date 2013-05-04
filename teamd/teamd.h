@@ -32,7 +32,9 @@
 #include <jansson.h>
 #include <linux/filter.h>
 #include <linux/if_packet.h>
+#ifdef ENABLE_DBUS
 #include <dbus/dbus.h>
+#endif
 #include <team.h>
 #include <private/list.h>
 
@@ -103,10 +105,12 @@ struct teamd_context {
 		int				ctrl_pipe_w;
 		int				err;
 	} run_loop;
+#ifdef ENABLE_DBUS
 	struct {
 		bool			enabled;
 		DBusConnection *	con;
 	} dbus;
+#endif
 	struct {
 		bool			enabled;
 		int			sock;
@@ -285,9 +289,29 @@ void teamd_option_watch_fini(struct teamd_context *ctx);
 int teamd_ifinfo_watch_init(struct teamd_context *ctx);
 void teamd_ifinfo_watch_fini(struct teamd_context *ctx);
 
+#ifdef ENABLE_DBUS
+
 int teamd_dbus_init(struct teamd_context *ctx);
 void teamd_dbus_fini(struct teamd_context *ctx);
 int teamd_dbus_expose_name(struct teamd_context *ctx);
+
+#else
+
+static inline int teamd_dbus_init(struct teamd_context *ctx)
+{
+	return 0;
+}
+
+static inline void teamd_dbus_fini(struct teamd_context *ctx)
+{
+}
+
+static inline int teamd_dbus_expose_name(struct teamd_context *ctx)
+{
+	return 0;
+}
+
+#endif
 
 int teamd_usock_init(struct teamd_context *ctx);
 void teamd_usock_fini(struct teamd_context *ctx);

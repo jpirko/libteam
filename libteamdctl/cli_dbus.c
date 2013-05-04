@@ -17,6 +17,8 @@
  *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+#ifdef ENABLE_DBUS
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -275,3 +277,5 @@ const struct teamdctl_cli *teamdctl_cli_dbus_get(void)
 {
 	return &cli_dbus;
 }
+
+#endif /* ENABLE_DBUS */

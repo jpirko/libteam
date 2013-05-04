@@ -181,7 +181,12 @@ static int parse_command_line(struct teamd_context *ctx,
 			ctx->init_no_ports = true;
 			break;
 		case 'D':
+#ifndef ENABLE_DBUS
+			fprintf(stderr, "D-Bus support is not compiled-in\n");
+			return -1;
+#else
 			ctx->dbus.enabled = true;
+#endif
 			break;
 		case 'U':
 			ctx->usock.enabled = true;

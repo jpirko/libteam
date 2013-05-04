@@ -225,7 +225,9 @@ int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
 	int i;
 	const struct teamdctl_cli *teamdctl_cli_list[] = {
 		teamdctl_cli_usock_get(),
+#ifdef ENABLE_DBUS
 		teamdctl_cli_dbus_get(),
+#endif
 	};
 #define TEAMDCTL_CLI_LIST_SIZE ARRAY_SIZE(teamdctl_cli_list)
 

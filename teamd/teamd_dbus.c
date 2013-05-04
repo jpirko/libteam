@@ -17,6 +17,8 @@
  *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+#ifdef ENABLE_DBUS
+
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -535,3 +537,5 @@ int teamd_dbus_expose_name(struct teamd_context *ctx)
 	free(service_name);
 	return err;
 }
+
+#endif /* ENABLE_DBUS */
