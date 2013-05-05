@@ -482,7 +482,7 @@ static int ab_load_config(struct teamd_context *ctx, struct ab *ab)
 }
 
 static int ab_state_active_port_get(struct teamd_context *ctx,
-				    struct team_state_val_gsetter_ctx *gsc,
+				    struct team_state_gsc *gsc,
 				    void *priv)
 {
 	struct ab *ab = priv;

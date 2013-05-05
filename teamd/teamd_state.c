@@ -161,7 +161,7 @@ static int teamd_state_val_group_dump(struct teamd_context *ctx,
 				      void *priv)
 {
 	const struct teamd_state_val *val;
-	struct team_state_val_gsetter_ctx gsc;
+	struct team_state_gsc gsc;
 	json_t *val_json_obj = val_json_obj;
 	json_t *vg_json_obj = vg_json_obj;
 	int i;
@@ -352,7 +352,7 @@ errout:
  */
 
 static struct team_ifinfo *__get_ifinfo(struct teamd_context *ctx,
-					struct team_state_val_gsetter_ctx *gsc)
+					struct team_state_gsc *gsc)
 {
 	if (gsc->info.tdport)
 		return gsc->info.tdport->team_ifinfo;
@@ -361,7 +361,7 @@ static struct team_ifinfo *__get_ifinfo(struct teamd_context *ctx,
 }
 
 static int ifinfo_state_ifindex_get(struct teamd_context *ctx,
-				    struct team_state_val_gsetter_ctx *gsc,
+				    struct team_state_gsc *gsc,
 				    void *priv)
 {
 	gsc->data.int_val = team_get_ifinfo_ifindex(__get_ifinfo(ctx, gsc));
@@ -369,7 +369,7 @@ static int ifinfo_state_ifindex_get(struct teamd_context *ctx,
 }
 
 static int ifinfo_state_ifname_get(struct teamd_context *ctx,
-				   struct team_state_val_gsetter_ctx *gsc,
+				   struct team_state_gsc *gsc,
 				   void *priv)
 {
 	gsc->data.str_val.ptr = team_get_ifinfo_ifname(__get_ifinfo(ctx, gsc));
@@ -377,7 +377,7 @@ static int ifinfo_state_ifname_get(struct teamd_context *ctx,
 }
 
 static int ifinfo_state_dev_addr_len_get(struct teamd_context *ctx,
-					 struct team_state_val_gsetter_ctx *gsc,
+					 struct team_state_gsc *gsc,
 					 void *priv)
 {
 	gsc->data.int_val = team_get_ifinfo_hwaddr_len(__get_ifinfo(ctx, gsc));
@@ -386,7 +386,7 @@ static int ifinfo_state_dev_addr_len_get(struct teamd_context *ctx,
 
 
 static int ifinfo_state_dev_addr_get(struct teamd_context *ctx,
-				     struct team_state_val_gsetter_ctx *gsc,
+				     struct team_state_gsc *gsc,
 				     void *priv)
 {
 	struct team_ifinfo *ifinfo = __get_ifinfo(ctx, gsc);
@@ -438,7 +438,7 @@ static const struct teamd_state_val_group ports_ifinfo_state_vg = {
 };
 
 static int port_link_state_up_get(struct teamd_context *ctx,
-				  struct team_state_val_gsetter_ctx *gsc,
+				  struct team_state_gsc *gsc,
 				  void *priv)
 {
 	gsc->data.bool_val = team_is_port_link_up(gsc->info.tdport->team_port);
@@ -446,7 +446,7 @@ static int port_link_state_up_get(struct teamd_context *ctx,
 }
 
 static int port_link_state_speed_get(struct teamd_context *ctx,
-				     struct team_state_val_gsetter_ctx *gsc,
+				     struct team_state_gsc *gsc,
 				     void *priv)
 {
 	gsc->data.int_val = team_get_port_speed(gsc->info.tdport->team_port);
@@ -454,7 +454,7 @@ static int port_link_state_speed_get(struct teamd_context *ctx,
 }
 
 static int port_link_state_duplex_get(struct teamd_context *ctx,
-				      struct team_state_val_gsetter_ctx *gsc,
+				      struct team_state_gsc *gsc,
 				      void *priv)
 {
 	gsc->data.str_val.ptr =
@@ -550,7 +550,7 @@ static const struct teamd_state_ops ports_state_ops = {
 };
 
 static int setup_state_runner_name_get(struct teamd_context *ctx,
-				       struct team_state_val_gsetter_ctx *gsc,
+				       struct team_state_gsc *gsc,
 				       void *priv)
 {
 	gsc->data.str_val.ptr = ctx->runner->name;
@@ -558,7 +558,7 @@ static int setup_state_runner_name_get(struct teamd_context *ctx,
 }
 
 static int setup_state_kernel_team_mode_name_get(struct teamd_context *ctx,
-						 struct team_state_val_gsetter_ctx *gsc,
+						 struct team_state_gsc *gsc,
 						 void *priv)
 {
 	gsc->data.str_val.ptr = ctx->runner->team_mode_name;
@@ -566,7 +566,7 @@ static int setup_state_kernel_team_mode_name_get(struct teamd_context *ctx,
 }
 
 static int setup_state_dbus_enabled_get(struct teamd_context *ctx,
-					struct team_state_val_gsetter_ctx *gsc,
+					struct team_state_gsc *gsc,
 					void *priv)
 {
 #ifdef ENABLED_DBUS
@@ -578,7 +578,7 @@ static int setup_state_dbus_enabled_get(struct teamd_context *ctx,
 }
 
 static int setup_state_debug_level_get(struct teamd_context *ctx,
-				       struct team_state_val_gsetter_ctx *gsc,
+				       struct team_state_gsc *gsc,
 				       void *priv)
 {
 	gsc->data.int_val = ctx->debug;
@@ -586,7 +586,7 @@ static int setup_state_debug_level_get(struct teamd_context *ctx,
 }
 
 static int setup_state_daemonized_get(struct teamd_context *ctx,
-				      struct team_state_val_gsetter_ctx *gsc,
+				      struct team_state_gsc *gsc,
 				      void *priv)
 {
 	gsc->data.bool_val = ctx->daemonize;
@@ -594,7 +594,7 @@ static int setup_state_daemonized_get(struct teamd_context *ctx,
 }
 
 static int setup_state_pid_get(struct teamd_context *ctx,
-			       struct team_state_val_gsetter_ctx *gsc,
+			       struct team_state_gsc *gsc,
 			       void *priv)
 {
 	gsc->data.int_val = getpid();
@@ -602,7 +602,7 @@ static int setup_state_pid_get(struct teamd_context *ctx,
 }
 
 static int setup_state_pid_file_get(struct teamd_context *ctx,
-				    struct team_state_val_gsetter_ctx *gsc,
+				    struct team_state_gsc *gsc,
 				    void *priv)
 {
 	gsc->data.str_val.ptr = ctx->pid_file ? ctx->pid_file : "";

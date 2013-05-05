@@ -1345,7 +1345,7 @@ static int lacp_carrier_fini(struct teamd_context *ctx, struct lacp *lacp)
 }
 
 static int lacp_state_active_get(struct teamd_context *ctx,
-				 struct team_state_val_gsetter_ctx *gsc,
+				 struct team_state_gsc *gsc,
 				 void *priv)
 {
 	struct lacp *lacp = priv;
@@ -1355,7 +1355,7 @@ static int lacp_state_active_get(struct teamd_context *ctx,
 }
 
 static int lacp_state_sys_prio_get(struct teamd_context *ctx,
-				   struct team_state_val_gsetter_ctx *gsc,
+				   struct team_state_gsc *gsc,
 				   void *priv)
 {
 	struct lacp *lacp = priv;
@@ -1365,7 +1365,7 @@ static int lacp_state_sys_prio_get(struct teamd_context *ctx,
 }
 
 static int lacp_state_fast_rate_get(struct teamd_context *ctx,
-				    struct team_state_val_gsetter_ctx *gsc,
+				    struct team_state_gsc *gsc,
 				    void *priv)
 {
 	struct lacp *lacp = priv;
@@ -1398,7 +1398,7 @@ static const struct teamd_state_val_group lacp_state_vg = {
 	.vals_count = ARRAY_SIZE(lacp_state_vals),
 };
 
-static struct lacp_port *lacp_port_gsc(struct team_state_val_gsetter_ctx *gsc,
+static struct lacp_port *lacp_port_gsc(struct team_state_gsc *gsc,
 				       void *priv)
 {
 	struct lacp *lacp = priv;
@@ -1407,7 +1407,7 @@ static struct lacp_port *lacp_port_gsc(struct team_state_val_gsetter_ctx *gsc,
 }
 
 static int lacp_port_state_selected_get(struct teamd_context *ctx,
-					struct team_state_val_gsetter_ctx *gsc,
+					struct team_state_gsc *gsc,
 					void *priv)
 {
 	gsc->data.bool_val = lacp_port_selected(lacp_port_gsc(gsc, priv));
@@ -1415,7 +1415,7 @@ static int lacp_port_state_selected_get(struct teamd_context *ctx,
 }
 
 static int lacp_port_state_aggregator_id_get(struct teamd_context *ctx,
-					     struct team_state_val_gsetter_ctx *gsc,
+					     struct team_state_gsc *gsc,
 					     void *priv)
 {
 	gsc->data.int_val = lacp_port_agg_id(lacp_port_gsc(gsc, priv));
@@ -1423,7 +1423,7 @@ static int lacp_port_state_aggregator_id_get(struct teamd_context *ctx,
 }
 
 static int lacp_port_state_state_get(struct teamd_context *ctx,
-				     struct team_state_val_gsetter_ctx *gsc,
+				     struct team_state_gsc *gsc,
 				     void *priv)
 {
 	gsc->data.str_val.ptr =
@@ -1432,7 +1432,7 @@ static int lacp_port_state_state_get(struct teamd_context *ctx,
 }
 
 static int lacp_port_state_key_get(struct teamd_context *ctx,
-				   struct team_state_val_gsetter_ctx *gsc,
+				   struct team_state_gsc *gsc,
 				   void *priv)
 {
 	gsc->data.int_val = lacp_port_gsc(gsc, priv)->cfg.lacp_key;
@@ -1440,7 +1440,7 @@ static int lacp_port_state_key_get(struct teamd_context *ctx,
 }
 
 static int lacp_port_state_prio_get(struct teamd_context *ctx,
-				    struct team_state_val_gsetter_ctx *gsc,
+				    struct team_state_gsc *gsc,
 				    void *priv)
 {
 	gsc->data.int_val = lacp_port_gsc(gsc, priv)->cfg.lacp_prio;
@@ -1482,14 +1482,14 @@ static const struct teamd_state_val_group lacp_port_state_vg = {
 	.per_port = true,
 };
 
-static struct lacpdu_info *lacp_port_actor_gsc(struct team_state_val_gsetter_ctx *gsc,
+static struct lacpdu_info *lacp_port_actor_gsc(struct team_state_gsc *gsc,
 					       void *priv)
 {
 	return &lacp_port_gsc(gsc, priv)->actor;
 }
 
 static int lacp_port_actor_state_system_priority_get(struct teamd_context *ctx,
-						     struct team_state_val_gsetter_ctx *gsc,
+						     struct team_state_gsc *gsc,
 						     void *priv)
 {
 	gsc->data.int_val =
@@ -1498,7 +1498,7 @@ static int lacp_port_actor_state_system_priority_get(struct teamd_context *ctx,
 }
 
 static int lacp_port_actor_state_system_get(struct teamd_context *ctx,
-					    struct team_state_val_gsetter_ctx *gsc,
+					    struct team_state_gsc *gsc,
 					    void *priv)
 {
 	char *addr = (char *) lacp_port_actor_gsc(gsc, priv)->system;
@@ -1513,7 +1513,7 @@ static int lacp_port_actor_state_system_get(struct teamd_context *ctx,
 }
 
 static int lacp_port_actor_state_key_get(struct teamd_context *ctx,
-					 struct team_state_val_gsetter_ctx *gsc,
+					 struct team_state_gsc *gsc,
 					 void *priv)
 {
 	gsc->data.int_val = ntohs(lacp_port_actor_gsc(gsc, priv)->key);
@@ -1521,7 +1521,7 @@ static int lacp_port_actor_state_key_get(struct teamd_context *ctx,
 }
 
 static int lacp_port_actor_state_port_priority_get(struct teamd_context *ctx,
-						   struct team_state_val_gsetter_ctx *gsc,
+						   struct team_state_gsc *gsc,
 						   void *priv)
 {
 	gsc->data.int_val =
@@ -1530,7 +1530,7 @@ static int lacp_port_actor_state_port_priority_get(struct teamd_context *ctx,
 }
 
 static int lacp_port_actor_state_port_get(struct teamd_context *ctx,
-					  struct team_state_val_gsetter_ctx *gsc,
+					  struct team_state_gsc *gsc,
 					  void *priv)
 {
 	gsc->data.int_val = ntohs(lacp_port_actor_gsc(gsc, priv)->port);
@@ -1538,7 +1538,7 @@ static int lacp_port_actor_state_port_get(struct teamd_context *ctx,
 }
 
 static int lacp_port_actor_state_state_get(struct teamd_context *ctx,
-					   struct team_state_val_gsetter_ctx *gsc,
+					   struct team_state_gsc *gsc,
 					   void *priv)
 {
 	gsc->data.int_val = lacp_port_actor_gsc(gsc, priv)->state;
@@ -1585,14 +1585,14 @@ static const struct teamd_state_val_group lacp_port_actor_state_vg = {
 	.per_port = true,
 };
 
-static struct lacpdu_info *lacp_port_partner_gsc(struct team_state_val_gsetter_ctx *gsc,
+static struct lacpdu_info *lacp_port_partner_gsc(struct team_state_gsc *gsc,
 						 void *priv)
 {
 	return &lacp_port_gsc(gsc, priv)->partner;
 }
 
 static int lacp_port_partner_state_system_priority_get(struct teamd_context *ctx,
-						       struct team_state_val_gsetter_ctx *gsc,
+						       struct team_state_gsc *gsc,
 						       void *priv)
 {
 	gsc->data.int_val =
@@ -1601,7 +1601,7 @@ static int lacp_port_partner_state_system_priority_get(struct teamd_context *ctx
 }
 
 static int lacp_port_partner_state_system_get(struct teamd_context *ctx,
-					      struct team_state_val_gsetter_ctx *gsc,
+					      struct team_state_gsc *gsc,
 					      void *priv)
 {
 	char *addr = (char *) lacp_port_partner_gsc(gsc, priv)->system;
@@ -1616,7 +1616,7 @@ static int lacp_port_partner_state_system_get(struct teamd_context *ctx,
 }
 
 static int lacp_port_partner_state_key_get(struct teamd_context *ctx,
-					   struct team_state_val_gsetter_ctx *gsc,
+					   struct team_state_gsc *gsc,
 					   void *priv)
 {
 	gsc->data.int_val = ntohs(lacp_port_partner_gsc(gsc, priv)->key);
@@ -1624,7 +1624,7 @@ static int lacp_port_partner_state_key_get(struct teamd_context *ctx,
 }
 
 static int lacp_port_partner_state_port_priority_get(struct teamd_context *ctx,
-						     struct team_state_val_gsetter_ctx *gsc,
+						     struct team_state_gsc *gsc,
 						     void *priv)
 {
 	gsc->data.int_val =
@@ -1633,7 +1633,7 @@ static int lacp_port_partner_state_port_priority_get(struct teamd_context *ctx,
 }
 
 static int lacp_port_partner_state_port_get(struct teamd_context *ctx,
-					    struct team_state_val_gsetter_ctx *gsc,
+					    struct team_state_gsc *gsc,
 					    void *priv)
 {
 	gsc->data.int_val = ntohs(lacp_port_partner_gsc(gsc, priv)->port);
@@ -1641,7 +1641,7 @@ static int lacp_port_partner_state_port_get(struct teamd_context *ctx,
 }
 
 static int lacp_port_partner_state_state_get(struct teamd_context *ctx,
-					     struct team_state_val_gsetter_ctx *gsc,
+					     struct team_state_gsc *gsc,
 					     void *priv)
 {
 	gsc->data.int_val = lacp_port_partner_gsc(gsc, priv)->state;

@@ -28,7 +28,7 @@ enum teamd_state_val_type {
 	TEAMD_STATE_ITEM_TYPE_BOOL,
 };
 
-struct team_state_val_gsetter_ctx {
+struct team_state_gsc {
 	union {
 		int int_val;
 		struct {
@@ -46,9 +46,9 @@ struct teamd_state_val {
 	const char *subpath;
 	enum teamd_state_val_type type;
 	int (*getter)(struct teamd_context *ctx,
-		      struct team_state_val_gsetter_ctx *gsc, void *priv);
+		      struct team_state_gsc *gsc, void *priv);
 	int (*setter)(struct teamd_context *ctx,
-		      struct team_state_val_gsetter_ctx *gsc, void *priv);
+		      struct team_state_gsc *gsc, void *priv);
 };
 
 struct teamd_state_val_group {
