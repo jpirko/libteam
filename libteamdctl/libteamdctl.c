@@ -166,13 +166,6 @@ void teamdctl_set_log_priority(struct teamdctl *tdc, int priority)
 	tdc->log_priority = priority;
 }
 
-static const struct teamdctl_cli *teamdctl_cli_list[] = {
-	&teamdctl_cli_usock,
-	&teamdctl_cli_dbus,
-};
-
-#define TEAMDCTL_CLI_LIST_SIZE ARRAY_SIZE(teamdctl_cli_list)
-
 static int cli_method_call(struct teamdctl *tdc, const char *method_name,
 			   char **p_reply, const char *fmt, ...)
 {
@@ -230,6 +223,11 @@ int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
 {
 	int err;
 	int i;
+	const struct teamdctl_cli *teamdctl_cli_list[] = {
+		teamdctl_cli_usock_get(),
+		teamdctl_cli_dbus_get(),
+	};
+#define TEAMDCTL_CLI_LIST_SIZE ARRAY_SIZE(teamdctl_cli_list)
 
 	if (tdc->cli)
 		return -EBUSY;

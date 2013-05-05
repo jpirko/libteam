@@ -263,10 +263,15 @@ void cli_dbus_fini(struct teamdctl *tdc, void *priv)
 	dbus_connection_unref(cli_dbus->conn);
 }
 
-const struct teamdctl_cli teamdctl_cli_dbus = {
+static const struct teamdctl_cli cli_dbus = {
 	.name = "dbus",
 	.init = cli_dbus_init,
 	.fini = cli_dbus_fini,
 	.method_call = cli_dbus_method_call,
 	.priv_size = sizeof(struct cli_dbus_priv),
 };
+
+const struct teamdctl_cli *teamdctl_cli_dbus_get(void)
+{
+	return &cli_dbus;
+}

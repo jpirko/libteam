@@ -91,8 +91,7 @@ struct teamdctl_cli {
 			   const char *fmt, va_list ap);
 };
 
-/* Cli structures */
-const struct teamdctl_cli teamdctl_cli_usock;
-const struct teamdctl_cli teamdctl_cli_dbus;
+const struct teamdctl_cli *teamdctl_cli_usock_get(void);
+const struct teamdctl_cli *teamdctl_cli_dbus_get(void);
 
 #endif /* _TEAMDCTL_PRIVATE_H_ */

@@ -216,10 +216,15 @@ void cli_usock_fini(struct teamdctl *tdc, void *priv)
 	close(cli_usock->sock);
 }
 
-const struct teamdctl_cli teamdctl_cli_usock = {
+static const struct teamdctl_cli cli_usock = {
 	.name = "usock",
 	.init = cli_usock_init,
 	.fini = cli_usock_fini,
 	.method_call = cli_usock_method_call,
 	.priv_size = sizeof(struct cli_usock_priv),
 };
+
+const struct teamdctl_cli *teamdctl_cli_usock_get(void)
+{
+	return &cli_usock;
+}
