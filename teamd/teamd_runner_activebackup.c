@@ -501,7 +501,7 @@ static const struct teamd_state_val ab_state_vals[] = {
 	},
 };
 
-static const struct teamd_state_val_group ab_state_vg = {
+static const struct teamd_state_val ab_state_vg = {
 	.subpath = "runner",
 	.vals = ab_state_vals,
 	.vals_count = ARRAY_SIZE(ab_state_vals),
@@ -522,9 +522,9 @@ static int ab_init(struct teamd_context *ctx, void *priv)
 		teamd_log_err("Failed to register event watch.");
 		return err;
 	}
-	err = teamd_state_val_group_register(ctx, &ab_state_vg, ab);
+	err = teamd_state_val_register(ctx, &ab_state_vg, ab);
 	if (err) {
-		teamd_log_err("Failed to register state group.");
+		teamd_log_err("Failed to register state value group.");
 		goto event_watch_unregister;
 	}
 	return 0;
@@ -538,7 +538,7 @@ static void ab_fini(struct teamd_context *ctx, void *priv)
 {
 	struct ab *ab = priv;
 
-	teamd_state_val_group_unregister(ctx, &ab_state_vg, ab);
+	teamd_state_val_unregister(ctx, &ab_state_vg, ab);
 	teamd_event_watch_unregister(ctx, &ab_event_watch_ops, ab);
 }
 

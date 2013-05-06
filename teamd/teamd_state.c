@@ -30,88 +30,151 @@
 #include "teamd_state.h"
 #include "teamd_json.h"
 
-struct teamd_state_vg_item {
+struct teamd_state_val_item {
 	struct list_item list;
 	char *subpath;
-	const struct teamd_state_val_group *vg;
+	const struct teamd_state_val *val;
 	void *priv;
+	const struct teamd_state_val *parent_val;
+	bool per_port;
 };
 
-static struct teamd_state_vg_item *
-__find_vg_item(struct teamd_context *ctx,
-	       const struct teamd_state_val_group *vg, void *priv)
+static struct teamd_state_val_item *
+__find_val_item(struct teamd_context *ctx,
+		const struct teamd_state_val *val,
+		void *priv, const struct teamd_state_val *parent_val)
 {
-	struct teamd_state_vg_item *item;
+	struct teamd_state_val_item *item;
 
-	list_for_each_node_entry(item, &ctx->state_vg_list, list) {
-		if (item->vg == vg && item->priv == priv)
+	list_for_each_node_entry(item, &ctx->state_val_list, list) {
+		if (item->val == val && item->parent_val == parent_val &&
+		    item->priv == priv)
 			return item;
 	}
 	return NULL;
 }
 
-int teamd_state_val_group_register_subpath(struct teamd_context *ctx,
-					   const struct teamd_state_val_group *vg,
-					   void *priv, const char *fmt, ...)
+void __unreg_val(struct teamd_context *ctx, const struct teamd_state_val *val,
+		 void *priv, const struct teamd_state_val *parent_val)
 {
-	va_list ap;
-	struct teamd_state_vg_item *item;
+	struct teamd_state_val_item *item;
+
+	if (val->type == TEAMD_STATE_ITEM_TYPE_NODE) {
+		int i;
+
+		TEAMD_BUG_ON(!val->vals); /* consistency check */
+		for (i = 0; i < val->vals_count; i++)
+			__unreg_val(ctx, &val->vals[i], priv, val);
+	} else {
+		item = __find_val_item(ctx, val, priv, parent_val);
+		if (!item)
+			return;
+		list_del(&item->list);
+		free(item->subpath);
+		free(item);
+	}
+}
+
+int __reg_val(struct teamd_context *ctx, const struct teamd_state_val *val,
+	      void *priv, const char *parent_subpath, const char *val_subpath,
+	      bool per_port, const struct teamd_state_val *parent_val)
+{
 	char *subpath;
 	int ret;
+	int err;
 
-	if (__find_vg_item(ctx, vg, priv))
-		return -EEXIST;
+	ret = asprintf(&subpath, "%s.%s", parent_subpath, val_subpath);
+	if (ret == -1)
+		return -ENOMEM;
+	if (val->per_port)
+		per_port = true;
+
+	if (val->type == TEAMD_STATE_ITEM_TYPE_NODE) {
+		int i;
+
+		TEAMD_BUG_ON(!val->vals); /* consistency check */
+		for (i = 0; i < val->vals_count; i++) {
+			const struct teamd_state_val *child_val = &val->vals[i];
+
+			err = __reg_val(ctx, child_val, priv, subpath,
+					child_val->subpath, per_port, val);
+			if (err)
+				break;
+		}
+		/* rollback in case for did not finish */
+		if (i != val->vals_count)
+			while (--i >= 0)
+				__unreg_val(ctx, &val->vals[i], priv, val);
+		free(subpath);
+	} else {
+		struct teamd_state_val_item *item;
+
+		if (__find_val_item(ctx, val, priv, parent_val)) {
+			err = -EEXIST;
+			goto errout;
+		}
+		item = malloc(sizeof(*item));
+		if (!item) {
+			err = -ENOMEM;
+			goto errout;
+		}
+		item->subpath = subpath;
+		item->val = val;
+		item->parent_val = parent_val;
+		item->priv = priv;
+		item->per_port = per_port;
+		list_add_tail(&ctx->state_val_list, &item->list);
+	}
+	return 0;
+errout:
+	free(subpath);
+	return err;
+}
+
+int teamd_state_val_register_subpath(struct teamd_context *ctx,
+				     const struct teamd_state_val *val,
+				     void *priv, const char *fmt, ...)
+{
+	va_list ap;
+	char *val_subpath;
+	int ret;
+	int err;
+
 	va_start(ap, fmt);
-	ret = vasprintf(&subpath, fmt, ap);
+	ret = vasprintf(&val_subpath, fmt, ap);
 	va_end(ap);
 	if (ret == -1)
 		return -ENOMEM;
 
-	item = malloc(sizeof(*item));
-	if (!item) {
-		free(subpath);
-		return -ENOMEM;
-	}
-	item->subpath = subpath;
-	item->vg = vg;
-	item->priv = priv;
-	list_add_tail(&ctx->state_vg_list, &item->list);
-	return 0;
+	err = __reg_val(ctx, val, priv, "", val_subpath, false, NULL);
+	free(val_subpath);
+	return err;
 }
 
-int teamd_state_val_group_register(struct teamd_context *ctx,
-				   const struct teamd_state_val_group *vg,
-				   void *priv)
+int teamd_state_val_register(struct teamd_context *ctx,
+			     const struct teamd_state_val *val,
+			     void *priv)
 {
-	if (!vg->subpath)
-		return -EINVAL;
-	return teamd_state_val_group_register_subpath(ctx, vg,
-						      priv, vg->subpath);
+	TEAMD_BUG_ON(!val->subpath);
+	return __reg_val(ctx, val, priv, "", val->subpath, false, NULL);
 }
 
-void teamd_state_val_group_unregister(struct teamd_context *ctx,
-				      const struct teamd_state_val_group *vg,
-				      void *priv)
+void teamd_state_val_unregister(struct teamd_context *ctx,
+				const struct teamd_state_val *val,
+				void *priv)
 {
-	struct teamd_state_vg_item *item;
-
-	item = __find_vg_item(ctx, vg, priv);
-	if (!item)
-		return;
-	list_del(&item->list);
-	free(item->subpath);
-	free(item);
+	__unreg_val(ctx, val, priv, NULL);
 }
 
-int teamd_state_val_group_register_many(struct teamd_context *ctx,
-					const struct teamd_state_val_group **vg,
-					unsigned int vg_count, void *priv)
+int teamd_state_val_register_many(struct teamd_context *ctx,
+				  const struct teamd_state_val **vals,
+				  unsigned int vals_count, void *priv)
 {
 	int i;
 	int err;
 
-	for (i = 0; i < vg_count; i++) {
-		err = teamd_state_val_group_register(ctx, vg[i], priv);
+	for (i = 0; i < vals_count; i++) {
+		err = teamd_state_val_register(ctx, vals[i], priv);
 		if (err)
 			goto rollback;
 	}
@@ -119,115 +182,114 @@ int teamd_state_val_group_register_many(struct teamd_context *ctx,
 
 rollback:
 	while (--i >= 0)
-		teamd_state_val_group_unregister(ctx, vg[i], priv);
+		teamd_state_val_unregister(ctx, vals[i], priv);
 	return err;
 }
 
-void teamd_state_val_group_unregister_many(struct teamd_context *ctx,
-					   const struct teamd_state_val_group **vg,
-					   unsigned int vg_count, void *priv)
+void teamd_state_val_unregister_many(struct teamd_context *ctx,
+				     const struct teamd_state_val **vals,
+				     unsigned int vals_count, void *priv)
 {
 	int i;
 
-	for (i = 0; i < vg_count; i++)
-		teamd_state_val_group_unregister(ctx, vg[i], priv);
+	for (i = 0; i < vals_count; i++)
+		teamd_state_val_unregister(ctx, vals[i], priv);
 }
 
-static int teamd_state_build_val_group_subpath(json_t **p_vg_json_obj,
-					       json_t *root_json_obj,
-					       struct teamd_port *tdport,
-					       const char *subpath)
+static int teamd_state_build_val_json_subpath(json_t **p_vg_json_obj,
+					      json_t *root_json_obj,
+					      struct teamd_port *tdport,
+					      const char *subpath)
 {
 	char *path;
 	int ret;
 	int err;
+	char *dot;
 
 	if (tdport)
-		ret = asprintf(&path, "$.ports.%s.%s", tdport->ifname, subpath);
+		ret = asprintf(&path, "$.ports.%s%s", tdport->ifname, subpath);
 	else
-		ret = asprintf(&path, "$.%s", subpath);
+		ret = asprintf(&path, "$%s", subpath);
 	if (ret == -1)
 		return -ENOMEM;
+	dot = strrchr(path, '.');
+	TEAMD_BUG_ON(!dot);
+	*dot = '\0';
 	err = teamd_json_path_lite_build(p_vg_json_obj, root_json_obj, path);
 	free(path);
 	return err;
 }
 
-static int teamd_state_val_group_dump(struct teamd_context *ctx,
-				      json_t *root_json_obj,
-				      struct teamd_port *tdport,
-				      const char *subpath,
-				      const struct teamd_state_val_group *vg,
-				      void *priv)
+static int teamd_state_val_dump(struct teamd_context *ctx,
+				json_t *root_json_obj,
+				struct teamd_port *tdport,
+				struct teamd_state_val_item *item)
 {
-	const struct teamd_state_val *val;
+	const struct teamd_state_val *val = item->val;
+	char *subpath = item->subpath;
+	void *priv = item->priv;
+	char *subpath_end;
 	struct team_state_gsc gsc;
 	json_t *val_json_obj = val_json_obj;
 	json_t *vg_json_obj = vg_json_obj;
-	int i;
 	int err;
 	int ret;
 
-	err = teamd_state_build_val_group_subpath(&vg_json_obj, root_json_obj,
-						  tdport, subpath);
+	subpath_end = strrchr(subpath, '.');
+	subpath_end++;
+	TEAMD_BUG_ON(!subpath_end);
+	err = teamd_state_build_val_json_subpath(&vg_json_obj, root_json_obj,
+						 tdport, subpath);
 	if (err)
 		return err;
 
-	for (i = 0; i < vg->vals_count; i++) {
-		val = &vg->vals[i];
-		memset(&gsc, 0, sizeof(gsc));
-		gsc.info.tdport = tdport;
-		err = val->getter(ctx, &gsc, priv);
-		if (err)
-			return err;
-		switch (val->type) {
-		case TEAMD_STATE_ITEM_TYPE_INT:
-			val_json_obj = json_integer(gsc.data.int_val);
-			break;
-		case TEAMD_STATE_ITEM_TYPE_STRING:
-			val_json_obj = json_string(gsc.data.str_val.ptr);
-			if (gsc.data.str_val.free)
-				free((void *) gsc.data.str_val.ptr);
-			break;
-		case TEAMD_STATE_ITEM_TYPE_BOOL:
-			val_json_obj = json_boolean(gsc.data.bool_val);
-		}
-		if (!val_json_obj)
-			return -ENOMEM;
-		ret = json_object_set_new(vg_json_obj, val->subpath, val_json_obj);
-		if (ret)
-			return -EINVAL;
+	memset(&gsc, 0, sizeof(gsc));
+	gsc.info.tdport = tdport;
+	err = val->getter(ctx, &gsc, priv);
+	if (err)
+		return err;
+	switch (val->type) {
+	case TEAMD_STATE_ITEM_TYPE_INT:
+		val_json_obj = json_integer(gsc.data.int_val);
+		break;
+	case TEAMD_STATE_ITEM_TYPE_STRING:
+		val_json_obj = json_string(gsc.data.str_val.ptr);
+		if (gsc.data.str_val.free)
+			free((void *) gsc.data.str_val.ptr);
+		break;
+	case TEAMD_STATE_ITEM_TYPE_BOOL:
+		val_json_obj = json_boolean(gsc.data.bool_val);
+		break;
+	case TEAMD_STATE_ITEM_TYPE_NODE:
+		TEAMD_BUG();
 	}
+	if (!val_json_obj)
+		return -ENOMEM;
+	ret = json_object_set_new(vg_json_obj, subpath_end, val_json_obj);
+	if (ret)
+		return -EINVAL;
 	return 0;
 }
 
-static int teamd_state_val_groups_dump(struct teamd_context *ctx,
-				       json_t *root_json_obj)
+static int teamd_state_vals_dump(struct teamd_context *ctx,
+				 json_t *root_json_obj)
 {
-	struct teamd_state_vg_item *item;
+	struct teamd_state_val_item *item;
 	int err;
 
-	list_for_each_node_entry(item, &ctx->state_vg_list, list) {
-		if (item->vg->per_port) {
+	list_for_each_node_entry(item, &ctx->state_val_list, list) {
+		if (item->per_port) {
 			struct teamd_port *tdport;
 
 			teamd_for_each_tdport(tdport, ctx) {
-				err = teamd_state_val_group_dump(ctx,
-								 root_json_obj,
-								 tdport,
-								 item->subpath,
-								 item->vg,
-								 item->priv);
+				err = teamd_state_val_dump(ctx, root_json_obj,
+							   tdport, item);
 				if (err)
 					return err;
 			}
 		} else {
-			err = teamd_state_val_group_dump(ctx,
-							 root_json_obj,
-							 NULL,
-							 item->subpath,
-							 item->vg,
-							 item->priv);
+			err = teamd_state_val_dump(ctx, root_json_obj,
+						   NULL, item);
 			if (err)
 				return err;
 		}
@@ -244,7 +306,7 @@ struct state_ops_item {
 int teamd_state_init(struct teamd_context *ctx)
 {
 	list_init(&ctx->state_ops_list);
-	list_init(&ctx->state_vg_list);
+	list_init(&ctx->state_val_list);
 	return 0;
 }
 
@@ -332,7 +394,7 @@ int teamd_state_dump(struct teamd_context *ctx, char **p_state_dump)
 			goto errout;
 		}
 	}
-	err = teamd_state_val_groups_dump(ctx, state_json);
+	err = teamd_state_vals_dump(ctx, state_json);
 	if (err)
 		goto errout;
 	dump = json_dumps(state_json, TEAMD_JSON_DUMPS_FLAGS);
@@ -424,13 +486,13 @@ static const struct teamd_state_val ifinfo_state_vals[] = {
 	},
 };
 
-static const struct teamd_state_val_group teamdev_ifinfo_state_vg = {
+static const struct teamd_state_val teamdev_ifinfo_state_vg = {
 	.subpath = "team_device.ifinfo",
 	.vals = ifinfo_state_vals,
 	.vals_count = ARRAY_SIZE(ifinfo_state_vals),
 };
 
-static const struct teamd_state_val_group ports_ifinfo_state_vg = {
+static const struct teamd_state_val ports_ifinfo_state_vg = {
 	.subpath = "ifinfo",
 	.vals = ifinfo_state_vals,
 	.vals_count = ARRAY_SIZE(ifinfo_state_vals),
@@ -481,7 +543,7 @@ static const struct teamd_state_val port_link_state_vals[] = {
 	},
 };
 
-static const struct teamd_state_val_group ports_link_state_vg = {
+static const struct teamd_state_val ports_link_state_vg = {
 	.subpath = "link",
 	.vals = port_link_state_vals,
 	.vals_count = ARRAY_SIZE(port_link_state_vals),
@@ -647,13 +709,13 @@ static const struct teamd_state_val setup_state_vals[] = {
 	},
 };
 
-static const struct teamd_state_val_group setup_state_vg = {
+static const struct teamd_state_val setup_state_vg = {
 	.subpath = "setup",
 	.vals = setup_state_vals,
 	.vals_count = ARRAY_SIZE(setup_state_vals),
 };
 
-static const struct teamd_state_val_group *state_vgs[] = {
+static const struct teamd_state_val *state_vgs[] = {
 	&ports_ifinfo_state_vg,
 	&ports_link_state_vg,
 	&setup_state_vg,
@@ -663,7 +725,7 @@ int teamd_state_basics_init(struct teamd_context *ctx)
 {
 	int err;
 
-	err = teamd_state_val_group_register(ctx, &teamdev_ifinfo_state_vg, ctx);
+	err = teamd_state_val_register(ctx, &teamdev_ifinfo_state_vg, ctx);
 	if (err)
 		return err;
 
@@ -671,8 +733,8 @@ int teamd_state_basics_init(struct teamd_context *ctx)
 	if (err)
 		goto teamdev_ifinfo_state_unreg;
 
-	err = teamd_state_val_group_register_many(ctx, state_vgs,
-						  ARRAY_SIZE(state_vgs), ctx);
+	err = teamd_state_val_register_many(ctx, state_vgs,
+					    ARRAY_SIZE(state_vgs), ctx);
 	if (err)
 		goto ports_state_unreg;
 
@@ -681,14 +743,14 @@ int teamd_state_basics_init(struct teamd_context *ctx)
 ports_state_unreg:
 	teamd_state_ops_unregister(ctx, &ports_state_ops, ctx);
 teamdev_ifinfo_state_unreg:
-	teamd_state_val_group_unregister(ctx, &teamdev_ifinfo_state_vg, ctx);
+	teamd_state_val_unregister(ctx, &teamdev_ifinfo_state_vg, ctx);
 	return err;
 }
 
 void teamd_state_basics_fini(struct teamd_context *ctx)
 {
-	teamd_state_val_group_unregister_many(ctx, state_vgs,
+	teamd_state_val_unregister_many(ctx, state_vgs,
 					      ARRAY_SIZE(state_vgs), ctx);
 	teamd_state_ops_unregister(ctx, &ports_state_ops, ctx);
-	teamd_state_val_group_unregister(ctx, &teamdev_ifinfo_state_vg, ctx);
+	teamd_state_val_unregister(ctx, &teamdev_ifinfo_state_vg, ctx);
 }
