@@ -63,12 +63,17 @@ AS_IF([test "x$enable_debug" = "xyes"], [
 	AC_DEFINE(ENABLE_DEBUG, [1], [Debug messages.])
 ])
 
+have_dbus=no
 AC_ARG_ENABLE([dbus],
-	AS_HELP_STRING([--disable-dbus], [disable D-Bus API @<:@default=enabled@:>@]),
-	[], enable_dbus=yes)
-AS_IF([test "x$enable_dbus" = "xyes"], [
-	PKG_CHECK_MODULES([DBUS], [dbus-1], [AC_DEFINE(ENABLE_DBUS, [1], [D-Bus API.])], enable_dbus=no)
-])
+	AS_HELP_STRING([--disable-dbus], [disable D-Bus API @<:@default=enabled@:>@]))
+	if test "x$enable_dbus" != "xno"; then
+		PKG_CHECK_MODULES([DBUS], [dbus-1],
+				  [AC_DEFINE(ENABLE_DBUS, [1], [D-Bus API.]) have_dbus=yes],
+				  have_dbus=no)
+	if test "x$have_dbus$enable_dbus" = xnoyes; then
+		AC_MSG_ERROR([*** D-Bus support requested but libraries not found])
+	fi
+fi
 
 AC_CONFIG_FILES([Makefile
 include/Makefile \
