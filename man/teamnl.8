@@ -1,32 +1,30 @@
-.TH teamnl 8 "26 August 2012" "libteam"
+.TH TEAMNL 8 "2013-04-01" "libteam" "Team Netlink Interface"
 .SH NAME
 teamnl \(em team network device Netlink interface tool
 .SH SYNOPSIS
 .B teamnl
-.B \-h
-.TP
+.RB [ \-p
+.IR port_name ]
+.RB [ \-a
+.IR array_index ]
+.IR "team_device command " [ command_args ...]
+.br
 .B teamnl
-.RB [ "\-p port_name" ]
-.RB [ "\-a array_index" ]
-.RB TEAMDEV
-.RB COMMAND
-.RB [COMMAND_ARGS..]
-.TP
+.B \-h
 .SH DESCRIPTION
 .PP
-teamnl is a tool which provides possibility to interact with team
-device via team driver Netlink interface.
-
+teamnl is a tool enabling interaction with a team
+device via the team driver Netlink interface.
 .SH OPTIONS
 .TP
 .B "\-h, \-\-help"
+Print help text to console and exit.
 .TP
-.B "\-p ifname, \-\-port_name ifname"
+.BI "\-p "ifname ", \-\-port_name "ifname
 Select per-port option of provided interface name.
 .TP
-.B "\-a index, \-\-array_index index"
+.BI "\-a "index ", \-\-array_index "index
 Select array option of provided array index.
-
 .SH COMMAND
 .TP
 .B ports
@@ -35,15 +33,18 @@ Dumps team ports.
 .B option
 Dumps team options.
 .TP
-.B "getoption OPT_NAME"
+.BI "getoption " opt_name
 Gets option by selected name.
 .TP
-.B "setoption OPT_NAME OPT_VALUE"
+.BI "setoption " "opt_name opt_value"
 Sets option by selected name.
 .TP
-.B "monitor OPT_STYLE"
-Monitors changes made to options, ports and iterface infos. Style can be either "changed" (default) or "all".
-
+.BI "monitor " opt_style
+Monitors changes made to options, ports and interface information. Style can be either "changed" (default) or "all".
+.SH SEE ALSO
+.BR teamd (8),
+.BR teamdctl (8),
+.BR teamd.conf (5)
 .SH AUTHOR
 .PP
 Jiri Pirko is the original author and current maintainer of libteam.
