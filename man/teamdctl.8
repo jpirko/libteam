@@ -1,48 +1,42 @@
-.TH teamdctl 8 "1 September 2012" "libteam"
+.TH TEAMDCTL 8 "2013-04-01" "libteam" "teamd control"
 .SH NAME
-teamdctl \(em team network device control daemon control tool
+teamdctl \(em team daemon control tool
 .SH SYNOPSIS
-.B teamdctl
-.B \-h
-.TP
-.B teamdctl TEAMDEV COMMAND [COMMAND_ARGS..]
-.TP
+.B "teamdctl "
+.IR "team_device command " [ command_args ...]
+.br
+.B teamdctl \-h
 .SH DESCRIPTION
 .PP
-teamdctl is a tool which provides D-Bus wrapper over teamd D-Bus API.
-It allows user to interfere with running teamd instance.
-
+teamdctl is a tool that allows a user to interact with a running teamd instance.
+It defaults to using Unix Domain Sockets, but will fall back to using the D-Bus API,
+to ensure reliable operation in all environments.
 .SH OPTIONS
 .TP
 .B "\-h, \-\-help"
 Print help text to console and exit.
-
 .TP
 .B "\-v, \-\-verbosity"
 Increase output verbosity.
-
 .TP
 .B "\-o, \-\-oneline"
 Force output to one line if possible.
-
 .TP
 .B "\-D, \-\-force-dbus"
 Force to use D-Bus interface.
-
 .TP
 .B "\-U, \-\-force-usock"
-Force to use UNIX domain socket interface.
-
+Force to use UNIX domain socket interface. This is the default behavior.
 .SH COMMAND
 .TP
 .B "config dump"
 Dumps teamd JSON config.
 .TP
 .B "config dump noports"
-Dumps teamd JSON config without "ports" section included.
+Dumps teamd JSON configuration without "ports" section included.
 .TP
 .B "config dump actual"
-Dumps teamd actual JSON config. It includes ports which are currently present.
+Dumps teamd actual JSON configuration. It includes ports which are currently present.
 .TP
 .B "state dump" | "state"
 Dumps teamd JSON state document.
@@ -50,23 +44,22 @@ Dumps teamd JSON state document.
 .B "state view"
 Prints out state of teamd parsed from JSON state document.
 .TP
-.B "port add PORTDEV"
+.BI "port add " portdev
 Takes port device name as argument. Adds port device into team.
 .TP
-.B "port remove PORTDEV"
+.BI "port remove " portdev
 Takes port device name as argument. Removes port device from team.
 .TP
-.B "port config update PORTDEV PORTCONFIG"
-Takes port device name as the first argument and new port JSON config as the
-second argument. Updates port device config.
+.BI "port config update " "portdev portconfig-string"
+Takes port device name as the first argument and JSON format configuration
+string as the second argument. Updates port device configuration.
 .TP
-.B "port config dump PORTDEV"
-Takes port device name as the first argument. Dumps port device JSON config.
-
+.BI "port config dump " portdev
+Takes port device name as the first argument. Dumps port device JSON configuration to standard output.
 .SH SEE ALSO
-.BR teamd (8)
-.BR teamnl (8)
-
+.BR teamd (8),
+.BR teamnl (8),
+.BR teamd.conf (5)
 .SH AUTHOR
 .PP
 Jiri Pirko is the original author and current maintainer of libteam.
