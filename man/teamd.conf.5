@@ -1,280 +1,289 @@
-.TH teamd.conf 5 "1 September 2012" "libteam"
+.TH TEAMD.CONF 5 "2013-04-01" "libteam" "Team daemon configuration"
 .SH NAME
-teamd.conf -- libteam daemon configuration file
+teamd.conf \(em libteam daemon configuration file
 .SH DESCRIPTION
 .PP
-teamd uses JSON format configuration. Here comes a list of config options.
+teamd uses JSON format configuration.
+.SH OPTIONS
 .TP
 .BR "device " (string, " " mandatory)
 Desired name of new team device.
-
 .TP
 .BR "hwaddr " (string)
 Desired hardware address of new team device. Usual MAC address format is accepted.
-
 .TP
 .BR "runner.name " (string, " " mandatory)
-Name of team device. There are following runners available:
-
-.BR "broadcast "-
-Simple runner using which the team device transmits packets via all ports.
-
-.BR "roundrobin "-
-Simple runner using which the team device transmits packets in round-robin fashion.
-
-.BR "activebackup "-
+Name of team device. The following runners are available:
+.RS 7
+.PP
+.BR "broadcast "\(em
+Simple runner which directs the team device to transmit packets via all ports.
+.PP
+.BR "roundrobin "\(em
+Simple runner which directs the team device to transmits packets in a round-robin fashion.
+.PP
+.BR "activebackup "\(em
 Watches for link changes and selects active port to be used for data transfers.
-
-.BR "loadbalance "-
-To do passive load balancing, runner only setups BPF hash function which will determine port for packet transmit. To do active load balancing, runner is moving hashes among available ports trying to reach perfect balance.
-
-.BR "lacp "-
-Implements 802.3ad LACP protocol. Can use same TX port selection possibilities as loadbalance runner.
-
+.PP
+.BR "loadbalance "\(em
+To do passive load balancing, runner only sets up BPF hash function which will determine port for packet transmit. To do active load balancing, runner moves hashes among available ports trying to reach perfect balance.
+.PP
+.BR "lacp "\(em
+Implements 802.3ad LACP protocol. Can use same Tx port selection possibilities as loadbalance runner.
+.RE
 .TP
 .BR "link_watch.name "| " ports.PORTIFNAME.link_watch.name " (string)
-Name of link watch to be used. There are following link watches available:
-
-.BR "ethtool "-
+Name of link watcher to be used. There are the following link watchers available:
+.RS 7
+.PP
+.BR "ethtool "\(em
 Uses Libteam lib to get port ethtool state changes.
-
-.BR "arp_ping "-
+.PP
+.BR "arp_ping "\(em
 ARP requests are sent through a port. If an ARP reply is received, the link is considered to be up.
-
-.BR "nsna_ping "-
-Similar to the previous, only it uses IPv6 Neighbour Solicitation / Neighbour Announcement mechanism. This is an alternative to arp_ping and becomes handy in pure-IPv6 environments.
-
+.PP
+.BR "nsna_ping "\(em
+Similar to the previous, except that it uses IPv6 Neighbor Solicitation / Neighbor Advertisement mechanism. This is an alternative to arp_ping and becomes handy in pure-IPv6 environments.
+.PP
 .TP
 .BR "ports " (object)
 List of port NICs to be used in team device.
-
+.PP
 See examples for more information.
-
+.RE
 .TP
 .BR "ports.PORTIFNAME.queue_id " (int)
-ID of queue which should this port be mapped on.
-
+ID of queue which this port should be mapped to.
+.RS 7
+.PP
 Default:
 .BR "None"
-
+.RE
 .SH ACTIVE-BACKUP RUNNER SPECIFIC OPTIONS
 .TP
 .BR "runner.hwaddr_policy " (string)
-This defines policy on how hardware addresses of team device and port devices should be set during the team lifetime. Following are available:
-
-.BR "same_all "-
-All ports will have always the same hardware address as team device.
-
-.BR "by_active "-
-Team device has hardware address of currently active port. This is useful in case that port device is not able to change its hardware address.
-
-.BR "only_active "-
-Only active port has hardware address of the team device. The others have their own.
-
+This defines the policy of how hardware addresses of team device and port devices should be set during the team lifetime. The following are available:
+.RS 7
+.PP
+.BR "same_all "\(em
+All ports will always have the same hardware address as the associated team device.
+.PP
+.BR "by_active "\(em
+Team device adopts the hardware address of currently active port. This is useful in case the port device is not able to change its hardware address.
+.PP
+.BR "only_active "\(em
+Only the active port adopts the hardware address of the team device. The others have their own.
+.PP
 Default:
 .BR "same_all"
-
+.RE
+.PP
 .TP
 .BR "ports.PORTIFNAME.prio " (int)
 Port priority. The higher number means higher priority.
-
+.RS 7
+.PP
 Default:
 .BR "0"
-
+.RE
 .TP
 .BR "ports.PORTIFNAME.sticky " (bool)
-Flag which tells if the port is sticky. That means it does not get de-selected if another port with better priority or parameters becomes available.
-
+Flag which indicates if the port is sticky. If set, it means the port does not get unselected if another port with higher priority or better parameters becomes available.
+.RS 7
+.PP
 Default:
 .BR "false"
-
+.RE
 .SH LOAD BALANCE RUNNER SPECIFIC OPTIONS
-
 .TP
 .BR "runner.tx_hash " (array)
-List of fragment types (strings) which should be used for packet TX hash computation. Here are following available:
-
-.BR "eth "-
+List of fragment types (strings) which should be used for packet Tx hash computation. The following are available:
+.RS 7
+.PP
+.BR "eth "\(em
 Uses source and destination MAC addresses.
-
-.BR "ipv4 "-
+.PP
+.BR "ipv4 "\(em
 Uses source and destination IPv4 addresses.
-
-.BR "ipv6 "-
+.PP
+.BR "ipv6 "\(em
 Uses source and destination IPv6 addresses.
-
+.RE
 .TP
 .BR "runner.tx_balancer.name " (string)
-Name of active TX balancer. Active TX balancing is disabled by default. The only value available is
+Name of active Tx balancer. Active Tx balancing is disabled by default. The only value available is
 .BR "basic".
-
+.RS 7
+.PP
 Default:
 .BR "None"
-
+.RE
 .TP
 .BR "runner.tx_balancer.balancing_interval " (int)
-In tenths of second. Interval in what will be rebalancing periodically done.
-
+In tenths of a second. Periodic interval between rebalancing.
+.RS 7
+.PP
 Default:
 .BR "50"
-
+.RE
 .SH LACP RUNNER SPECIFIC OPTIONS
 .TP
 .BR "runner.active " (bool)
 If active is
 .BR "true"
-LACPDU frames are send along the configured links by itselt periodically. If not, it acts as "speak when spoken to".
-
+LACPDU frames are sent along the configured links periodically. If not, it acts as "speak when spoken to".
+.RS 7
+.PP
 Default:
 .BR "true"
-
+.RE
+.PP
 .TP
 .BR "runner.fast_rate " (bool)
-Option specifies the rate in which our link partner is asked to transmit LACPDU packets. If this is
+Option specifies the rate at which our link partner is asked to transmit LACPDU packets. If this is
 .BR "true"
 then packets will be sent once per second. Otherwise they will be sent every 30 seconds.
-
 .TP
 .BR "runner.tx_hash " (array)
 Same as for load balance runner.
-
 .TP
 .BR "runner.tx_balancer.name " (string)
 Same as for load balance runner.
-
 .TP
 .BR "runner.tx_balancer.balancing_interval " (int)
 Same as for load balance runner.
-
 .TP
 .BR "runner.sys_prio " (int)
-System priority, value can be 0-65535.
-
+System priority, value can be 0 \(en 65535.
+.RS 7
+.PP
 Default:
 .BR "255"
-
+.RE
 .TP
 .BR "runner.min_ports " (int)
-Specifies the minimum number of ports that must be active before asserting carrier in the master interface, value can be 1-255.
-
+Specifies the minimum number of ports that must be active before asserting carrier in the master interface, value can be 1 \(en 255.
+.RS 7
+.PP
 Default:
 .BR "0"
-
+.RE
 .TP
 .BR "runner.agg_select_policy " (string)
 This selects policy on how the aggregators will be selected. Following are available:
-
-.BR "lacp_prio "-
+.RS 7
+.PP
+.BR "lacp_prio "\(em
 Aggregator with highest priority according to LACP standard will be selected. Aggregator priority is affected by per-port option
 .BR "lacp_prio".
-
-.BR "lacp_prio_stable "-
-Same as previous one, only do not replace selected aggregator if is still usable.
-
-.BR "bandwidth "-
+.PP
+.BR "lacp_prio_stable "\(em
+Same as previous one, except do not replace selected aggregator if is still usable.
+.PP
+.BR "bandwidth "\(em
 Select aggregator with highest total bandwidth.
-
-.BR "count "-
+.PP
+.BR "count "\(em
 Select aggregator with highest number of ports.
-
-.BR "port_options "-
-Aggregator with highest priority according per-port options
+.PP
+.BR "port_options "\(em
+Aggregator with highest priority according to per-port options
 .BR "prio " and
-.BR "sticky " will be selected. This means that aggregator containing port with highest priority will be selected unless at least one of the ports in currently selected aggregator is sticky.
-
+.BR "sticky "
+will be selected. This means that the aggregator containing the port with the highest priority will be selected unless at least one of the ports in the currently selected aggregator is sticky.
+.PP
 Default:
 .BR "lacp_prio"
-
+.RE
 .TP
 .BR "ports.PORTIFNAME.lacp_prio " (int)
 Port priority according to LACP standard. The lower number means higher priority.
-
 .TP
 .BR "ports.PORTIFNAME.lacp_key " (int)
-Port key according to LACP standard. Only ports with the same key are possible to aggregate.
-
+Port key according to LACP standard. It is only possible to aggregate ports with the same key.
+.RS 7
+.PP
 Default:
 .BR "0"
-
+.RE
+.PP
 .SH ETHTOOL LINK WATCH SPECIFIC OPTIONS
 .TP
 .BR "link_watch.delay_up "| " ports.PORTIFNAME.link_watch.delay_up " (int)
-Value is positive number in milliseconds. It's a delay between link goes up and runner is actually notified about it.
-
+Value is positive number in milliseconds. It is the delay between the link coming up and the runner being notified about it.
+.RS 7
+.PP
 Default:
 .BR "0"
-
+.RE
 .TP
 .BR "link_watch.delay_down "| " ports.PORTIFNAME.link_watch.delay_down " (int)
-Value is positive number in milliseconds. It's a delay between link goes down and runner is actually notified about it.
-
+Value is positive number in milliseconds. It is the delay between the link going down and the runner being notified about it.
+.RS 7
+.PP
 Default:
 .BR "0"
-
+.RE
+.PP
 .SH ARP PING LINK WATCH SPECIFIC OPTIONS
 .TP
 .BR "link_watch.interval "| " ports.PORTIFNAME.link_watch.interval " (int)
-Value is positive number in milliseconds. It's an interval in which ARP requests are sent.
-
+Value is positive number in milliseconds. It's the interval between ARP requests being sent.
 .TP
 .BR "link_watch.init_wait "| " ports.PORTIFNAME.link_watch.init_wait " (int)
-Value is positive number in milliseconds. It's an delay between link watch initialization and first ARP request send.
-
+Value is positive number in milliseconds. It's the delay between link watch initialization and first ARP request being sent.
+.RS 7
+.PP
 Default:
 .BR "0"
-
+.RE
 .TP
 .BR "link_watch.missed_max "| " ports.PORTIFNAME.link_watch.missed_max " (int)
-Maximum number of missed ARP replies. If this number is overreached, link is reported as down.
-
+Maximum number of missed ARP replies. If this number is exceeded, link is reported as down.
 .TP
 .BR "link_watch.source_host "| " ports.PORTIFNAME.link_watch.source_host " (int)
 Hostname to be converted to IP address which will be filled into ARP request as source address.
-
 .TP
 .BR "link_watch.target_host "| " ports.PORTIFNAME.link_watch.target_host " (int)
 Hostname to be converted to IP address which will be filled into ARP request as destination address.
-
 .TP
 .BR "link_watch.validate_active "| " ports.PORTIFNAME.link_watch.validate_active " (bool)
-Validate received ARP packets on active ports. If this is not set, all incoming ARP packets will be considered as good reply.
-
+Validate received ARP packets on active ports. If this is not set, all incoming ARP packets will be considered as a good reply.
+.RS 7
+.PP
 Default:
 .BR "false"
-
+.RE
 .TP
 .BR "link_watch.validate_inactive "| " ports.PORTIFNAME.link_watch.validate_inactive " (bool)
-Validate received ARP packets on inactive ports. If this is not set, all incoming ARP packets will be considered as good reply.
-
+Validate received ARP packets on inactive ports. If this is not set, all incoming ARP packets will be considered as a good reply.
+.RS 7
+.PP
 Default:
 .BR "false"
-
+.RE
 .TP
 .BR "link_watch.send_always "| " ports.PORTIFNAME.link_watch.send_always " (bool)
-By default, ARP requests are send on active ports only. This option allows to force sending even on inactive ones.
-
+By default, ARP requests are sent on active ports only. This option allows sending even on inactive ports.
+.PP
 Default:
 .BR "false"
-
+.PP
 .SH NS/NA PING LINK WATCH SPECIFIC OPTIONS
 .TP
 .BR "link_watch.interval "| " ports.PORTIFNAME.link_watch.interval " (int)
-Value is positive number in milliseconds. It's an interval in which NS packets are sent.
-
+Value is positive number in milliseconds. It's the interval between sending NS packets.
 .TP
 .BR "link_watch.init_wait "| " ports.PORTIFNAME.link_watch.init_wait " (int)
-Value is positive number in milliseconds. It's an delay between link watch initialization and first NS packet send.
-
+Value is positive number in milliseconds. It's the delay between link watch initialization and first NS packet send.
 .TP
 .BR "link_watch.missed_max "| " ports.PORTIFNAME.link_watch.missed_max " (int)
-Maximum number of missed NA reply packets. If this number is overreached, link is reported as down.
-
+Maximum number of missed NA reply packets. If this number is exceeded, link is reported as down.
 .TP
 .BR "link_watch.target_host "| " ports.PORTIFNAME.link_watch.target_host " (int)
 Hostname to be converted to IPv6 address which will be filled into NS packet as target address.
-
 .SH EXAMPLES
-
+.PP
 .nf
 {
   "device": "team0",
@@ -282,9 +291,9 @@ Hostname to be converted to IPv6 address which will be filled into NS packet as 
   "ports": {"eth1": {}, "eth2": {}}
 }
 .fi
-
-Very basic config.
-
+.PP
+Very basic configuration.
+.PP
 .nf
 {
   "device": "team0",
@@ -301,9 +310,9 @@ Very basic config.
   }
 }
 .fi
-
-This config uses active-backup runner with ethtool linkwatch. Port eth2 has bigger priority. But sticky flag ensures that is eth1 becomes active, it stays active until it has link.
-
+.PP
+This configuration uses active-backup runner with ethtool link watcher. Port eth2 has higher priority. But sticky flag ensures that if eth1 becomes active, it stays active while the link remains up.
+.PP
 .nf
 {
   "device": "team0",
@@ -324,9 +333,9 @@ This config uses active-backup runner with ethtool linkwatch. Port eth2 has bigg
   }
 }
 .fi
-
-Similar to the previous one. Ony difference that link changes are not proparated to runner immediately, but there are delays applied.
-
+.PP
+Similar to the previous one. Only difference is that link changes are not propagated to the runner immediately, but delays are applied.
+.PP
 .nf
 {
   "device": "team0",
@@ -349,9 +358,9 @@ Similar to the previous one. Ony difference that link changes are not proparated
   }
 }
 .fi
-
-This config uses APR ping link watch.
-
+.PP
+This configuration uses ARP ping link watch.
+.PP
 .nf
 {
 "device": "team0",
@@ -383,9 +392,9 @@ This config uses APR ping link watch.
   }
 }
 .fi
-
-Similar to the previous one, only this time two link watches are used at the same time.
-
+.PP
+Similar to the previous one, only this time two link watchers are used at the same time.
+.PP
 .nf
 {
   "device": "team0",
@@ -396,9 +405,9 @@ Similar to the previous one, only this time two link watches are used at the sam
   "ports": {"eth1": {}, "eth2": {}}
 }
 .fi
-
-Config for hash-based passive TX load balancing.
-
+.PP
+Configuration for hash-based passive Tx load balancing.
+.PP
 .nf
 {
   "device": "team0",
@@ -412,9 +421,9 @@ Config for hash-based passive TX load balancing.
   "ports": {"eth1": {}, "eth2": {}}
 }
 .fi
-
-Config for active TX load balancing using basic load balancer.
-
+.PP
+Configuration for active Tx load balancing using basic load balancer.
+.PP
 .nf
 {
   "device": "team0",
@@ -428,12 +437,12 @@ Config for active TX load balancing using basic load balancer.
   "ports": {"eth1": {}, "eth2": {}}
 }
 .fi
-
-Config for connection to LACP capable counterpart.
-
+.PP
+Configuration for connection to LACP capable counterpart.
 .SH SEE ALSO
-.BR teamd (8)
-
+.BR teamd (8),
+.BR teamdctl (8),
+.BR teamnl (8)
 .SH AUTHOR
 .PP
 Jiri Pirko is the original author and current maintainer of libteam.
