@@ -56,7 +56,7 @@ Return 0 if a daemon is already running.
 Load the specified configuration file.
 .TP
 .BI "\-c " text ", \-\-config "text
-Use given config string. If this option is present then \-f option will be
+Use given JSON format configuration string. If this option is present then \-f option will be
 ignored.
 .TP
 .BI "\-p " filename ", \-\-pid-file " filename
@@ -72,7 +72,7 @@ Force team device recreation in case it already exists.
 Use the specified team device name (overrides "device" key in config).
 .TP
 .B "\-n, \-\-no-ports"
-Start without ports, even if they are listed in config.
+Start without ports, even if they are listed in the configuration.
 .TP
 .B "\-D, \-\-dbus-enable"
 Enable D-Bus interface.
