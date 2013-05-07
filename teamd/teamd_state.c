@@ -321,6 +321,47 @@ static int __find_by_item_path(struct teamd_state_val_item **p_item,
 	return -ENOENT;
 }
 
+int teamd_state_item_value_get(struct teamd_context *ctx, const char *item_path,
+			       char **p_value)
+{
+	struct teamd_state_val_item *item;
+	const struct teamd_state_val *val;
+	void *priv;
+	struct team_state_gsc gsc;
+	int err;
+	int ret = ret;
+
+	memset(&gsc, 0, sizeof(gsc));
+	err = __find_by_item_path(&item, &gsc.info.tdport, ctx, item_path);
+	if (err)
+		return err;
+
+	val = item->val;
+	priv = item->priv;
+	err = val->getter(ctx, &gsc, priv);
+	if (err)
+		return err;
+	switch (val->type) {
+	case TEAMD_STATE_ITEM_TYPE_INT:
+		ret = asprintf(p_value, "%d", gsc.data.int_val);
+		break;
+	case TEAMD_STATE_ITEM_TYPE_STRING:
+		ret = asprintf(p_value, "%s", gsc.data.str_val.ptr);
+		if (gsc.data.str_val.free)
+			free((void *) gsc.data.str_val.ptr);
+		break;
+	case TEAMD_STATE_ITEM_TYPE_BOOL:
+		ret = asprintf(p_value, "%s",
+			       gsc.data.bool_val ? "true" : "false");
+		break;
+	case TEAMD_STATE_ITEM_TYPE_NODE:
+		TEAMD_BUG();
+	}
+	if (ret == -1)
+		return -ENOMEM;
+	return 0;
+}
+
 int __set_int_val(struct team_state_gsc *gsc, const char *value)
 {
 	long val;
@@ -385,6 +426,7 @@ int teamd_state_item_value_set(struct teamd_context *ctx, const char *item_path,
 	}
 	return val->setter(ctx, &gsc, priv);
 }
+
 
 struct state_ops_item {
 	struct list_item list;

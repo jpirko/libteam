@@ -419,6 +419,23 @@ char *teamdctl_state_get_raw(struct teamdctl *tdc)
 }
 
 /**
+ * teamdctl_state_item_value_get:
+ * @tdc: libteamdctl library context
+ * @item_path: path to item
+ * @p_value: pointer where reply string will be stored
+ *
+ * Get state item value. Note that caller is responsible to free *p_value.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAMDCTL_EXPORT
+int teamdctl_state_item_value_get(struct teamdctl *tdc, const char *item_path,
+				  char **p_value)
+{
+	return cli_method_call(tdc, "StateItemValueGet", p_value,
+			       "s", item_path);
+}
+/**
  * teamdctl_state_item_value_set:
  * @tdc: libteamdctl library context
  * @item_path: path to item

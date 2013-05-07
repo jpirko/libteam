@@ -158,6 +158,32 @@ static int teamd_ctl_method_state_dump(struct teamd_context *ctx,
 	return err;
 }
 
+static int teamd_ctl_method_state_item_value_get(struct teamd_context *ctx,
+						 const struct teamd_ctl_method_ops *ops,
+						 void *ops_priv)
+{
+	const char *item_path;
+	char *value;
+	int err;
+
+	err = ops->get_args(ops_priv, "s", &item_path);
+	if (err)
+		return ops->reply_err(ops_priv, "InvalidArgs", "Did not receive correct message arguments.");
+	teamd_log_dbgx(ctx, 2, "item_path \"%s\"", item_path);
+
+	err = teamd_state_item_value_get(ctx, item_path, &value);
+	if (err == -ENOENT) {
+		teamd_log_err("Failed to get state item \"%s\".", item_path);
+		return ops->reply_err(ops_priv, "PathDoesNotExist", "Item path does not exist.");
+	} else if (err) {
+		teamd_log_err("Failed to get state item \"%s\".", item_path);
+		return ops->reply_err(ops_priv, "ItemValueGetFail", "Failed to get item value.");
+	}
+	err =  ops->reply_succ(ops_priv, value);
+	free(value);
+	return err;
+}
+
 static int teamd_ctl_method_state_item_value_set(struct teamd_context *ctx,
 						 const struct teamd_ctl_method_ops *ops,
 						 void *ops_priv)
@@ -223,6 +249,11 @@ static const struct teamd_ctl_method teamd_ctl_method_list[] = {
 	{
 		.name = "StateDump",
 		.func = teamd_ctl_method_state_dump,
+
+	},
+	{
+		.name = "StateItemValueGet",
+		.func = teamd_ctl_method_state_item_value_get,
 
 	},
 	{
