@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <assert.h>
 #include <jansson.h>
 #include <linux/filter.h>
 #include <linux/if_packet.h>
@@ -46,6 +47,18 @@
 #define teamd_log_dbgx(ctx, val, args...)	\
 	if (val <= ctx->debug)			\
 		daemon_log(LOG_DEBUG, ##args)
+
+static inline void TEAMD_BUG(void)
+{
+	teamd_log_dbg("BUG: %s:%d\n", __FILE__, __LINE__);
+	assert(0);
+}
+
+static inline void TEAMD_BUG_ON(bool condition)
+{
+	if (condition)
+		TEAMD_BUG();
+}
 
 #define TEAMD_RUN_DIR "/var/run/teamd/"
 
