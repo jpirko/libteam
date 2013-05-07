@@ -19,6 +19,7 @@
 
 #include <stdbool.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
@@ -171,6 +172,8 @@ void teamd_state_val_unregister(struct teamd_context *ctx,
 	__unreg_val(ctx, val, priv, NULL);
 }
 
+#define TEAMD_STATE_PER_PORT_PREFIX "ports."
+
 static int teamd_state_build_val_json_subpath(json_t **p_vg_json_obj,
 					      json_t *root_json_obj,
 					      struct teamd_port *tdport,
@@ -182,7 +185,8 @@ static int teamd_state_build_val_json_subpath(json_t **p_vg_json_obj,
 	char *dot;
 
 	if (tdport)
-		ret = asprintf(&path, "$.ports.%s%s", tdport->ifname, subpath);
+		ret = asprintf(&path, "$." TEAMD_STATE_PER_PORT_PREFIX "%s%s",
+			       tdport->ifname, subpath);
 	else
 		ret = asprintf(&path, "$%s", subpath);
 	if (ret == -1)
@@ -270,6 +274,116 @@ static int teamd_state_vals_dump(struct teamd_context *ctx,
 		}
 	}
 	return 0;
+}
+
+static int __find_by_item_path(struct teamd_state_val_item **p_item,
+			       struct teamd_port **p_tdport,
+			       struct teamd_context *ctx, const char *item_path)
+{
+	struct teamd_state_val_item *item;
+	char *subpath;
+
+	if (!strncmp(item_path, TEAMD_STATE_PER_PORT_PREFIX,
+		     strlen(TEAMD_STATE_PER_PORT_PREFIX))) {
+		struct teamd_port *tdport;
+		bool found;
+		char *ifname_start = strchr(item_path, '.') + 1;
+		char *ifname_end = strchr(ifname_start, '.');
+		size_t ifname_len = ifname_end - ifname_start;
+
+		if (!ifname_end)
+			return -EINVAL;
+		subpath = ifname_end + 1;
+
+		found = false;
+		teamd_for_each_tdport(tdport, ctx) {
+			if (!strncmp(tdport->ifname, ifname_start,
+				     ifname_len)) {
+				*p_tdport = tdport;
+				found = true;
+				break;
+			}
+		}
+		if (!found)
+			return -ENOENT;
+	} else {
+		subpath = (char *) item_path;
+		*p_tdport = NULL;
+	}
+
+	list_for_each_node_entry(item, &ctx->state_val_list, list) {
+		/* item->subpath[0] == '.' */
+		if (!strcmp(item->subpath + 1, subpath)) {
+			*p_item = item;
+			return 0;
+		}
+	}
+	return -ENOENT;
+}
+
+int __set_int_val(struct team_state_gsc *gsc, const char *value)
+{
+	long val;
+	char *endptr;
+
+	errno = 0;
+	val = strtol(value, &endptr, 10);
+	if (errno)
+		return -errno;
+	if (strlen(endptr) != 0)
+		return -EINVAL;
+	if (val < INT_MIN || val > INT_MAX)
+		return -ERANGE;
+	gsc->data.int_val = val;
+	return 0;
+}
+
+int __set_bool_val(struct team_state_gsc *gsc, const char *value)
+{
+	if (!strcasecmp("true", value))
+		gsc->data.bool_val = true;
+	else if (!strcasecmp("false", value))
+		gsc->data.bool_val = false;
+	else
+		return -EINVAL;
+	return 0;
+}
+
+int teamd_state_item_value_set(struct teamd_context *ctx, const char *item_path,
+			       const char *value)
+{
+	struct teamd_state_val_item *item;
+	const struct teamd_state_val *val;
+	void *priv;
+	struct team_state_gsc gsc;
+	int err;
+
+	err = __find_by_item_path(&item, &gsc.info.tdport, ctx, item_path);
+	if (err)
+		return err;
+
+	val = item->val;
+	priv = item->priv;
+	if (!val->setter)
+		return -EOPNOTSUPP;
+	switch (val->type) {
+	case TEAMD_STATE_ITEM_TYPE_INT:
+		err = __set_int_val(&gsc, value);
+		if (err)
+			return err;
+		break;
+	case TEAMD_STATE_ITEM_TYPE_STRING:
+		gsc.data.str_val.ptr = value;
+		break;
+	case TEAMD_STATE_ITEM_TYPE_BOOL:
+		err = __set_bool_val(&gsc, value);
+		if (err)
+			return err;
+		break;
+	case TEAMD_STATE_ITEM_TYPE_NODE:
+		TEAMD_BUG();
+	}
+	return val->setter(ctx, &gsc, priv);
 }
 
 struct state_ops_item {

@@ -417,3 +417,21 @@ char *teamdctl_state_get_raw(struct teamdctl *tdc)
 {
 	return tdc->cached_reply.state;
 }
+
+/**
+ * teamdctl_state_item_value_set:
+ * @tdc: libteamdctl library context
+ * @item_path: path to item
+ * @value: new value to be set
+ *
+ * Set state item value.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAMDCTL_EXPORT
+int teamdctl_state_item_value_set(struct teamdctl *tdc, const char *item_path,
+				  const char *value)
+{
+	return cli_method_call(tdc, "StateItemValueSet", NULL,
+			       "ss", item_path, value);
+}

@@ -83,6 +83,8 @@ void teamd_state_ops_unregister(struct teamd_context *ctx,
 				const struct teamd_state_ops *ops,
 				void *priv);
 int teamd_state_dump(struct teamd_context *ctx, char **p_state_dump);
+int teamd_state_item_value_set(struct teamd_context *ctx, const char *item_path,
+			       const char *value);
 
 int teamd_state_basics_init(struct teamd_context *ctx);
 void teamd_state_basics_fini(struct teamd_context *ctx);

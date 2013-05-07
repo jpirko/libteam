@@ -617,6 +617,12 @@ static int call_method_port_config_dump(struct teamdctl *tdc,
 					   argv[0]);
 }
 
+static int call_method_state_item_set(struct teamdctl *tdc,
+				      int argc, char **argv)
+{
+	return teamdctl_state_item_value_set(tdc, argv[0], argv[1]);
+}
+
 
 enum id_command_type {
 	ID_CMDTYPE_NONE = 0,
@@ -627,6 +633,8 @@ enum id_command_type {
 	ID_CMDTYPE_S,
 	ID_CMDTYPE_S_D,
 	ID_CMDTYPE_S_V,
+	ID_CMDTYPE_S_I,
+	ID_CMDTYPE_S_I_S,
 	ID_CMDTYPE_P,
 	ID_CMDTYPE_P_A,
 	ID_CMDTYPE_P_R,
@@ -689,6 +697,18 @@ static struct command_type command_types[] = {
 		.parent_id = ID_CMDTYPE_S,
 		.name = "view",
 		.call_method = call_method_state_stateview,
+	},
+	{
+		.id = ID_CMDTYPE_S_I,
+		.parent_id = ID_CMDTYPE_S,
+		.name = "item",
+	},
+	{
+		.id = ID_CMDTYPE_S_I_S,
+		.parent_id = ID_CMDTYPE_S_I,
+		.name = "set",
+		.call_method = call_method_state_item_set,
+		.params = {"ITEMPATH", "VALUE"},
 	},
 	{
 		.id = ID_CMDTYPE_P,

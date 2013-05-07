@@ -158,6 +158,34 @@ static int teamd_ctl_method_state_dump(struct teamd_context *ctx,
 	return err;
 }
 
+static int teamd_ctl_method_state_item_value_set(struct teamd_context *ctx,
+						 const struct teamd_ctl_method_ops *ops,
+						 void *ops_priv)
+{
+	const char *item_path;
+	const char *value;
+	int err;
+
+	err = ops->get_args(ops_priv, "ss", &item_path, &value);
+	if (err)
+		return ops->reply_err(ops_priv, "InvalidArgs", "Did not receive correct message arguments.");
+	teamd_log_dbgx(ctx, 2, "item_path \"%s\", value \"%s\"",
+		       item_path, value);
+
+	err = teamd_state_item_value_set(ctx, item_path, value);
+	if (err == -ENOENT) {
+		teamd_log_err("Failed to set state item \"%s\".", item_path);
+		return ops->reply_err(ops_priv, "PathDoesNotExist", "Item path does not exist.");
+	} else if (err == -EOPNOTSUPP) {
+		teamd_log_err("Failed to set state item \"%s\".", item_path);
+		return ops->reply_err(ops_priv, "OpNotSupp", "Operation not supported.");
+	} else if (err) {
+		teamd_log_err("Failed to set state item \"%s\".", item_path);
+		return ops->reply_err(ops_priv, "ItemValueSetFail", "Failed to set item value.");
+	}
+	return ops->reply_succ(ops_priv, NULL);
+}
+
 typedef int (*teamd_ctl_method_func_t)(struct teamd_context *ctx,
 				       const struct teamd_ctl_method_ops *ops,
 				       void *ops_priv);
@@ -195,6 +223,11 @@ static const struct teamd_ctl_method teamd_ctl_method_list[] = {
 	{
 		.name = "StateDump",
 		.func = teamd_ctl_method_state_dump,
+
+	},
+	{
+		.name = "StateItemValueSet",
+		.func = teamd_ctl_method_state_item_value_set,
 
 	},
 };
