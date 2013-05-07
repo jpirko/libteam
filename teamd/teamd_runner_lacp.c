@@ -1392,12 +1392,6 @@ static const struct teamd_state_val lacp_state_vals[] = {
 	},
 };
 
-static const struct teamd_state_val lacp_state_vg = {
-	.subpath = "runner",
-	.vals = lacp_state_vals,
-	.vals_count = ARRAY_SIZE(lacp_state_vals),
-};
-
 static struct lacp_port *lacp_port_gsc(struct team_state_gsc *gsc,
 				       void *priv)
 {
@@ -1677,16 +1671,23 @@ static const struct teamd_state_val lacp_port_state_vals[] = {
 	},
 };
 
-static const struct teamd_state_val lacp_port_state_vg = {
-	.subpath = "runner",
-	.vals = lacp_port_state_vals,
-	.vals_count = ARRAY_SIZE(lacp_port_state_vals),
-	.per_port = true,
+static const struct teamd_state_val lacp_state_vgs[] = {
+	{
+		.subpath = "runner",
+		.vals = lacp_state_vals,
+		.vals_count = ARRAY_SIZE(lacp_state_vals),
+	},
+	{
+		.subpath = "runner",
+		.vals = lacp_port_state_vals,
+		.vals_count = ARRAY_SIZE(lacp_port_state_vals),
+		.per_port = true,
+	},
 };
 
-static const struct teamd_state_val *lacp_state_vgs[] = {
-	&lacp_state_vg,
-	&lacp_port_state_vg,
+static const struct teamd_state_val lacp_state_vg = {
+	.vals = lacp_state_vgs,
+	.vals_count = ARRAY_SIZE(lacp_state_vgs),
 };
 
 static int lacp_init(struct teamd_context *ctx, void *priv)
@@ -1723,8 +1724,7 @@ static int lacp_init(struct teamd_context *ctx, void *priv)
 		teamd_log_err("Failed to init balanced.");
 		goto event_watch_unregister;
 	}
-	err = teamd_state_val_register_many(ctx, lacp_state_vgs,
-					    ARRAY_SIZE(lacp_state_vgs), lacp);
+	err = teamd_state_val_register(ctx, &lacp_state_vg, lacp);
 	if (err) {
 		teamd_log_err("Failed to register state groups.");
 		goto balancer_fini;
@@ -1742,8 +1742,7 @@ static void lacp_fini(struct teamd_context *ctx, void *priv)
 {
 	struct lacp *lacp = priv;
 
-	teamd_state_val_unregister_many(ctx, lacp_state_vgs,
-					ARRAY_SIZE(lacp_state_vgs), lacp);
+	teamd_state_val_unregister(ctx, &lacp_state_vg, lacp);
 	teamd_balancer_fini(lacp->tb);
 	teamd_event_watch_unregister(ctx, &lacp_port_watch_ops, lacp);
 	lacp_carrier_fini(ctx, lacp);

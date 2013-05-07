@@ -64,12 +64,6 @@ int teamd_state_val_register(struct teamd_context *ctx,
 void teamd_state_val_unregister(struct teamd_context *ctx,
 				const struct teamd_state_val *val,
 				void *priv);
-int teamd_state_val_register_many(struct teamd_context *ctx,
-				  const struct teamd_state_val **vals,
-				  unsigned int vals_count, void *priv);
-void teamd_state_val_unregister_many(struct teamd_context *ctx,
-				     const struct teamd_state_val **vals,
-				     unsigned int vals_count, void *priv);
 
 struct teamd_state_ops {
 	int (*dump)(struct teamd_context *ctx,
