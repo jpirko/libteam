@@ -48,7 +48,7 @@ static inline int teamd_usock_recv_msg(int sock, char **p_str)
 	if (ret == -1)
 		return -errno;
 
-	buf = malloc(expected_len);
+	buf = malloc(expected_len + 1);
 	if (!buf)
 		return -ENOMEM;
 	len = recv(sock, buf, expected_len, 0);
