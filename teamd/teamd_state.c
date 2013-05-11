@@ -583,7 +583,6 @@ static int ifinfo_state_dev_addr_len_get(struct teamd_context *ctx,
 	return 0;
 }
 
-
 static int ifinfo_state_dev_addr_get(struct teamd_context *ctx,
 				     struct team_state_gsc *gsc,
 				     void *priv)

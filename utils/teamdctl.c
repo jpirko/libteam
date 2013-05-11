@@ -179,7 +179,7 @@ static int stateview_json_setup_process(char **prunner_name, json_t *setup_json)
 }
 
 static int stateview_json_link_watch_info_process(char *lw_name,
-						  json_t *lw_info_json)
+						  json_t *lw_json)
 {
 	int err;
 
@@ -187,11 +187,11 @@ static int stateview_json_link_watch_info_process(char *lw_name,
 		int delay_up;
 		int delay_down;
 
-		err = json_unpack(lw_info_json, "{s:i, s:i}",
+		err = json_unpack(lw_json, "{s:i, s:i}",
 				  "delay_up", &delay_up,
 				  "delay_down", &delay_down);
 		if (err) {
-			pr_err("Failed to parse JSON ethtool link watch info dump.\n");
+			pr_err("Failed to parse JSON ethtool link watch dump.\n");
 			return -EINVAL;
 		}
 		pr_out2("link up delay: %d\n", delay_up);
@@ -207,7 +207,7 @@ static int stateview_json_link_watch_info_process(char *lw_name,
 		int missed_max;
 		int missed;
 
-		err = json_unpack(lw_info_json, "{s:s, s:s, s:i, s:i, s:b, s:b, s:b, s:i, s:i}",
+		err = json_unpack(lw_json, "{s:s, s:s, s:i, s:i, s:b, s:b, s:b, s:i, s:i}",
 				  "source_host", &source_host,
 				  "target_host", &target_host,
 				  "interval", &interval,
@@ -218,7 +218,7 @@ static int stateview_json_link_watch_info_process(char *lw_name,
 				  "missed_max", &missed_max,
 				  "missed", &missed);
 		if (err) {
-			pr_err("Failed to parse JSON arp_ping link watch info dump.\n");
+			pr_err("Failed to parse JSON arp_ping link watch dump.\n");
 			return -EINVAL;
 		}
 		pr_out2("source host: %s\n", source_host);
@@ -236,14 +236,14 @@ static int stateview_json_link_watch_info_process(char *lw_name,
 		int missed_max;
 		int missed;
 
-		err = json_unpack(lw_info_json, "{s:s, s:i, s:i, s:i, s:i}",
+		err = json_unpack(lw_json, "{s:s, s:i, s:i, s:i, s:i}",
 				  "target_host", &target_host,
 				  "interval", &interval,
 				  "init_wait", &init_wait,
 				  "missed_max", &missed_max,
 				  "missed", &missed);
 		if (err) {
-			pr_err("Failed to parse JSON nsna_ping link watch info dump.\n");
+			pr_err("Failed to parse JSON nsna_ping link watch dump.\n");
 			return -EINVAL;
 		}
 		pr_out2("target host: %s\n", target_host);
@@ -263,9 +263,8 @@ static int stateview_json_port_link_watches_process(json_t *port_link_watches_js
 	int up;
 	json_t *lw_list_json;
 	json_t *lw_json;
-	json_t *lw_info_json;
 	char *lw_name;
-	int i;
+	const char *key;
 
 	err = json_unpack(port_link_watches_json, "{s:b, s:o}",
 			  "up", &up, "list", &lw_list_json);
@@ -276,28 +275,21 @@ static int stateview_json_port_link_watches_process(json_t *port_link_watches_js
 	pr_out("link watches:\n");
 	pr_out_indent_inc();
 	pr_out("link summary: %s\n", boolupdown(up));
-	for (i = 0; i < json_array_size(lw_list_json); i++) {
-		lw_json = json_array_get(lw_list_json, i);
-
-		err = json_unpack(lw_json, "{s:b, s:s, s:o}",
-				  "up", &up,
-				  "name", &lw_name,
-				  "info", &lw_info_json);
+	json_object_foreach(lw_list_json, key, lw_json) {
+		err = json_unpack(lw_json, "{s:b, s:s}",
+				  "up", &up, "name", &lw_name);
 		if (err) {
 			pr_err("Failed to parse JSON port link watch dump.\n");
 			return -EINVAL;
 		}
-		pr_out("intance[%d]:\n", i);
+		pr_out("intance[%s]:\n", key);
 		pr_out_indent_inc();
 		pr_out("name: %s\n", lw_name);
 		pr_out("link: %s\n", boolupdown(up));
-		pr_out2("info:\n");
-		pr_out_indent_inc();
 		err = stateview_json_link_watch_info_process(lw_name,
-							     lw_info_json);
+							     lw_json);
 		if (err)
 			return err;
-		pr_out_indent_dec();
 		pr_out_indent_dec();
 	}
 	pr_out_indent_dec();

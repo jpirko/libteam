@@ -42,6 +42,7 @@
 #include "teamd_state.h"
 
 struct lw_common_port_priv {
+	unsigned int id;
 	const struct teamd_link_watch *link_watch;
 	struct teamd_context *ctx;
 	struct teamd_port *tdport;
@@ -52,9 +53,7 @@ struct lw_common_port_priv {
 
 struct teamd_link_watch {
 	const char *name;
-	json_t *(*state_json)(struct teamd_context *ctx,
-			      struct teamd_port *tdport,
-			      struct lw_common_port_priv *common_ppriv);
+	const struct teamd_state_val state_vg;
 	struct teamd_port_priv port_priv;
 };
 
@@ -307,23 +306,49 @@ static void lw_ethtool_port_removed(struct teamd_context *ctx,
 	teamd_loop_callback_del(ctx, LW_ETHTOOL_DELAY_CB_NAME, priv);
 }
 
-static json_t *lw_ethtool_state_json(struct teamd_context *ctx,
-				     struct teamd_port *tdport,
-				     struct lw_common_port_priv *common_ppriv)
+static int lw_ethtool_state_delay_up_get(struct teamd_context *ctx,
+					 struct team_state_gsc *gsc,
+					 void *priv)
 {
-	struct lw_ethtool_port_priv *ethtool_ppriv;
+	struct lw_common_port_priv *common_ppriv = priv;
+	struct timespec *ts;
 
-	ethtool_ppriv = lw_ethtool_ppriv_get(common_ppriv);
-	return json_pack("{s:i, s:i}",
-			 "delay_up",
-			 timespec_to_ms(&ethtool_ppriv->delay_up),
-			 "delay_down",
-			 timespec_to_ms(&ethtool_ppriv->delay_up));
+	ts = &lw_ethtool_ppriv_get(common_ppriv)->delay_up;
+	gsc->data.int_val = timespec_to_ms(ts);
+	return 0;
 }
+
+static int lw_ethtool_state_delay_down_get(struct teamd_context *ctx,
+					   struct team_state_gsc *gsc,
+					   void *priv)
+{
+	struct lw_common_port_priv *common_ppriv = priv;
+	struct timespec *ts;
+
+	ts = &lw_ethtool_ppriv_get(common_ppriv)->delay_down;
+	gsc->data.int_val = timespec_to_ms(ts);
+	return 0;
+}
+
+static const struct teamd_state_val lw_ethtool_state_vals[] = {
+	{
+		.subpath = "delay_up",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lw_ethtool_state_delay_up_get,
+	},
+	{
+		.subpath = "delay_down",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lw_ethtool_state_delay_down_get,
+	},
+};
 
 static const struct teamd_link_watch teamd_link_watch_ethtool = {
 	.name			= "ethtool",
-	.state_json		= lw_ethtool_state_json,
+	.state_vg		= {
+		.vals		= lw_ethtool_state_vals,
+		.vals_count	= ARRAY_SIZE(lw_ethtool_state_vals),
+	},
 	.port_priv = {
 		.init		= lw_ethtool_port_added,
 		.fini		= lw_ethtool_port_removed,
@@ -520,6 +545,50 @@ static void lw_psr_port_removed(struct teamd_context *ctx,
 	teamd_loop_callback_del(ctx, LW_PERIODIC_CB_NAME, psr_ppriv);
 	teamd_loop_callback_del(ctx, LW_SOCKET_CB_NAME, psr_ppriv);
 	psr_ppriv->ops->sock_close(psr_ppriv);
+}
+
+static int lw_psr_state_interval_get(struct teamd_context *ctx,
+				     struct team_state_gsc *gsc,
+				     void *priv)
+{
+	struct lw_common_port_priv *common_ppriv = priv;
+	struct lw_psr_port_priv *psr_ppriv = lw_psr_ppriv_get(common_ppriv);
+
+	gsc->data.int_val = timespec_to_ms(&psr_ppriv->interval);
+	return 0;
+}
+
+static int lw_psr_state_init_wait_get(struct teamd_context *ctx,
+				      struct team_state_gsc *gsc,
+				      void *priv)
+{
+	struct lw_common_port_priv *common_ppriv = priv;
+	struct lw_psr_port_priv *psr_ppriv = lw_psr_ppriv_get(common_ppriv);
+
+	gsc->data.int_val = timespec_to_ms(&psr_ppriv->init_wait);
+	return 0;
+}
+
+static int lw_psr_state_missed_max_get(struct teamd_context *ctx,
+				       struct team_state_gsc *gsc,
+				       void *priv)
+{
+	struct lw_common_port_priv *common_ppriv = priv;
+	struct lw_psr_port_priv *psr_ppriv = lw_psr_ppriv_get(common_ppriv);
+
+	gsc->data.int_val = psr_ppriv->missed_max;
+	return 0;
+}
+
+static int lw_psr_state_missed_get(struct teamd_context *ctx,
+				   struct team_state_gsc *gsc,
+				   void *priv)
+{
+	struct lw_common_port_priv *common_ppriv = priv;
+	struct lw_psr_port_priv *psr_ppriv = lw_psr_ppriv_get(common_ppriv);
+
+	gsc->data.int_val = psr_ppriv->missed;
+	return 0;
 }
 
 
@@ -832,32 +901,120 @@ static int lw_ap_port_added(struct teamd_context *ctx,
 	return lw_psr_port_added(ctx, tdport, priv, creator_priv);
 }
 
-static json_t *lw_ap_state_json(struct teamd_context *ctx,
-				struct teamd_port *tdport,
-				struct lw_common_port_priv *common_ppriv)
+static int lw_ap_state_source_host_get(struct teamd_context *ctx,
+				       struct team_state_gsc *gsc,
+				       void *priv)
 {
+	struct lw_common_port_priv *common_ppriv = priv;
 	struct lw_psr_port_priv *psr_ppriv = lw_psr_ppriv_get(common_ppriv);
 	struct lw_ap_port_priv *ap_ppriv = lw_ap_ppriv_get(psr_ppriv);
-	static char src[NI_MAXHOST];
-	static char dst[NI_MAXHOST];
 
-	strcpy(src, str_in_addr(&ap_ppriv->src));
-	strcpy(dst, str_in_addr(&ap_ppriv->dst));
-	return json_pack("{s:s, s:s, s:i, s:i, s:b, s:b, s:b, s:i, s:i}",
-			 "source_host", src,
-			 "target_host", dst,
-			 "interval", timespec_to_ms(&psr_ppriv->interval),
-			 "init_wait", timespec_to_ms(&psr_ppriv->init_wait),
-			 "validate_active", ap_ppriv->validate_active,
-			 "validate_inactive", ap_ppriv->validate_inactive,
-			 "send_always", ap_ppriv->send_always,
-			 "missed_max", psr_ppriv->missed_max,
-			 "missed", psr_ppriv->missed);
+	gsc->data.str_val.ptr = str_in_addr(&ap_ppriv->src);
+	return 0;
 }
+
+static int lw_ap_state_target_host_get(struct teamd_context *ctx,
+				       struct team_state_gsc *gsc,
+				       void *priv)
+{
+	struct lw_common_port_priv *common_ppriv = priv;
+	struct lw_psr_port_priv *psr_ppriv = lw_psr_ppriv_get(common_ppriv);
+	struct lw_ap_port_priv *ap_ppriv = lw_ap_ppriv_get(psr_ppriv);
+
+	gsc->data.str_val.ptr = str_in_addr(&ap_ppriv->dst);
+	return 0;
+}
+
+static int lw_ap_state_validate_active_get(struct teamd_context *ctx,
+					   struct team_state_gsc *gsc,
+					   void *priv)
+{
+	struct lw_common_port_priv *common_ppriv = priv;
+	struct lw_psr_port_priv *psr_ppriv = lw_psr_ppriv_get(common_ppriv);
+	struct lw_ap_port_priv *ap_ppriv = lw_ap_ppriv_get(psr_ppriv);
+
+	gsc->data.int_val = ap_ppriv->validate_active;
+	return 0;
+}
+
+static int lw_ap_state_validate_inactive_get(struct teamd_context *ctx,
+					     struct team_state_gsc *gsc,
+					     void *priv)
+{
+	struct lw_common_port_priv *common_ppriv = priv;
+	struct lw_psr_port_priv *psr_ppriv = lw_psr_ppriv_get(common_ppriv);
+	struct lw_ap_port_priv *ap_ppriv = lw_ap_ppriv_get(psr_ppriv);
+
+	gsc->data.int_val = ap_ppriv->validate_inactive;
+	return 0;
+}
+
+static int lw_ap_state_send_always_get(struct teamd_context *ctx,
+				       struct team_state_gsc *gsc,
+				       void *priv)
+{
+	struct lw_common_port_priv *common_ppriv = priv;
+	struct lw_psr_port_priv *psr_ppriv = lw_psr_ppriv_get(common_ppriv);
+	struct lw_ap_port_priv *ap_ppriv = lw_ap_ppriv_get(psr_ppriv);
+
+	gsc->data.int_val = ap_ppriv->send_always;
+	return 0;
+}
+
+static const struct teamd_state_val lw_ap_state_vals[] = {
+	{
+		.subpath = "source_host",
+		.type = TEAMD_STATE_ITEM_TYPE_STRING,
+		.getter = lw_ap_state_source_host_get,
+	},
+	{
+		.subpath = "target_host",
+		.type = TEAMD_STATE_ITEM_TYPE_STRING,
+		.getter = lw_ap_state_target_host_get,
+	},
+	{
+		.subpath = "interval",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lw_psr_state_interval_get,
+	},
+	{
+		.subpath = "init_wait",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lw_psr_state_init_wait_get,
+	},
+	{
+		.subpath = "validate_active",
+		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
+		.getter = lw_ap_state_validate_active_get,
+	},
+	{
+		.subpath = "validate_inactive",
+		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
+		.getter = lw_ap_state_validate_inactive_get,
+	},
+	{
+		.subpath = "send_always",
+		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
+		.getter = lw_ap_state_send_always_get,
+	},
+	{
+		.subpath = "missed_max",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lw_psr_state_missed_max_get,
+	},
+	{
+		.subpath = "missed",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lw_psr_state_missed_get,
+	},
+};
 
 static const struct teamd_link_watch teamd_link_watch_arp_ping = {
 	.name			= "arp_ping",
-	.state_json		= lw_ap_state_json,
+	.state_vg		= {
+		.vals		= lw_ap_state_vals,
+		.vals_count	= ARRAY_SIZE(lw_ap_state_vals),
+	},
 	.port_priv = {
 		.init		= lw_ap_port_added,
 		.fini		= lw_psr_port_removed,
@@ -1101,23 +1258,52 @@ static int lw_nsnap_port_added(struct teamd_context *ctx,
 	return lw_psr_port_added(ctx, tdport, priv, creator_priv);
 }
 
-static json_t *lw_nsnap_state_json(struct teamd_context *ctx,
-				   struct teamd_port *tdport,
-				   struct lw_common_port_priv *common_ppriv)
+static int lw_nsnap_state_target_host_get(struct teamd_context *ctx,
+					  struct team_state_gsc *gsc,
+				          void *priv)
 {
+	struct lw_common_port_priv *common_ppriv = priv;
 	struct lw_psr_port_priv *psr_ppriv = lw_psr_ppriv_get(common_ppriv);
 	struct lw_nsnap_port_priv *nsnap_ppriv = lw_nsnap_ppriv_get(psr_ppriv);
-	return json_pack("{s:s, s:i, s:i, s:i, s:i}",
-			 "target_host", str_sockaddr_in6(&nsnap_ppriv->dst),
-			 "interval", timespec_to_ms(&psr_ppriv->interval),
-			 "init_wait", timespec_to_ms(&psr_ppriv->init_wait),
-			 "missed_max", psr_ppriv->missed_max,
-			 "missed", psr_ppriv->missed);
+
+	gsc->data.str_val.ptr = str_sockaddr_in6(&nsnap_ppriv->dst);
+	return 0;
 }
+
+static const struct teamd_state_val lw_nsnap_state_vals[] = {
+	{
+		.subpath = "target_host",
+		.type = TEAMD_STATE_ITEM_TYPE_STRING,
+		.getter = lw_nsnap_state_target_host_get,
+	},
+	{
+		.subpath = "interval",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lw_psr_state_interval_get,
+	},
+	{
+		.subpath = "init_wait",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lw_psr_state_init_wait_get,
+	},
+	{
+		.subpath = "missed_max",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lw_psr_state_missed_max_get,
+	},
+	{
+		.subpath = "missed",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lw_psr_state_missed_get,
+	},
+};
 
 static const struct teamd_link_watch teamd_link_watch_nsnap = {
 	.name			= "nsna_ping",
-	.state_json		= lw_nsnap_state_json,
+	.state_vg		= {
+		.vals		= lw_nsnap_state_vals,
+		.vals_count	= ARRAY_SIZE(lw_nsnap_state_vals),
+	},
 	.port_priv = {
 		.init		= lw_nsnap_port_added,
 		.fini		= lw_psr_port_removed,
@@ -1193,6 +1379,95 @@ static int teamd_link_watch_refresh_user_linkup(struct teamd_context *ctx,
 	return 0;
 }
 
+static int link_watch_state_name_get(struct teamd_context *ctx,
+				     struct team_state_gsc *gsc,
+				     void *priv)
+{
+	struct lw_common_port_priv *common_ppriv = priv;
+
+	gsc->data.str_val.ptr = common_ppriv->link_watch->name;
+	return 0;
+}
+
+static int link_watch_state_up_get(struct teamd_context *ctx,
+				   struct team_state_gsc *gsc,
+				   void *priv)
+{
+	struct lw_common_port_priv *common_ppriv = priv;
+
+	gsc->data.bool_val = common_ppriv->link_up;
+	return 0;
+}
+
+static const struct teamd_state_val link_watch_state_vals[] = {
+	{
+		.subpath = "name",
+		.type = TEAMD_STATE_ITEM_TYPE_STRING,
+		.getter = link_watch_state_name_get,
+	},
+	{
+		.subpath = "up",
+		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
+		.getter = link_watch_state_up_get,
+	},
+};
+
+static const struct teamd_state_val link_watch_state_vg = {
+	.vals = link_watch_state_vals,
+	.vals_count = ARRAY_SIZE(link_watch_state_vals),
+};
+
+#define LW_STATE_SUBPATH "link_watches"
+#define LW_LIST_STATE_SUBPATH LW_STATE_SUBPATH ".list"
+
+static int link_watch_state_register(struct teamd_context *ctx,
+				     struct lw_common_port_priv *common_ppriv)
+{
+	int err;
+
+	err = teamd_state_val_register_ex(ctx, &link_watch_state_vg,
+					  common_ppriv, common_ppriv->tdport,
+					  LW_LIST_STATE_SUBPATH
+					  ".link_watch_%d",
+					  common_ppriv->id);
+	if (err)
+		return err;
+
+	err = teamd_state_val_register_ex(ctx,
+					  &common_ppriv->link_watch->state_vg,
+					  common_ppriv, common_ppriv->tdport,
+					  LW_LIST_STATE_SUBPATH
+					  ".link_watch_%d",
+					  common_ppriv->id);
+	if (err)
+		goto errout;
+	return 0;
+errout:
+	teamd_state_val_unregister(ctx, &link_watch_state_vg, common_ppriv);
+	return err;
+}
+
+static void link_watch_state_unregister(struct teamd_context *ctx,
+					struct lw_common_port_priv *common_ppriv)
+{
+	teamd_state_val_unregister(ctx, &common_ppriv->link_watch->state_vg,
+				   common_ppriv);
+	teamd_state_val_unregister(ctx, &link_watch_state_vg, common_ppriv);
+}
+
+static unsigned int link_watch_select_free_id(struct teamd_port *tdport)
+{
+	struct lw_common_port_priv *common_ppriv;
+	unsigned int id = 0;
+
+	teamd_for_each_port_priv_by_creator(common_ppriv, tdport,
+					    LW_PORT_PRIV_CREATOR_PRIV) {
+		if (id <= common_ppriv->id)
+			id = common_ppriv->id + 1;
+	}
+	return id;
+}
+
 static int link_watch_load_config_one(struct teamd_context *ctx,
 				      struct teamd_port *tdport,
 				      struct teamd_config_path_cookie *cpcookie)
@@ -1200,6 +1475,7 @@ static int link_watch_load_config_one(struct teamd_context *ctx,
 	int err;
 	const char *link_watch_name;
 	const struct teamd_link_watch *link_watch;
+	unsigned int id;
 	struct lw_common_port_priv *common_ppriv;
 
 	err = teamd_config_string_get(ctx, &link_watch_name,
@@ -1215,15 +1491,21 @@ static int link_watch_load_config_one(struct teamd_context *ctx,
 			      link_watch_name);
 		return -EINVAL;
 	}
+	id = link_watch_select_free_id(tdport);
 	err = teamd_port_priv_create_and_get((void **) &common_ppriv, tdport,
 					     &link_watch->port_priv,
 					     LW_PORT_PRIV_CREATOR_PRIV);
 	if (err)
 		return err;
+	common_ppriv->id = id;
 	common_ppriv->link_watch = link_watch;
 	common_ppriv->ctx = ctx;
 	common_ppriv->tdport = tdport;
 	common_ppriv->cpcookie = cpcookie;
+
+	err = link_watch_state_register(ctx, common_ppriv);
+	if (err)
+		return err;
 	return 0;
 }
 
@@ -1278,6 +1560,17 @@ static int link_watch_event_watch_port_added(struct teamd_context *ctx,
 						  LW_PORT_PRIV_CREATOR_PRIV))
 		teamd_log_info("%s: Using no link watch.", tdport->ifname);
 	return 0;
+}
+
+static void link_watch_event_watch_port_removed(struct teamd_context *ctx,
+						struct teamd_port *tdport,
+						void *priv)
+{
+	struct lw_common_port_priv *common_ppriv;
+
+	teamd_for_each_port_priv_by_creator(common_ppriv, tdport,
+					    LW_PORT_PRIV_CREATOR_PRIV)
+		link_watch_state_unregister(ctx, common_ppriv);
 }
 
 static int link_watch_event_watch_port_link_changed(struct teamd_context *ctx,
@@ -1335,74 +1628,33 @@ static int link_watch_enabled_option_changed(struct teamd_context *ctx,
 
 static const struct teamd_event_watch_ops link_watch_port_watch_ops = {
 	.port_added = link_watch_event_watch_port_added,
+	.port_removed = link_watch_event_watch_port_removed,
 	.port_link_changed = link_watch_event_watch_port_link_changed,
 	.option_changed = link_watch_enabled_option_changed,
 	.option_changed_match_name = "enabled",
 };
 
-static json_t *__fill_lw_instance(struct teamd_context *ctx,
-				  struct teamd_port *tdport,
-				  struct lw_common_port_priv *common_ppriv)
+static int port_link_state_up_get(struct teamd_context *ctx,
+				  struct team_state_gsc *gsc,
+				  void *priv)
 {
-	const struct teamd_link_watch *lw = common_ppriv->link_watch;
-	json_t *lwinfo_json;
-	json_t *state_json;
-
-	if (!lw->state_json)
-		lwinfo_json = json_object();
-	else
-		lwinfo_json = lw->state_json(ctx, tdport, common_ppriv);
-
-	state_json = json_pack("{s:s, s:b, s:o}",
-			       "name", lw->name,
-			       "up", common_ppriv->link_up,
-			       "info", lwinfo_json);
-	if (!state_json)
-		json_decref(lwinfo_json);
-	return state_json;
-}
-
-static int link_watch_state_per_port_dump(struct teamd_context *ctx,
-					  struct teamd_port *tdport,
-					  json_t **pstate_json, void *priv)
-{
-	struct lw_common_port_priv *common_ppriv;
-	int err;
-	json_t *state_json;
-	json_t *array_json;
-	json_t *instance_json;
-	bool link;
-
-	array_json = json_array();
-	if (!array_json)
-		return -ENOMEM;
-
-	teamd_for_each_port_priv_by_creator(common_ppriv, tdport,
-					    LW_PORT_PRIV_CREATOR_PRIV) {
-		instance_json = __fill_lw_instance(ctx, tdport, common_ppriv);
-		if (!instance_json)
-			goto errout;
-		err = json_array_append_new(array_json, instance_json);
-		if (err)
-			goto errout;
-	}
-	link = teamd_link_watch_port_up(ctx, tdport);
-	state_json = json_pack("{s:o, s:b}",
-			       "list", array_json,
-			       "up", link);
-	if (!state_json)
-		goto errout;
-	*pstate_json = state_json;
+	gsc->data.bool_val = teamd_link_watch_port_up(ctx, gsc->info.tdport);
 	return 0;
-
-errout:
-	json_decref(array_json);
-	return -ENOMEM;
 }
 
-static const struct teamd_state_ops link_watch_state_ops = {
-	.per_port_dump = link_watch_state_per_port_dump,
-	.name = "link_watches",
+static const struct teamd_state_val link_watch_root_state_vals[] = {
+	{
+		.subpath = "up",
+		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
+		.getter = port_link_state_up_get,
+	},
+};
+
+static const struct teamd_state_val link_watch_root_state_vg = {
+	.subpath = LW_STATE_SUBPATH,
+	.vals = link_watch_root_state_vals,
+	.vals_count = ARRAY_SIZE(link_watch_root_state_vals),
+	.per_port = true,
 };
 
 int teamd_link_watch_init(struct teamd_context *ctx)
@@ -1414,7 +1666,7 @@ int teamd_link_watch_init(struct teamd_context *ctx)
 		teamd_log_err("Failed to register event watch.");
 		return err;
 	}
-	err = teamd_state_ops_register(ctx, &link_watch_state_ops, ctx);
+	err = teamd_state_val_register(ctx, &link_watch_root_state_vg, ctx);
 	if (err)
 		goto event_watch_unregister;
 	return 0;
@@ -1426,5 +1678,6 @@ event_watch_unregister:
 
 void teamd_link_watch_fini(struct teamd_context *ctx)
 {
+	teamd_state_val_unregister(ctx, &link_watch_root_state_vg, ctx);
 	teamd_event_watch_unregister(ctx, &link_watch_port_watch_ops, NULL);
 }
