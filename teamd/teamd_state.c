@@ -434,15 +434,9 @@ int teamd_state_item_value_set(struct teamd_context *ctx, const char *item_path,
 }
 
 
-struct state_ops_item {
-	struct list_item list;
-	const struct teamd_state_ops *ops;
-	void *priv;
-};
 
 int teamd_state_init(struct teamd_context *ctx)
 {
-	list_init(&ctx->state_ops_list);
 	list_init(&ctx->state_val_list);
 	return 0;
 }
@@ -451,66 +445,9 @@ void teamd_state_fini(struct teamd_context *ctx)
 {
 }
 
-static struct state_ops_item *__find_item(struct teamd_context *ctx,
-					  const struct teamd_state_ops *ops,
-					  void *priv)
-{
-	struct state_ops_item *item;
-
-	list_for_each_node_entry(item, &ctx->state_ops_list, list) {
-		if (item->ops == ops && item->priv == priv)
-			return item;
-	}
-	return NULL;
-}
-
-static struct state_ops_item *__find_item_by_name(struct teamd_context *ctx,
-						  const char *name)
-{
-	struct state_ops_item *item;
-
-	list_for_each_node_entry(item, &ctx->state_ops_list, list) {
-		if (item->ops->name == name)
-			return item;
-	}
-	return NULL;
-}
-
-int teamd_state_ops_register(struct teamd_context *ctx,
-			     const struct teamd_state_ops *ops,
-			     void *priv)
-{
-	struct state_ops_item *item;
-
-	if (__find_item_by_name(ctx, ops->name))
-		return -EBUSY;
-	item = malloc(sizeof(*item));
-	if (!item)
-		return -ENOMEM;
-	item->ops = ops;
-	item->priv = priv;
-	list_add_tail(&ctx->state_ops_list, &item->list);
-	return 0;
-}
-
-void teamd_state_ops_unregister(struct teamd_context *ctx,
-				const struct teamd_state_ops *ops,
-				void *priv)
-{
-	struct state_ops_item *item;
-
-	item = __find_item(ctx, ops, priv);
-	if (!item)
-		return;
-	list_del(&item->list);
-	free(item);
-}
-
 int teamd_state_dump(struct teamd_context *ctx, char **p_state_dump)
 {
-	struct state_ops_item *item;
 	json_t *state_json;
-	json_t *substate_json;
 	char *dump;
 	int err;
 
@@ -518,19 +455,6 @@ int teamd_state_dump(struct teamd_context *ctx, char **p_state_dump)
 	if (!state_json)
 		return -ENOMEM;
 
-	list_for_each_node_entry(item, &ctx->state_ops_list, list) {
-		if (!item->ops->dump)
-			continue;
-		err = item->ops->dump(ctx, &substate_json, item->priv);
-		if (err)
-			goto errout;
-		err = json_object_set_new(state_json, item->ops->name,
-					  substate_json);
-		if (err) {
-			err = -ENOMEM;
-			goto errout;
-		}
-	}
 	err = teamd_state_vals_dump(ctx, state_json);
 	if (err)
 		goto errout;
@@ -622,12 +546,6 @@ static const struct teamd_state_val ifinfo_state_vals[] = {
 	},
 };
 
-static const struct teamd_state_val teamdev_ifinfo_state_vg = {
-	.subpath = "team_device.ifinfo",
-	.vals = ifinfo_state_vals,
-	.vals_count = ARRAY_SIZE(ifinfo_state_vals),
-};
-
 static int port_link_state_up_get(struct teamd_context *ctx,
 				  struct team_state_gsc *gsc,
 				  void *priv)
@@ -670,67 +588,6 @@ static const struct teamd_state_val port_link_state_vals[] = {
 		.type = TEAMD_STATE_ITEM_TYPE_STRING,
 		.getter = port_link_state_duplex_get,
 	},
-};
-
-static int __fill_per_port(struct teamd_context *ctx, json_t *tdport_json,
-			   struct teamd_port *tdport)
-{
-	struct state_ops_item *item;
-	json_t *substate_json;
-	int err;
-
-	list_for_each_node_entry(item, &ctx->state_ops_list, list) {
-		if (!item->ops->per_port_dump)
-			continue;
-		err = item->ops->per_port_dump(ctx, tdport, &substate_json,
-					       item->priv);
-		if (err)
-			return err;
-		err = json_object_set_new(tdport_json, item->ops->name,
-					  substate_json);
-		if (err)
-			return -ENOMEM;
-	}
-	return 0;
-}
-
-static int ports_state_dump(struct teamd_context *ctx,
-			    json_t **pstate_json, void *priv)
-{
-	struct teamd_port *tdport;
-	int err;
-	json_t *state_json;
-	json_t *tdport_json;
-
-	state_json = json_object();
-	if (!state_json)
-		return -ENOMEM;
-
-	teamd_for_each_tdport(tdport, ctx) {
-		tdport_json = json_object();
-		if (!tdport_json)
-			goto errout;
-		err = json_object_set_new(state_json, tdport->ifname,
-					  tdport_json);
-		if (err) {
-			err = -ENOMEM;
-			goto errout;
-		}
-		err = __fill_per_port(ctx, tdport_json, tdport);
-		if (err)
-			goto errout;
-	}
-
-	*pstate_json = state_json;
-	return 0;
-errout:
-	json_decref(state_json);
-	return -ENOMEM;
-}
-
-static const struct teamd_state_ops ports_state_ops = {
-	.dump = ports_state_dump,
-	.name = "ports",
 };
 
 static int setup_state_runner_name_get(struct teamd_context *ctx,
@@ -833,6 +690,11 @@ static const struct teamd_state_val setup_state_vals[] = {
 
 static const struct teamd_state_val state_vgs[] = {
 	{
+		.subpath = "team_device.ifinfo",
+		.vals = ifinfo_state_vals,
+		.vals_count = ARRAY_SIZE(ifinfo_state_vals),
+	},
+	{
 		.subpath = "ifinfo",
 		.vals = ifinfo_state_vals,
 		.vals_count = ARRAY_SIZE(ifinfo_state_vals),
@@ -860,30 +722,13 @@ int teamd_state_basics_init(struct teamd_context *ctx)
 {
 	int err;
 
-	err = teamd_state_val_register(ctx, &teamdev_ifinfo_state_vg, ctx);
-	if (err)
-		return err;
-
-	err = teamd_state_ops_register(ctx, &ports_state_ops, ctx);
-	if (err)
-		goto teamdev_ifinfo_state_unreg;
-
 	err = teamd_state_val_register(ctx, &root_state_vg, ctx);
 	if (err)
-		goto ports_state_unreg;
-
+		return err;
 	return 0;
-
-ports_state_unreg:
-	teamd_state_ops_unregister(ctx, &ports_state_ops, ctx);
-teamdev_ifinfo_state_unreg:
-	teamd_state_val_unregister(ctx, &teamdev_ifinfo_state_vg, ctx);
-	return err;
 }
 
 void teamd_state_basics_fini(struct teamd_context *ctx)
 {
 	teamd_state_val_unregister(ctx, &root_state_vg, ctx);
-	teamd_state_ops_unregister(ctx, &ports_state_ops, ctx);
-	teamd_state_val_unregister(ctx, &teamdev_ifinfo_state_vg, ctx);
 }

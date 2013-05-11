@@ -65,24 +65,8 @@ int teamd_state_val_register(struct teamd_context *ctx,
 void teamd_state_val_unregister(struct teamd_context *ctx,
 				const struct teamd_state_val *val,
 				void *priv);
-
-struct teamd_state_ops {
-	int (*dump)(struct teamd_context *ctx,
-		    json_t **pstate_json, void *priv);
-	int (*per_port_dump)(struct teamd_context *ctx,
-			     struct teamd_port *tdport,
-			     json_t **pstate_json, void *priv);
-	char *name;
-};
-
 int teamd_state_init(struct teamd_context *ctx);
 void teamd_state_fini(struct teamd_context *ctx);
-int teamd_state_ops_register(struct teamd_context *ctx,
-			     const struct teamd_state_ops *ops,
-			     void *priv);
-void teamd_state_ops_unregister(struct teamd_context *ctx,
-				const struct teamd_state_ops *ops,
-				void *priv);
 int teamd_state_dump(struct teamd_context *ctx, char **p_state_dump);
 int teamd_state_item_value_get(struct teamd_context *ctx, const char *item_path,
 			       char **p_value);
