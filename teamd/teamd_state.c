@@ -38,6 +38,7 @@ struct teamd_state_val_item {
 	void *priv;
 	const struct teamd_state_val *parent_val;
 	bool per_port;
+	struct teamd_port *tdport;
 };
 
 static struct teamd_state_val_item *
@@ -78,7 +79,8 @@ void __unreg_val(struct teamd_context *ctx, const struct teamd_state_val *val,
 
 int __reg_val(struct teamd_context *ctx, const struct teamd_state_val *val,
 	      void *priv, const char *parent_subpath, const char *val_subpath,
-	      bool per_port, const struct teamd_state_val *parent_val)
+	      bool per_port, struct teamd_port *tdport,
+	      const struct teamd_state_val *parent_val)
 {
 	char *subpath;
 	int ret;
@@ -95,6 +97,8 @@ int __reg_val(struct teamd_context *ctx, const struct teamd_state_val *val,
 	}
 	if (val->per_port)
 		per_port = true;
+	if (per_port && tdport)
+		return -EINVAL;
 
 	if (val->type == TEAMD_STATE_ITEM_TYPE_NODE) {
 		int i;
@@ -104,7 +108,8 @@ int __reg_val(struct teamd_context *ctx, const struct teamd_state_val *val,
 			const struct teamd_state_val *child_val = &val->vals[i];
 
 			err = __reg_val(ctx, child_val, priv, subpath,
-					child_val->subpath, per_port, val);
+					child_val->subpath, per_port,
+					tdport, val);
 			if (err)
 				break;
 		}
@@ -130,6 +135,7 @@ int __reg_val(struct teamd_context *ctx, const struct teamd_state_val *val,
 		item->parent_val = parent_val;
 		item->priv = priv;
 		item->per_port = per_port;
+		item->tdport = tdport;
 		list_add_tail(&ctx->state_val_list, &item->list);
 	}
 	return 0;
@@ -138,9 +144,10 @@ errout:
 	return err;
 }
 
-int teamd_state_val_register_subpath(struct teamd_context *ctx,
-				     const struct teamd_state_val *val,
-				     void *priv, const char *fmt, ...)
+int teamd_state_val_register_ex(struct teamd_context *ctx,
+				const struct teamd_state_val *val,
+				void *priv, struct teamd_port *tdport,
+				const char *fmt, ...)
 {
 	va_list ap;
 	char *val_subpath;
@@ -153,7 +160,7 @@ int teamd_state_val_register_subpath(struct teamd_context *ctx,
 	if (ret == -1)
 		return -ENOMEM;
 
-	err = __reg_val(ctx, val, priv, "", val_subpath, false, NULL);
+	err = __reg_val(ctx, val, priv, "", val_subpath, false, tdport, NULL);
 	free(val_subpath);
 	return err;
 }
@@ -162,7 +169,7 @@ int teamd_state_val_register(struct teamd_context *ctx,
 			     const struct teamd_state_val *val,
 			     void *priv)
 {
-	return __reg_val(ctx, val, priv, "", val->subpath, false, NULL);
+	return __reg_val(ctx, val, priv, "", val->subpath, false, NULL, NULL);
 }
 
 void teamd_state_val_unregister(struct teamd_context *ctx,
@@ -268,7 +275,7 @@ static int teamd_state_vals_dump(struct teamd_context *ctx,
 			}
 		} else {
 			err = teamd_state_val_dump(ctx, root_json_obj,
-						   NULL, item);
+						   item->tdport, item);
 			if (err)
 				return err;
 		}
@@ -282,11 +289,11 @@ static int __find_by_item_path(struct teamd_state_val_item **p_item,
 {
 	struct teamd_state_val_item *item;
 	char *subpath;
+	struct teamd_port *tdport = NULL;
 
 	if (!strncmp(item_path, TEAMD_STATE_PER_PORT_PREFIX,
 		     strlen(TEAMD_STATE_PER_PORT_PREFIX))) {
-		struct teamd_port *tdport;
-		bool found;
+		struct teamd_port *cur_tdport;
 		char *ifname_start = strchr(item_path, '.') + 1;
 		char *ifname_end = strchr(ifname_start, '.');
 		size_t ifname_len = ifname_end - ifname_start;
@@ -295,26 +302,25 @@ static int __find_by_item_path(struct teamd_state_val_item **p_item,
 			return -EINVAL;
 		subpath = ifname_end + 1;
 
-		found = false;
-		teamd_for_each_tdport(tdport, ctx) {
-			if (!strncmp(tdport->ifname, ifname_start,
+		teamd_for_each_tdport(cur_tdport, ctx) {
+			if (!strncmp(cur_tdport->ifname, ifname_start,
 				     ifname_len)) {
-				*p_tdport = tdport;
-				found = true;
+				tdport = cur_tdport;
 				break;
 			}
 		}
-		if (!found)
+		if (!tdport)
 			return -ENOENT;
 	} else {
 		subpath = (char *) item_path;
-		*p_tdport = NULL;
 	}
 
 	list_for_each_node_entry(item, &ctx->state_val_list, list) {
 		/* item->subpath[0] == '.' */
-		if (!strcmp(item->subpath + 1, subpath)) {
+		if (!strcmp(item->subpath + 1, subpath) &&
+		    (item->tdport && item->tdport == tdport)) {
 			*p_item = item;
+			*p_tdport = tdport;
 			return 0;
 		}
 	}

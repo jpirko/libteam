@@ -55,9 +55,10 @@ struct teamd_state_val {
 	bool per_port;
 };
 
-int teamd_state_val_register_subpath(struct teamd_context *ctx,
-				     const struct teamd_state_val *val,
-				     void *priv, const char *fmt, ...);
+int teamd_state_val_register_ex(struct teamd_context *ctx,
+				const struct teamd_state_val *val,
+				void *priv, struct teamd_port *tdport,
+				const char *fmt, ...);
 int teamd_state_val_register(struct teamd_context *ctx,
 			     const struct teamd_state_val *val,
 			     void *priv);
