@@ -30,6 +30,7 @@
 
 #include "teamd.h"
 #include "teamd_dbus.h"
+#include "teamd_dbus_common.h"
 #include "teamd_ctl_methods.h"
 
 static const char *introspection_xml =

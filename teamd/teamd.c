@@ -45,6 +45,8 @@
 #include "teamd.h"
 #include "teamd_config.h"
 #include "teamd_state.h"
+#include "teamd_usock.h"
+#include "teamd_dbus.h"
 
 static const struct teamd_runner *teamd_runner_list[] = {
 	&teamd_runner_broadcast,

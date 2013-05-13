@@ -26,7 +26,7 @@
 #include <unistd.h>
 #include <teamdctl.h>
 #include "teamdctl_private.h"
-#include "../teamd/teamd_usock.h"
+#include "../teamd/teamd_usock_common.h"
 
 struct cli_usock_priv {
 	int sock;

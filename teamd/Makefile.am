@@ -22,4 +22,5 @@ teamd_SOURCES=teamd.c teamd_common.c teamd_json.c teamd_config.c teamd_state.c \
 EXTRA_DIST = example_configs dbus redhat
 
 noinst_HEADERS = teamd.h teamd_bpf_chef.h teamd_ctl_methods.h teamd_json.h \
-		 teamd_dbus.h teamd_usock.h teamd_config.h teamd_state.h
+		 teamd_dbus.h teamd_usock.h teamd_dbus_common.h \
+		 teamd_usock_common.h teamd_config.h teamd_state.h

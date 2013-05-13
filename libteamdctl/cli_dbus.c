@@ -27,7 +27,7 @@
 #include <dbus/dbus.h>
 #include <teamdctl.h>
 #include "teamdctl_private.h"
-#include "../teamd/teamd_dbus.h"
+#include "../teamd/teamd_dbus_common.h"
 
 struct cli_dbus_priv {
 	DBusConnection *conn;

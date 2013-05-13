@@ -20,8 +20,28 @@
 #ifndef _TEAMD_DBUS_H_
 #define _TEAMD_DBUS_H_
 
-#define TEAMD_DBUS_SERVICE	"org.libteam.teamd"
-#define TEAMD_DBUS_IFACE	"org.libteam.teamd"
-#define TEAMD_DBUS_PATH		"/org/libteam/teamd"
+#ifdef ENABLE_DBUS
+
+int teamd_dbus_init(struct teamd_context *ctx);
+void teamd_dbus_fini(struct teamd_context *ctx);
+int teamd_dbus_expose_name(struct teamd_context *ctx);
+
+#else
+
+static inline int teamd_dbus_init(struct teamd_context *ctx)
+{
+	return 0;
+}
+
+static inline void teamd_dbus_fini(struct teamd_context *ctx)
+{
+}
+
+static inline int teamd_dbus_expose_name(struct teamd_context *ctx)
+{
+	return 0;
+}
+
+#endif
 
 #endif /* _TEAMD_DBUS_H_ */
