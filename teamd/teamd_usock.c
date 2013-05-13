@@ -73,6 +73,16 @@ static int usock_op_get_args(void *ops_priv, const char *fmt, ...)
 	return 0;
 }
 
+static void usock_send(struct usock_ops_priv *usock_ops_priv,
+		       char *buf, size_t buflen)
+{
+	int ret;
+
+	ret = send(usock_ops_priv->sock, buf, buflen, 0);
+	if (ret == -1)
+		teamd_log_warn("Usock send failed: %s", strerror(errno));
+}
+
 static int usock_op_reply_err(void *ops_priv, const char *err_code,
 			      const char *err_msg)
 {
@@ -83,11 +93,9 @@ static int usock_op_reply_err(void *ops_priv, const char *err_code,
 	err = asprintf(&strbuf, "%s\n%s\n%s\n", TEAMD_USOCK_REPLY_ERR_PREFIX,
 		       err_code, err_msg);
 	if (err == -1)
-		return -errno;
-	err = send(usock_ops_priv->sock, strbuf, strlen(strbuf), 0);
+		return -ENOMEM;
+	usock_send(usock_ops_priv, strbuf, strlen(strbuf));
 	free(strbuf);
-	if (err == -1)
-		return -errno;
 	return 0;
 }
 
@@ -100,11 +108,9 @@ static int usock_op_reply_succ(void *ops_priv, const char *msg)
 	err = asprintf(&strbuf, "%s\n%s", TEAMD_USOCK_REPLY_SUCC_PREFIX,
 		       msg ? msg : "");
 	if (err == -1)
-		return -errno;
-	err = send(usock_ops_priv->sock, strbuf, strlen(strbuf), 0);
+		return -ENOMEM;
+	usock_send(usock_ops_priv, strbuf, strlen(strbuf));
 	free(strbuf);
-	if (err == -1)
-		return -errno;
 	return 0;
 }
 
