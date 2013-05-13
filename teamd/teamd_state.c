@@ -318,7 +318,7 @@ static int __find_by_item_path(struct teamd_state_val_item **p_item,
 	list_for_each_node_entry(item, &ctx->state_val_list, list) {
 		/* item->subpath[0] == '.' */
 		if (!strcmp(item->subpath + 1, subpath) &&
-		    (item->tdport && item->tdport == tdport)) {
+		    (!item->tdport || item->tdport == tdport)) {
 			*p_item = item;
 			*p_tdport = tdport;
 			return 0;
