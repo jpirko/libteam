@@ -150,11 +150,11 @@ static int cli_dbus_method_call(struct teamdctl *tdc, const char *method_name,
 	if (err)
 		goto free_msg;
 
-	err = cli_dbus_get_reply_str(tdc, &reply, msg);
-	if (err)
-		goto free_msg;
-
 	if (p_reply) {
+		err = cli_dbus_get_reply_str(tdc, &reply, msg);
+		if (err)
+			goto free_msg;
+
 		reply = strdup(reply);
 		if (!reply) {
 			err = -ENOMEM;
