@@ -77,7 +77,7 @@ static int cli_usock_send(int sock, char *msg)
 	return 0;
 }
 
-#define WAIT_USEC 500000
+#define WAIT_USEC 5000000
 
 static int cli_usock_wait_recv(int sock)
 {
