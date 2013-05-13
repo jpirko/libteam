@@ -1374,6 +1374,16 @@ static int lacp_state_fast_rate_get(struct teamd_context *ctx,
 	return 0;
 }
 
+static int lacp_state_select_policy_get(struct teamd_context *ctx,
+					struct team_state_gsc *gsc,
+					void *priv)
+{
+	struct lacp *lacp = priv;
+
+	gsc->data.str_val.ptr = lacp_get_agg_select_policy_name(lacp);
+	return 0;
+}
+
 static const struct teamd_state_val lacp_state_vals[] = {
 	{
 		.subpath = "active",
@@ -1389,6 +1399,11 @@ static const struct teamd_state_val lacp_state_vals[] = {
 		.subpath = "fast_rate",
 		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
 		.getter = lacp_state_fast_rate_get,
+	},
+	{
+		.subpath = "select_policy",
+		.type = TEAMD_STATE_ITEM_TYPE_STRING,
+		.getter = lacp_state_select_policy_get,
 	},
 };
 
