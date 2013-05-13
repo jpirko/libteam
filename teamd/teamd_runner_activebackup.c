@@ -305,6 +305,18 @@ static void ab_best_port_check_set(struct teamd_context *ctx,
 	}
 }
 
+static int ab_change_active_port(struct teamd_context *ctx, struct ab *ab,
+				 struct teamd_port *active_tdport,
+				 struct teamd_port *new_active_tdport)
+{
+	int err;
+
+	err = ab_clear_active_port(ctx, ab, active_tdport);
+	if (err)
+		return err;
+	return ab_set_active_port(ctx, ab, new_active_tdport);
+}
+
 static int ab_link_watch_handler(struct teamd_context *ctx, struct ab *ab)
 {
 	struct teamd_port *tdport;
@@ -358,10 +370,8 @@ static int ab_link_watch_handler(struct teamd_context *ctx, struct ab *ab)
 		      best.tdport->ifname, best.tdport->ifindex, best.prio);
 
 	if (!active_tdport || !ab_is_port_sticky(ab, active_tdport)) {
-		err = ab_clear_active_port(ctx, ab, active_tdport);
-		if (err)
-			return err;
-		err = ab_set_active_port(ctx, ab, best.tdport);
+		err = ab_change_active_port(ctx, ab, active_tdport,
+					    best.tdport);
 		if (err)
 			return err;
 	}
@@ -493,11 +503,27 @@ static int ab_state_active_port_get(struct teamd_context *ctx,
 	return 0;
 }
 
+static int ab_state_active_port_set(struct teamd_context *ctx,
+				    struct team_state_gsc *gsc,
+				    void *priv)
+{
+	struct ab *ab = priv;
+	struct teamd_port *tdport;
+	struct teamd_port *active_tdport;
+
+	active_tdport = teamd_get_port(ctx, ab->active_ifindex);
+	tdport = teamd_get_port_by_ifname(ctx, (char *) gsc->data.str_val.ptr);
+	if (!tdport)
+		return -ENODEV;
+	return ab_change_active_port(ctx, ab, active_tdport, tdport);
+}
+
 static const struct teamd_state_val ab_state_vals[] = {
 	{
 		.subpath = "active_port",
 		.type = TEAMD_STATE_ITEM_TYPE_STRING,
 		.getter = ab_state_active_port_get,
+		.setter = ab_state_active_port_set,
 	},
 };
 
