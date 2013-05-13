@@ -123,7 +123,7 @@ static int cli_dbus_method_call(struct teamdctl *tdc, const char *method_name,
 	}
 
 	dbres = dbus_connection_send_with_reply(cli_dbus->conn, msg,
-						&pending, -1);
+						&pending, TEAMDCTL_REPLY_TIMEOUT);
 	if (dbres == FALSE) {
 		err(tdc, "Send with reply failed.");
 		err = -ENOMEM;

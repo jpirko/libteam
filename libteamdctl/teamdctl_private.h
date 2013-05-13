@@ -94,4 +94,6 @@ struct teamdctl_cli {
 const struct teamdctl_cli *teamdctl_cli_usock_get(void);
 const struct teamdctl_cli *teamdctl_cli_dbus_get(void);
 
+#define TEAMDCTL_REPLY_TIMEOUT 5000 /* ms */
+
 #endif /* _TEAMDCTL_PRIVATE_H_ */
