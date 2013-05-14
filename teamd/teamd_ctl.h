@@ -1,5 +1,5 @@
 /*
- *   teamd_ctl_methods.h - Teamd control methods
+ *   teamd_ctl.h - Teamd control subsystem
  *   Copyright (C) 2012 Jiri Pirko <jpirko@redhat.com>
  *
  *   This library is free software; you can redistribute it and/or
@@ -17,8 +17,8 @@
  *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef _TEAMD_CTL_METHODS_H_
-#define _TEAMD_CTL_METHODS_H_
+#ifndef _TEAMD_CTL_H_
+#define _TEAMD_CTL_H_
 
 struct teamd_ctl_method_ops {
 	int (*get_args)(void *ops_priv, const char *fmt, ...);
@@ -32,4 +32,4 @@ int teamd_ctl_method_call(struct teamd_context *ctx, const char *method_name,
 			  const struct teamd_ctl_method_ops *ops,
 			  void *ops_priv);
 
-#endif /* _TEAMD_CTL_METHODS_H_ */
+#endif /* _TEAMD_CTL_H_ */

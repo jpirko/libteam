@@ -33,7 +33,7 @@
 #include "teamd.h"
 #include "teamd_usock.h"
 #include "teamd_usock_common.h"
-#include "teamd_ctl_methods.h"
+#include "teamd_ctl.h"
 
 struct usock_ops_priv {
 	char *rcv_msg_args;

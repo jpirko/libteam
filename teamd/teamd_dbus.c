@@ -31,7 +31,7 @@
 #include "teamd.h"
 #include "teamd_dbus.h"
 #include "teamd_dbus_common.h"
-#include "teamd_ctl_methods.h"
+#include "teamd_ctl.h"
 
 static const char *introspection_xml =
 	"<node name='" TEAMD_DBUS_PATH "'>"

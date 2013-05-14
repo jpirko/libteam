@@ -1,5 +1,5 @@
 /*
- *   teamd_ctl_methods.c - Teamd control methods
+ *   teamd_ctl.c - Teamd control subsustem
  *   Copyright (C) 2012 Jiri Pirko <jpirko@redhat.com>
  *
  *   This library is free software; you can redistribute it and/or
@@ -28,7 +28,7 @@
 #include "teamd.h"
 #include "teamd_config.h"
 #include "teamd_state.h"
-#include "teamd_ctl_methods.h"
+#include "teamd_ctl.h"
 
 static int teamd_ctl_method_port_config_update(struct teamd_context *ctx,
 					       const struct teamd_ctl_method_ops *ops,
