@@ -31,6 +31,7 @@
 #include "teamd.h"
 #include "teamd_config.h"
 #include "teamd_state.h"
+#include "teamd_workq.h"
 
 struct ab;
 
@@ -503,19 +504,52 @@ static int ab_state_active_port_get(struct teamd_context *ctx,
 	return 0;
 }
 
+struct ab_active_port_set_info {
+	struct teamd_workq workq;
+	struct ab *ab;
+	uint32_t ifindex;
+};
+
+static int ab_active_port_set_work(struct teamd_context *ctx,
+				   struct teamd_workq *workq)
+{
+	struct ab_active_port_set_info *info;
+	struct ab *ab;
+	uint32_t ifindex;
+	struct teamd_port *tdport;
+	struct teamd_port *active_tdport;
+
+	info = get_container(workq, struct ab_active_port_set_info, workq);
+	ab = info->ab;
+	ifindex = info->ifindex;
+	free(info);
+	tdport = teamd_get_port(ctx, ifindex);
+	if (!tdport)
+		/* Port disapeared in between, ignore */
+		return 0;
+	active_tdport = teamd_get_port(ctx, ab->active_ifindex);
+	return ab_change_active_port(ctx, ab, active_tdport, tdport);
+}
+
 static int ab_state_active_port_set(struct teamd_context *ctx,
 				    struct team_state_gsc *gsc,
 				    void *priv)
 {
+	struct ab_active_port_set_info *info;
 	struct ab *ab = priv;
 	struct teamd_port *tdport;
-	struct teamd_port *active_tdport;
 
-	active_tdport = teamd_get_port(ctx, ab->active_ifindex);
 	tdport = teamd_get_port_by_ifname(ctx, (char *) gsc->data.str_val.ptr);
 	if (!tdport)
 		return -ENODEV;
-	return ab_change_active_port(ctx, ab, active_tdport, tdport);
+	info = malloc(sizeof(*info));
+	if (!info)
+		return -ENOMEM;
+	info->workq.func = ab_active_port_set_work;
+	info->ab = ab;
+	info->ifindex = tdport->ifindex;
+	teamd_workq_schedule(ctx, &info->workq);
+	return 0;
 }
 
 static const struct teamd_state_val ab_state_vals[] = {
