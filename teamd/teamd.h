@@ -130,6 +130,11 @@ struct teamd_context {
 		struct sockaddr_un	addr;
 		struct list_item	acc_conn_list;
 	} usock;
+	struct {
+		struct list_item	work_list;
+		int			pipe_r;
+		int			pipe_w;
+	} workq;
 };
 
 struct teamd_port {

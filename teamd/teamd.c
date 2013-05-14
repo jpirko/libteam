@@ -43,6 +43,7 @@
 #include <team.h>
 
 #include "teamd.h"
+#include "teamd_workq.h"
 #include "teamd_config.h"
 #include "teamd_state.h"
 #include "teamd_usock.h"
@@ -1047,10 +1048,16 @@ static int teamd_init(struct teamd_context *ctx)
 		goto team_destroy;
 	}
 
+	err = teamd_workq_init(ctx);
+	if (err) {
+		teamd_log_err("Failed to init workq.");
+		goto run_loop_fini;
+	}
+
 	err = teamd_register_default_handlers(ctx);
 	if (err) {
 		teamd_log_err("Failed to register debug event handlers.");
-		goto run_loop_fini;
+		goto workq_fini;
 	}
 
 	err = teamd_events_init(ctx);
@@ -1161,6 +1168,8 @@ events_fini:
 	teamd_events_fini(ctx);
 team_unreg_debug_handlers:
 	teamd_unregister_default_handlers(ctx);
+workq_fini:
+	teamd_workq_fini(ctx);
 run_loop_fini:
 	teamd_run_loop_fini(ctx);
 team_destroy:
@@ -1182,6 +1191,7 @@ static void teamd_fini(struct teamd_context *ctx)
 	teamd_option_watch_fini(ctx);
 	teamd_events_fini(ctx);
 	teamd_unregister_default_handlers(ctx);
+	teamd_workq_fini(ctx);
 	teamd_run_loop_fini(ctx);
 	team_destroy(ctx->th);
 	team_free(ctx->th);

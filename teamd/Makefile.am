@@ -12,8 +12,8 @@ teamd_LDADD = $(top_builddir)/libteam/libteam.la $(LIBDAEMON_LIBS) $(JANSSON_LIB
 
 bin_PROGRAMS=teamd
 teamd_SOURCES=teamd.c teamd_common.c teamd_json.c teamd_config.c teamd_state.c \
-	      teamd_events.c teamd_per_port.c teamd_option_watch.c \
-	      teamd_ifinfo_watch.c teamd_link_watch.c \
+	      teamd_workq.c teamd_events.c teamd_per_port.c \
+	      teamd_option_watch.c teamd_ifinfo_watch.c teamd_link_watch.c \
 	      teamd_ctl.c teamd_dbus.c teamd_usock.c \
 	      teamd_bpf_chef.c teamd_hash_func.c teamd_balancer.c \
 	      teamd_runner_basic_ones.c teamd_runner_activebackup.c \
@@ -21,6 +21,6 @@ teamd_SOURCES=teamd.c teamd_common.c teamd_json.c teamd_config.c teamd_state.c \
 
 EXTRA_DIST = example_configs dbus redhat
 
-noinst_HEADERS = teamd.h teamd_bpf_chef.h teamd_ctl.h teamd_json.h \
-		 teamd_dbus.h teamd_usock.h teamd_dbus_common.h \
+noinst_HEADERS = teamd.h teamd_workq.h teamd_bpf_chef.h teamd_ctl.h \
+		 teamd_json.h teamd_dbus.h teamd_usock.h teamd_dbus_common.h \
 		 teamd_usock_common.h teamd_config.h teamd_state.h

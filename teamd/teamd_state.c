@@ -433,8 +433,6 @@ int teamd_state_item_value_set(struct teamd_context *ctx, const char *item_path,
 	return val->setter(ctx, &gsc, priv);
 }
 
-
-
 int teamd_state_init(struct teamd_context *ctx)
 {
 	list_init(&ctx->state_val_list);
