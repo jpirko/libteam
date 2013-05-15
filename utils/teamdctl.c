@@ -334,6 +334,7 @@ static int stateview_json_port_runner_process(char *runner_name,
 	if (!strcmp(runner_name, "lacp")) {
 		int selected;
 		int aggregator_id;
+		int aggregator_selected;
 		char *state;
 		int key;
 		int prio;
@@ -342,10 +343,11 @@ static int stateview_json_port_runner_process(char *runner_name,
 
 		pr_out("runner:\n");
 		err = json_unpack(port_json,
-				  "{s:{s:b, s:i, s:s, s:i, s:i, s:o, s:o}}",
+				  "{s:{s:b, s:{s:i, s:b}, s:s, s:i, s:i, s:o, s:o}}",
 				  "runner",
 				  "selected", &selected,
-				  "aggregator_id", &aggregator_id,
+				  "aggregator", "id", &aggregator_id,
+				  "selected", &aggregator_selected,
 				  "state", &state,
 				  "key", &key,
 				  "prio", &prio,
@@ -356,7 +358,8 @@ static int stateview_json_port_runner_process(char *runner_name,
 			return -EINVAL;
 		}
 		pr_out_indent_inc();
-		pr_out("aggregator ID: %d\n", aggregator_id);
+		pr_out("aggregator ID: %d%s\n", aggregator_id,
+						aggregator_selected ? ", Selected" : "");
 		pr_out("selected: %s\n", boolyesno(selected));
 		pr_out("state: %s\n", state);
 		pr_out2("key: %d\n", key);

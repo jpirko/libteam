@@ -200,9 +200,19 @@ static uint32_t lacp_agg_id(struct lacp_port *agg_lead)
 	return agg_lead ? agg_lead->tdport->ifindex : 0;
 }
 
+static bool lacp_agg_selected(struct lacp_port *agg_lead)
+{
+	return agg_lead ? agg_lead == agg_lead->lacp->selected_agg_lead : false;
+}
+
 static uint32_t lacp_port_agg_id(struct lacp_port *lacp_port)
 {
 	return lacp_agg_id(lacp_port->agg_lead);
+}
+
+static uint32_t lacp_port_agg_selected(struct lacp_port *lacp_port)
+{
+	return lacp_agg_selected(lacp_port->agg_lead);
 }
 
 static bool lacp_port_is_agg_lead(struct lacp_port *lacp_port)
@@ -1623,6 +1633,14 @@ static int lacp_port_state_aggregator_id_get(struct teamd_context *ctx,
 	return 0;
 }
 
+static int lacp_port_state_aggregator_selected_get(struct teamd_context *ctx,
+						   struct team_state_gsc *gsc,
+						   void *priv)
+{
+	gsc->data.bool_val = lacp_port_agg_selected(lacp_port_gsc(gsc, priv));
+	return 0;
+}
+
 static int lacp_port_state_state_get(struct teamd_context *ctx,
 				     struct team_state_gsc *gsc,
 				     void *priv)
@@ -1655,9 +1673,14 @@ static const struct teamd_state_val lacp_port_state_vals[] = {
 		.getter = lacp_port_state_selected_get,
 	},
 	{
-		.subpath = "aggregator_id",
+		.subpath = "aggregator.id",
 		.type = TEAMD_STATE_ITEM_TYPE_INT,
 		.getter = lacp_port_state_aggregator_id_get,
+	},
+	{
+		.subpath = "aggregator.selected",
+		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
+		.getter = lacp_port_state_aggregator_selected_get,
 	},
 	{
 		.subpath = "state",
