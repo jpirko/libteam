@@ -1,4 +1,5 @@
 %module capi
+#define __attribute__(__x__)
 %{
 #include "@top_srcdir@/include/team.h"
 
