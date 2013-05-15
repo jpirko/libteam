@@ -34,6 +34,7 @@
 #include "teamd.h"
 #include "teamd_config.h"
 #include "teamd_state.h"
+#include "teamd_workq.h"
 
 /*
  * Packet format for LACPDU described in
@@ -718,12 +719,13 @@ static int lacp_ports_update_enabled(struct lacp *lacp)
 	return 0;
 }
 
-static int lacp_selected_agg_update(struct lacp *lacp)
+static int lacp_selected_agg_update(struct lacp *lacp,
+				    struct lacp_port *next_agg_lead)
 {
-	struct lacp_port *next_agg_lead;
 	int err;
 
-	next_agg_lead = lacp_get_next_agg(lacp);
+	if (!next_agg_lead)
+		next_agg_lead = lacp_get_next_agg(lacp);
 	if (lacp->selected_agg_lead != next_agg_lead)
 		teamd_log_dbg("Selecting aggregator %u",
 			      lacp_agg_id(next_agg_lead));
@@ -760,7 +762,7 @@ static int lacp_port_agg_update(struct lacp_port *lacp_port)
 	    lacp_port_selectable(lacp_port))
 		lacp_port_agg_select(lacp_port);
 
-	return lacp_selected_agg_update(lacp_port->lacp);
+	return lacp_selected_agg_update(lacp_port->lacp, NULL);
 }
 
 static const char slow_addr[ETH_ALEN] = { 0x01, 0x80, 0xC2, 0x00, 0x00, 0x02 };
@@ -1641,6 +1643,54 @@ static int lacp_port_state_aggregator_selected_get(struct teamd_context *ctx,
 	return 0;
 }
 
+struct lacp_port_selected_set_info {
+	struct teamd_workq workq;
+	struct lacp *lacp;
+	uint32_t ifindex;
+};
+
+static int lacp_port_aggregator_select_work(struct teamd_context *ctx,
+					    struct teamd_workq *workq)
+{
+	struct lacp_port_selected_set_info *info;
+	struct teamd_port *tdport;
+	struct lacp *lacp;
+	struct lacp_port *lacp_port;
+
+	info = get_container(workq, struct lacp_port_selected_set_info, workq);
+	lacp = info->lacp;
+	free(info);
+	tdport = teamd_get_port(ctx, info->ifindex);
+	if (!tdport)
+		/* Port disapeared in between, ignore */
+		return 0;
+	lacp_port = lacp_port_get(lacp, tdport);
+	if (!lacp_port_selected(lacp_port))
+		return 0;
+	return lacp_selected_agg_update(lacp_port->lacp, lacp_port->agg_lead);
+}
+
+static int lacp_port_state_aggregator_selected_set(struct teamd_context *ctx,
+						   struct team_state_gsc *gsc,
+						   void *priv)
+{
+	struct lacp_port_selected_set_info *info;
+	struct lacp *lacp = priv;
+
+	if (!gsc->data.bool_val)
+		return -EOPNOTSUPP;
+	if (!lacp_port_selected(lacp_port_gsc(gsc, priv)))
+		return -EINVAL;
+	info = malloc(sizeof(*info));
+	if (!info)
+		return -ENOMEM;
+	info->workq.func = lacp_port_aggregator_select_work;
+	info->lacp = lacp;
+	info->ifindex = gsc->info.tdport->ifindex;
+	teamd_workq_schedule(ctx, &info->workq);
+	return 0;
+}
+
 static int lacp_port_state_state_get(struct teamd_context *ctx,
 				     struct team_state_gsc *gsc,
 				     void *priv)
@@ -1681,6 +1731,7 @@ static const struct teamd_state_val lacp_port_state_vals[] = {
 		.subpath = "aggregator.selected",
 		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
 		.getter = lacp_port_state_aggregator_selected_get,
+		.setter = lacp_port_state_aggregator_selected_set,
 	},
 	{
 		.subpath = "state",
