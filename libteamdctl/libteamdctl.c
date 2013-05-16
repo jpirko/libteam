@@ -191,6 +191,11 @@ static int cli_init(struct teamdctl *tdc, const char *team_name)
 	err = tdc->cli->init(tdc, team_name, tdc->cli_priv);
 	if (err)
 		goto free_priv;
+	if (tdc->cli->test_method_call_required) {
+		err = cli_method_call(tdc, "ConfigDump", NULL, "");
+		if (err)
+			goto free_priv;
+	}
 	return 0;
 free_priv:
 	if (tdc->cli->priv_size)

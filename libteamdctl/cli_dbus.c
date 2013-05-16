@@ -169,58 +169,6 @@ out:
 	return err;
 }
 
-static int cli_dbus_introspect(struct teamdctl *tdc,
-			       struct cli_dbus_priv *cli_dbus)
-{
-	DBusMessage *msg;
-	dbus_bool_t dbres;
-	DBusPendingCall *pending;
-	int err;
-
-	msg = dbus_message_new_method_call(cli_dbus->service_name,
-					   TEAMD_DBUS_PATH,
-					   "org.freedesktop.DBus.Introspectable",
-					   "Introspect");
-	if (!msg) {
-		err(tdc, "Failed to create message.");
-		return -ENOMEM;
-	}
-
-	dbres = dbus_connection_send_with_reply(cli_dbus->conn, msg,
-						&pending, -1);
-	if (dbres == FALSE) {
-		err(tdc, "Send with reply failed.");
-		err = -ENOMEM;
-		goto free_msg;
-	}
-	if (!pending) {
-		err(tdc, "Pending call not created.");
-		err = -ENOMEM;
-		goto free_msg;
-	}
-
-	dbus_pending_call_block(pending);
-
-	dbus_message_unref(msg);
-	msg = dbus_pending_call_steal_reply(pending);
-	dbus_pending_call_unref(pending);
-	if (!msg) {
-		err(tdc, "Failed to get reply.");
-		err = -EINVAL;
-		goto out;
-	}
-
-	err = cli_dbus_check_error_msg(tdc, msg);
-	if (err)
-		goto free_msg;
-
-free_msg:
-	dbus_message_unref(msg);
-out:
-	return err;
-
-}
-
 static int cli_dbus_init(struct teamdctl *tdc, const char *team_name, void *priv)
 {
 	struct cli_dbus_priv *cli_dbus = priv;
@@ -241,13 +189,7 @@ static int cli_dbus_init(struct teamdctl *tdc, const char *team_name, void *priv
 		err = -EINVAL;
 		goto free_service_name;
 	}
-
-	/* Now, try to introspect to see if it's possible to call methods */
-	err = cli_dbus_introspect(tdc, cli_dbus);
-	if (err) {
-		err(tdc, "Failed to do introspection.");
-		goto free_service_name;
-	}
+	err = 0;
 	goto free_error;
 
 free_service_name:
@@ -269,6 +211,7 @@ static const struct teamdctl_cli cli_dbus = {
 	.name = "dbus",
 	.init = cli_dbus_init,
 	.fini = cli_dbus_fini,
+	.test_method_call_required = true,
 	.method_call = cli_dbus_method_call,
 	.priv_size = sizeof(struct cli_dbus_priv),
 };

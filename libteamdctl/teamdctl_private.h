@@ -20,6 +20,7 @@
 #ifndef _TEAMDCTL_PRIVATE_H_
 #define _TEAMDCTL_PRIVATE_H_
 
+#include <stdbool.h>
 #include <syslog.h>
 #include <teamdctl.h>
 
@@ -86,6 +87,7 @@ struct teamdctl_cli {
 	size_t priv_size;
 	int (*init)(struct teamdctl *tdc, const char *team_name, void *priv);
 	void (*fini)(struct teamdctl *tdc, void *priv);
+	bool test_method_call_required;
 	int (*method_call)(struct teamdctl *tdc, const char *method_name,
 			   char **p_reply, void *priv,
 			   const char *fmt, va_list ap);
