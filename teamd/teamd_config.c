@@ -133,17 +133,15 @@ int teamd_config_actual_dump(struct teamd_context *ctx, char **p_config_dump)
 	 * Get rid of json object of ports which are not present
 	 */
 	err = json_unpack(actual_json, "{s:o}", "ports", &ports_obj);
-	if (err) {
-		err = -EINVAL;
-		goto errout;
-	}
-	iter = json_object_iter(ports_obj);
-	while (iter) {
-		const char *port_name = json_object_iter_key(iter);
+	if (!err) {
+		iter = json_object_iter(ports_obj);
+		while (iter) {
+			const char *port_name = json_object_iter_key(iter);
 
-		iter = json_object_iter_next(ports_obj, iter);
-		if (!teamd_get_port_by_ifname(ctx, (char *) port_name))
-			json_object_del(ports_obj, port_name);
+			iter = json_object_iter_next(ports_obj, iter);
+			if (!teamd_get_port_by_ifname(ctx, (char *) port_name))
+				json_object_del(ports_obj, port_name);
+		}
 	}
 
 	dump = json_dumps(actual_json, TEAMD_JSON_DUMPS_FLAGS);
