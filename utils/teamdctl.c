@@ -257,7 +257,7 @@ static int stateview_json_link_watch_info_process(char *lw_name,
 	return 0;
 }
 
-static int stateview_json_port_link_watches_process(json_t *port_link_watches_json)
+static int stateview_json_port_link_watches_list_process(json_t *port_link_watches_json)
 {
 	int err;
 	int up;
@@ -266,15 +266,9 @@ static int stateview_json_port_link_watches_process(json_t *port_link_watches_js
 	char *lw_name;
 	const char *key;
 
-	err = json_unpack(port_link_watches_json, "{s:b, s:o}",
-			  "up", &up, "list", &lw_list_json);
-	if (err) {
-		pr_err("Failed to parse JSON port link watches dump.\n");
-		return -EINVAL;
-	}
-	pr_out("link watches:\n");
-	pr_out_indent_inc();
-	pr_out("link summary: %s\n", boolupdown(up));
+	err = json_unpack(port_link_watches_json, "{s:o}", "list", &lw_list_json);
+	if (err)
+		return 0;
 	json_object_foreach(lw_list_json, key, lw_json) {
 		err = json_unpack(lw_json, "{s:b, s:s}",
 				  "up", &up, "name", &lw_name);
@@ -292,6 +286,24 @@ static int stateview_json_port_link_watches_process(json_t *port_link_watches_js
 			return err;
 		pr_out_indent_dec();
 	}
+	return 0;
+}
+static int stateview_json_port_link_watches_process(json_t *port_link_watches_json)
+{
+	int err;
+	int up;
+
+	err = json_unpack(port_link_watches_json, "{s:b}", "up", &up);
+	if (err) {
+		pr_err("Failed to parse JSON port link watches dump.\n");
+		return -EINVAL;
+	}
+	pr_out("link watches:\n");
+	pr_out_indent_inc();
+	pr_out("link summary: %s\n", boolupdown(up));
+	err = stateview_json_port_link_watches_list_process(port_link_watches_json);
+	if (err)
+		return err;
 	pr_out_indent_dec();
 	return 0;
 }
