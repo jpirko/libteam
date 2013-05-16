@@ -140,7 +140,7 @@ static int jsonnoportsdump_process_reply(char *reply)
 #define boolyesno(val) (val ? "yes" : "no")
 #define boolupdown(val) (val ? "up" : "down")
 
-static int stateview_json_setup_process(char **prunner_name, json_t *setup_json)
+static int stateview_json_setup_process(char **prunner_name, json_t *dump_json)
 {
 	int err;
 	char *runner_name;
@@ -152,7 +152,8 @@ static int stateview_json_setup_process(char **prunner_name, json_t *setup_json)
 	char *pid_file;
 
 	pr_out("setup:\n");
-	err = json_unpack(setup_json, "{s:s, s:s, s:b, s:i, s:b, s:i, s:s}",
+	err = json_unpack(dump_json, "{s:{s:s, s:s, s:b, s:i, s:b, s:i, s:s}}",
+			  "setup",
 			  "runner_name", &runner_name,
 			  "kernel_team_mode_name", &kernel_team_mode_name,
 			  "dbus_enabled", &dbus_enabled,
@@ -437,11 +438,15 @@ err_out:
 	return err;
 }
 
-static int stateview_json_ports_process(char *runner_name, json_t *ports_json)
+static int stateview_json_ports_process(char *runner_name, json_t *dump_json)
 {
 	int err;
+	json_t *ports_json;
 	json_t *iter;
 
+	err = json_unpack(dump_json, "{s:o}", "ports", &ports_json);
+	if (err)
+		return 0;
 	pr_err("ports:\n");
 	for (iter = json_object_iter(ports_json); iter;
 	     iter = json_object_iter_next(ports_json, iter)) {
@@ -502,29 +507,20 @@ static int stateview_json_process(char *dump)
 {
 	int err;
 	char *runner_name;
-	json_t *json;
-	json_t *setup_json;
-	json_t *ports_json;
+	json_t *dump_json;
 
-	err = __jsonload(&json, dump);
+	err = __jsonload(&dump_json, dump);
 	if (err)
 		return err;
-	err = json_unpack(json, "{s:o, s:o}", "setup", &setup_json,
-					      "ports", &ports_json);
-	if (err) {
-		pr_err("Failed to parse JSON dump.\n");
-		err = -EINVAL;
-		goto free_json;
-	}
-	err = stateview_json_setup_process(&runner_name, setup_json);
+	err = stateview_json_setup_process(&runner_name, dump_json);
 	if (err)
 		goto free_json;
-	err = stateview_json_ports_process(runner_name, ports_json);
+	err = stateview_json_ports_process(runner_name, dump_json);
 	if (err)
 		goto free_json;
-	err = stateview_json_runner_process(runner_name, json);
+	err = stateview_json_runner_process(runner_name, dump_json);
 free_json:
-	json_decref(json);
+	json_decref(dump_json);
 	return err;
 }
 
