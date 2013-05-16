@@ -6,7 +6,7 @@ from distutils.core import setup, Extension
 team = Extension('team/_capi',
             sources = ['team/capi.i'],
             include_dirs = ['../../include'],
-            library_dirs = ['../../lib/.libs'],
+            library_dirs = ['../../libteam/.libs'],
             swig_opts = ['-O', '-nodefaultctor'],
             libraries = ['team'],
             )
