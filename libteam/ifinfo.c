@@ -180,10 +180,13 @@ int ifinfo_create(struct team_handle *th, uint32_t ifindex,
 	}
 	ifinfo->ifindex = ifindex;
 	ifinfo->port = port;
-	ifinfo_update(ifinfo, link);
 	if (p_ifinfo)
 		*p_ifinfo = ifinfo;
 	list_add(&th->ifinfo_list, &ifinfo->list);
+	clear_last_changed(th);
+	ifinfo_update(ifinfo, link);
+	if (ifinfo->changed && port)
+		set_call_change_handlers(th, TEAM_IFINFO_CHANGE);
 
 errout:
 	rtnl_link_put(link);

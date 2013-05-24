@@ -702,7 +702,8 @@ static int sock_event_handler(struct team_handle *th)
 	th->msg_recv_started = false;
 
 	return check_call_change_handlers(th, TEAM_PORT_CHANGE |
-					      TEAM_OPTION_CHANGE);
+					      TEAM_OPTION_CHANGE |
+					      TEAM_IFINFO_CHANGE);
 }
 
 struct team_eventfd {
