@@ -52,6 +52,13 @@ static const char *introspection_xml =
 	"    </method>"
 	"    <method name='StateDump'>"
 	"    </method>"
+	"    <method name='StateItemValueGet'>"
+	"      <arg type='s' name='state_item_path' direction='in'/>"
+	"    </method>"
+	"    <method name='StateItemValueSet'>"
+	"      <arg type='s' name='state_item_path' direction='in'/>"
+	"      <arg type='s' name='value' direction='in'/>"
+	"    </method>"
 	"  </interface>"
 	"</node>";
 
