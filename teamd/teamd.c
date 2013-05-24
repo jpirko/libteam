@@ -48,6 +48,7 @@
 #include "teamd_state.h"
 #include "teamd_usock.h"
 #include "teamd_dbus.h"
+#include "teamd_sriov.h"
 
 static const struct teamd_runner *teamd_runner_list[] = {
 	&teamd_runner_broadcast,
@@ -1114,10 +1115,16 @@ static int teamd_init(struct teamd_context *ctx)
 		goto runner_fini;
 	}
 
+	err = teamd_sriov_init(ctx);
+	if (err) {
+		teamd_log_err("Failed to init SR-IOV support.");
+		goto state_basics_fini;
+	}
+
 	err = teamd_usock_init(ctx);
 	if (err) {
 		teamd_log_err("Failed to init unix domain socket.");
-		goto state_basics_fini;
+		goto sriov_fini;
 	}
 
 	err = teamd_dbus_init(ctx);
@@ -1148,6 +1155,8 @@ dbus_fini:
 	teamd_dbus_fini(ctx);
 usock_fini:
 	teamd_usock_fini(ctx);
+sriov_fini:
+	teamd_sriov_fini(ctx);
 state_basics_fini:
 	teamd_state_basics_fini(ctx);
 runner_fini:
@@ -1183,6 +1192,8 @@ static void teamd_fini(struct teamd_context *ctx)
 {
 	teamd_dbus_fini(ctx);
 	teamd_usock_fini(ctx);
+	teamd_sriov_fini(ctx);
+	teamd_state_basics_fini(ctx);
 	teamd_runner_fini(ctx);
 	teamd_link_watch_fini(ctx);
 	teamd_per_port_fini(ctx);
