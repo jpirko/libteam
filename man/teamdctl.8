@@ -1,4 +1,4 @@
-.TH TEAMDCTL 8 "2013-04-01" "libteam" "teamd control"
+.TH TEAMDCTL 8 "2013-05-24" "libteam" "teamd control"
 .SH NAME
 teamdctl \(em team daemon control tool
 .SH SYNOPSIS
@@ -44,6 +44,20 @@ Dumps teamd JSON state document.
 .TP
 .B "state view"
 Prints out state of teamd parsed from JSON state document.
+.TP
+.BI "state item get " state_item_path
+Finds state item in JSON state document and returns its value.
+.TP
+.BI "state item set " "state_item_path value"
+Finds state item in JSON state document and sets its value by value parameter. This is available only for limited number of paths:
+.RS 7
+.PP
+.BR "ports.PORTIFNAME.runner.aggregator.selected "\(em
+This is available for lacp runner. User can manually select aggragator.
+.PP
+.BR "runner.active_port "\(em
+This is available for activebackup runner. User can manually select active port.
+.RE
 .TP
 .BI "port add " portdev
 Takes port device name as argument. Adds port device into team.
