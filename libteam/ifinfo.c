@@ -134,17 +134,24 @@ static void obj_input(struct nl_object *obj, void *arg)
 	struct team_handle *th = arg;
 	struct rtnl_link *link;
 	struct team_ifinfo *ifinfo;
+	uint32_t ifindex;
+	int err;
 
 	if (nl_object_get_msgtype(obj) != RTM_NEWLINK)
 		return;
 	link = (struct rtnl_link *) obj;
 
+	ifindex = rtnl_link_get_ifindex(link);
 	ifinfo = find_ifinfo(th, rtnl_link_get_ifindex(link));
 	if (!ifinfo)
 		return;
 
+	err = rtnl_link_get_kernel(th->nl_cli.sock, ifindex, NULL, &link);
+	if (err)
+		return;
 	clear_last_changed(th);
 	ifinfo_update(ifinfo, link);
+	rtnl_link_put(link);
 	if (ifinfo->changed)
 		set_call_change_handlers(th, TEAM_IFINFO_CHANGE);
 }
