@@ -532,6 +532,11 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 		return -errno;
 	}
 
+	err = nl_socket_set_buffer_size(th->nl_sock, 98304, 0);
+	if (err) {
+		err(th, "Failed to set buffer size of netlink sock.");
+		return -nl2syserr(err);
+	}
 	err = nl_socket_set_buffer_size(th->nl_sock_event, 98304, 0);
 	if (err) {
 		err(th, "Failed to set buffer size of netlink event sock.");
