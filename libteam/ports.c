@@ -24,6 +24,7 @@
 #include <netlink/genl/ctrl.h>
 #include <netlink/cli/utils.h>
 #include <netlink/cli/link.h>
+#include <linux/netdevice.h>
 #include <linux/if_team.h>
 #include <linux/types.h>
 #include <team.h>
@@ -39,6 +40,8 @@ struct team_port {
 	bool			linkup;
 	bool			changed;
 	bool			removed;
+	unsigned char		orig_hwaddr_len;
+	char			orig_hwaddr[MAX_ADDR_LEN];
 	struct team_ifinfo *	ifinfo;
 };
 
@@ -154,6 +157,16 @@ int get_port_list_handler(struct nl_msg *msg, void *arg)
 			port->speed = nla_get_u32(port_attrs[TEAM_ATTR_PORT_SPEED]);
 		if (port_attrs[TEAM_ATTR_PORT_DUPLEX])
 			port->duplex = nla_get_u8(port_attrs[TEAM_ATTR_PORT_DUPLEX]);
+		if (port_attrs[TEAM_ATTR_PORT_ORIG_ADDR] &&
+		    port_attrs[TEAM_ATTR_PORT_ORIG_ADDR_LEN]) {
+			port->orig_hwaddr_len = nla_get_u8(port_attrs[TEAM_ATTR_PORT_ORIG_ADDR_LEN]);
+			memcpy(port->orig_hwaddr,
+			       nla_data(port_attrs[TEAM_ATTR_PORT_ORIG_ADDR]),
+			       port->orig_hwaddr_len);
+		} else {
+			port->orig_hwaddr_len = 0;
+			memset(port->orig_hwaddr, 0, sizeof(port->orig_hwaddr));
+		}
 	}
 
 	set_call_change_handlers(th, TEAM_PORT_CHANGE);
@@ -338,4 +351,32 @@ bool team_is_port_present(struct team_handle *th, struct team_port *port)
 
 	return team_get_ifinfo_master_ifindex(ifinfo) == th->ifindex &&
 	       !team_is_port_removed(port);
+}
+
+/**
+ * team_get_port_orig_hwaddr:
+ * @port: port structure
+ *
+ * Get port original hardware address.
+ *
+ * Returns: pointer to address.
+ **/
+TEAM_EXPORT
+const char *team_get_port_orig_hwaddr(struct team_port *port)
+{
+	return port->orig_hwaddr;
+}
+
+/**
+ * team_get_port_orig_hwaddr_len:
+ * @port: port structure
+ *
+ * Get port length original hardware address.
+ *
+ * Returns: address length.
+ **/
+TEAM_EXPORT
+uint8_t team_get_port_orig_hwaddr_len(struct team_port *port)
+{
+	return port->orig_hwaddr_len;
 }

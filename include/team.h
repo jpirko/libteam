@@ -114,6 +114,8 @@ bool team_is_port_changed(struct team_port *port);
 bool team_is_port_removed(struct team_port *port);
 struct team_ifinfo *team_get_port_ifinfo(struct team_port *port);
 bool team_is_port_present(struct team_handle *th, struct team_port *port);
+const char *team_get_port_orig_hwaddr(struct team_port *port);
+uint8_t team_get_port_orig_hwaddr_len(struct team_port *port);
 
 /*
  * team_ifinfo
