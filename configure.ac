@@ -1,7 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_INIT([libteam], [1.1], [jpirko@redhat.com])
+AC_INIT([libteam], [1.2], [jpirko@redhat.com])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([-Wall foreign subdir-objects])
@@ -23,7 +23,7 @@ AM_PROG_AR
 #    release, then set age to 0.
 
 AC_SUBST(LIBTEAM_CURRENT, 2)
-AC_SUBST(LIBTEAM_REVISION, 0)
+AC_SUBST(LIBTEAM_REVISION, 1)
 AC_SUBST(LIBTEAM_AGE, 1)
 
 AC_SUBST(LIBTEAMDCTL_CURRENT, 0)
