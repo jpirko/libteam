@@ -739,7 +739,7 @@ err_out:
 	return err;
 }
 
-static int teamd_check_change_hwaddr(struct teamd_context *ctx)
+static int teamd_set_hwaddr(struct teamd_context *ctx)
 {
 	int err;
 	const char *hwaddr_str;
@@ -811,11 +811,39 @@ static int teamd_add_ports(struct teamd_context *ctx)
 	return 0;
 }
 
+static int teamd_hwaddr_check_change(struct teamd_context *ctx,
+				     struct teamd_port *tdport)
+{
+	const char *hwaddr;
+	unsigned char hwaddr_len;
+	int err;
+
+	if (ctx->port_obj_list_count != 1)
+		return 0;
+	hwaddr = team_get_port_orig_hwaddr(tdport->team_port);
+	hwaddr_len = team_get_port_orig_hwaddr_len(tdport->team_port);
+	if (hwaddr_len != ctx->hwaddr_len) {
+		teamd_log_err("%s: Port original hardware address has different length (%d) than team device has (%d).",
+			      tdport->ifname, hwaddr_len, ctx->hwaddr_len);
+		return -EINVAL;
+	}
+	err = team_hwaddr_set(ctx->th, ctx->ifindex, hwaddr, hwaddr_len);
+	if (err) {
+		teamd_log_err("Failed to set team device hardware address.");
+		return err;
+	}
+	return 0;
+}
+
 static int teamd_event_watch_port_added(struct teamd_context *ctx,
 					struct teamd_port *tdport, void *priv)
 {
 	int err;
 	int tmp;
+
+	err = teamd_hwaddr_check_change(ctx, tdport);
+	if (err)
+		return err;
 
 	err = teamd_config_int_get(ctx, &tmp, "$.ports.%s.queue_id",
 				   tdport->ifname);
@@ -1037,9 +1065,9 @@ static int teamd_init(struct teamd_context *ctx)
 	ctx->hwaddr = team_get_ifinfo_hwaddr(ctx->ifinfo);
 	ctx->hwaddr_len = team_get_ifinfo_hwaddr_len(ctx->ifinfo);
 
-	err = teamd_check_change_hwaddr(ctx);
+	err = teamd_set_hwaddr(ctx);
 	if (err) {
-		teamd_log_err("Hardware address change failed.");
+		teamd_log_err("Hardware address set failed.");
 		goto team_destroy;
 	}
 
