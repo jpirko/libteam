@@ -277,7 +277,7 @@ static int stateview_json_port_link_watches_list_process(json_t *port_link_watch
 			pr_err("Failed to parse JSON port link watch dump.\n");
 			return -EINVAL;
 		}
-		pr_out("intance[%s]:\n", key);
+		pr_out("instance[%s]:\n", key);
 		pr_out_indent_inc();
 		pr_out("name: %s\n", lw_name);
 		pr_out("link: %s\n", boolupdown(up));
