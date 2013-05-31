@@ -1394,10 +1394,26 @@ int main(int argc, char **argv)
 	if (err)
 		goto context_fini;
 
+	ctx->argv0 = daemon_ident_from_argv0(argv[0]);
+
+	switch (ctx->cmd) {
+	case DAEMON_CMD_HELP:
+		print_help(ctx);
+		ret = EXIT_SUCCESS;
+		goto context_fini;
+	case DAEMON_CMD_VERSION:
+		printf("%s "PACKAGE_VERSION"\n", ctx->argv0);
+		ret = 0;
+		goto context_fini;
+	case DAEMON_CMD_KILL:
+	case DAEMON_CMD_CHECK:
+	case DAEMON_CMD_RUN:
+		break;
+	}
+
 	if (ctx->debug)
 		daemon_set_verbosity(LOG_DEBUG);
 
-	ctx->argv0 = daemon_ident_from_argv0(argv[0]);
 	daemon_log_ident = ctx->argv0;
 
 	err = teamd_config_load(ctx);
@@ -1422,12 +1438,7 @@ int main(int argc, char **argv)
 
 	switch (ctx->cmd) {
 	case DAEMON_CMD_HELP:
-		print_help(ctx);
-		ret = EXIT_SUCCESS;
-		break;
 	case DAEMON_CMD_VERSION:
-		printf("%s "PACKAGE_VERSION"\n", ctx->argv0);
-		ret = 0;
 		break;
 	case DAEMON_CMD_KILL:
 		err = daemon_pid_file_kill_wait(SIGTERM, 5);
