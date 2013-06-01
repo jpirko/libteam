@@ -31,6 +31,7 @@
 
 struct team_ifinfo {
 	struct list_item	list;
+	bool			linked;
 	uint32_t		ifindex;
 	struct team_port *	port; /* NULL if device is not team port */
 	char			hwaddr[MAX_ADDR_LEN];
@@ -110,7 +111,7 @@ static void ifinfo_update(struct team_ifinfo *ifinfo, struct rtnl_link *link)
 	update_master(ifinfo, link);
 }
 
-static struct team_ifinfo *find_ifinfo(struct team_handle *th, uint32_t ifindex)
+static struct team_ifinfo *ifinfo_find(struct team_handle *th, uint32_t ifindex)
 {
 	struct team_ifinfo *ifinfo;
 
@@ -129,7 +130,25 @@ static void clear_last_changed(struct team_handle *th)
 		clear_changed(ifinfo);
 }
 
-static void obj_input(struct nl_object *obj, void *arg)
+static struct team_ifinfo *ifinfo_find_create(struct team_handle *th,
+					      uint32_t ifindex)
+{
+	struct team_ifinfo *ifinfo;
+
+	ifinfo = ifinfo_find(th, ifindex);
+	if (ifinfo)
+		return ifinfo;
+
+	ifinfo = myzalloc(sizeof(*ifinfo));
+	if (!ifinfo)
+		return NULL;
+
+	ifinfo->ifindex = ifindex;
+	list_add(&th->ifinfo_list, &ifinfo->list);
+	return ifinfo;
+}
+
+static void obj_input(struct nl_object *obj, void *arg, bool getlink)
 {
 	struct team_handle *th = arg;
 	struct rtnl_link *link;
@@ -142,73 +161,146 @@ static void obj_input(struct nl_object *obj, void *arg)
 	link = (struct rtnl_link *) obj;
 
 	ifindex = rtnl_link_get_ifindex(link);
-	ifinfo = find_ifinfo(th, rtnl_link_get_ifindex(link));
+	ifinfo = ifinfo_find_create(th, ifindex);
 	if (!ifinfo)
 		return;
 
-	err = rtnl_link_get_kernel(th->nl_cli.sock, ifindex, NULL, &link);
-	if (err)
-		return;
+	if (getlink) {
+		err = rtnl_link_get_kernel(th->nl_cli.sock, ifindex, NULL, &link);
+		if (err)
+			return;
+	}
+
 	clear_last_changed(th);
 	ifinfo_update(ifinfo, link);
-	rtnl_link_put(link);
+
+	if (getlink)
+		rtnl_link_put(link);
+
 	if (ifinfo->changed)
 		set_call_change_handlers(th, TEAM_IFINFO_CHANGE);
+}
+
+static void event_handler_obj_input(struct nl_object *obj, void *arg)
+{
+	return obj_input(obj, arg, true);
 }
 
 int ifinfo_event_handler(struct nl_msg *msg, void *arg)
 {
 	struct team_handle *th = arg;
 
-	if (nl_msg_parse(msg, &obj_input, th) < 0)
+	if (nl_msg_parse(msg, &event_handler_obj_input, th) < 0)
 		err(th, "Unknown message type.");
 	return NL_STOP;
 }
 
-int ifinfo_create(struct team_handle *th, uint32_t ifindex,
-		  struct team_port *port, struct team_ifinfo **p_ifinfo)
+int ifinfo_list_alloc(struct team_handle *th)
 {
-	struct rtnl_link *link;
-	struct team_ifinfo *ifinfo;
-	int err;
-
-	ifinfo = find_ifinfo(th, ifindex);
-	if (ifinfo)
-		return -EEXIST;
-
-	err = rtnl_link_get_kernel(th->nl_cli.sock, ifindex, NULL, &link);
-	if (err)
-		return -nl2syserr(err);
-
-	ifinfo = myzalloc(sizeof(struct team_ifinfo));
-	if (!ifinfo) {
-		err = -ENOMEM;
-		goto errout;
-	}
-	ifinfo->ifindex = ifindex;
-	ifinfo->port = port;
-	if (p_ifinfo)
-		*p_ifinfo = ifinfo;
-	list_add(&th->ifinfo_list, &ifinfo->list);
-	clear_last_changed(th);
-	ifinfo_update(ifinfo, link);
-	if (ifinfo->changed && port)
-		set_call_change_handlers(th, TEAM_IFINFO_CHANGE);
-
-errout:
-	rtnl_link_put(link);
+	list_init(&th->ifinfo_list);
 	return 0;
 }
 
-void ifinfo_destroy(struct team_handle *th, uint32_t ifindex)
+static void valid_handler_obj_input(struct nl_object *obj, void *arg)
+{
+	return obj_input(obj, arg, false);
+}
+
+static int valid_handler(struct nl_msg *msg, void *arg)
+{
+	struct team_handle *th = arg;
+
+	if (nl_msg_parse(msg, &valid_handler_obj_input, th) < 0)
+		err(th, "Unknown message type.");
+	return NL_OK;
+}
+
+int get_ifinfo_list(struct team_handle *th)
+{
+	struct nl_cb *cb;
+	struct nl_cb *orig_cb;
+	struct rtgenmsg rt_hdr = {
+		.rtgen_family = AF_UNSPEC,
+	};
+	int ret;
+
+	ret = nl_send_simple(th->nl_cli.sock, RTM_GETLINK, NLM_F_DUMP,
+			     &rt_hdr, sizeof(rt_hdr));
+	if (ret < 0)
+		return -nl2syserr(ret);
+	orig_cb = nl_socket_get_cb(th->nl_cli.sock);
+	cb = nl_cb_clone(orig_cb);
+	nl_cb_put(orig_cb);
+	if (!cb)
+		return -ENOMEM;
+
+	nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, valid_handler, th);
+
+	ret = nl_recvmsgs(th->nl_cli.sock, cb);
+	nl_cb_put(cb);
+	if (ret < 0)
+		return -nl2syserr(ret);
+	return 0;
+}
+
+int ifinfo_list_init(struct team_handle *th)
+{
+	int err;
+
+	err = get_ifinfo_list(th);
+	if (err) {
+		err(th, "Failed to get interface information list.");
+		return err;
+	}
+	return 0;
+}
+
+static void ifinfo_destroy(struct team_ifinfo *ifinfo)
+{
+	list_del(&ifinfo->list);
+	free(ifinfo);
+}
+
+static void flush_port_list(struct team_handle *th)
+{
+	struct team_ifinfo *ifinfo, *tmp;
+
+	list_for_each_node_entry_safe(ifinfo, tmp, &th->ifinfo_list, list)
+		ifinfo_destroy(ifinfo);
+}
+
+void ifinfo_list_free(struct team_handle *th)
+{
+	flush_port_list(th);
+}
+
+int ifinfo_link_with_port(struct team_handle *th, uint32_t ifindex,
+			  struct team_port *port, struct team_ifinfo **p_ifinfo)
 {
 	struct team_ifinfo *ifinfo;
 
-	ifinfo = find_ifinfo(th, ifindex);
+	ifinfo = ifinfo_find(th, ifindex);
 	if (!ifinfo)
-		return;
-	list_del(&ifinfo->list);
-	free(ifinfo);
+		return -ENOENT;
+	if (ifinfo->linked)
+		return -EBUSY;
+	ifinfo->port = port;
+	ifinfo->linked = true;
+	if (p_ifinfo)
+		*p_ifinfo = ifinfo;
+	return 0;
+}
+
+int ifinfo_link(struct team_handle *th, uint32_t ifindex,
+		struct team_ifinfo **p_ifinfo)
+{
+	return ifinfo_link_with_port(th, ifindex, NULL, p_ifinfo);
+}
+
+void ifinfo_unlink(struct team_ifinfo *ifinfo)
+{
+	ifinfo->port = NULL;
+	ifinfo->linked = false;
 }
 
 /**
@@ -224,7 +316,12 @@ TEAM_EXPORT
 struct team_ifinfo *team_get_next_ifinfo(struct team_handle *th,
 					 struct team_ifinfo *ifinfo)
 {
-	return list_get_next_node_entry(&th->ifinfo_list, ifinfo, list);
+	do {
+		ifinfo = list_get_next_node_entry(&th->ifinfo_list, ifinfo, list);
+		if (ifinfo && ifinfo->linked)
+			return ifinfo;
+	} while (ifinfo);
+	return NULL;
 }
 
 /**

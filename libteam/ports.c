@@ -56,9 +56,9 @@ static struct team_port *port_create(struct team_handle *th,
 		err(th, "Malloc failed.");
 		return NULL;
 	}
-	err = ifinfo_create(th, ifindex, port, &port->ifinfo);
+	err = ifinfo_link_with_port(th, ifindex, port, &port->ifinfo);
 	if (err) {
-		err(th, "Failed to create ifinfo.");
+		err(th, "Failed to link port with ifinfo.");
 		free(port);
 		return NULL;
 	}
@@ -70,7 +70,7 @@ static struct team_port *port_create(struct team_handle *th,
 static void port_destroy(struct team_handle *th,
 			 struct team_port *port)
 {
-	ifinfo_destroy(th, port->ifindex);
+	ifinfo_unlink(port->ifinfo);
 	list_del(&port->list);
 	free(port);
 }

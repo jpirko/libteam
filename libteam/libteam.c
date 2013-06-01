@@ -334,8 +334,10 @@ struct team_handle *team_alloc(void)
 	dbg(th, "log_priority=%d", th->log_priority);
 
 	list_init(&th->change_handler.list);
-	list_init(&th->ifinfo_list);
 
+	err = ifinfo_list_alloc(th);
+	if (err)
+		goto err_ifinfo_list_alloc;
 	err = port_list_alloc(th);
 	if (err)
 		goto err_port_list_alloc;
@@ -387,6 +389,9 @@ err_option_list_alloc:
 	port_list_free(th);
 
 err_port_list_alloc:
+	ifinfo_list_free(th);
+
+err_ifinfo_list_alloc:
 	free(th);
 
 	return NULL;
@@ -583,6 +588,12 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 		return -nl2syserr(err);
 	}
 
+	err = ifinfo_list_init(th);
+	if (err) {
+		err(th, "Failed to init interface information list.");
+		return err;
+	}
+
 	err = port_list_init(th);
 	if (err) {
 		err(th, "Failed to init port list.");
@@ -595,9 +606,9 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 		return err;
 	}
 
-	err = ifinfo_create(th, ifindex, NULL, &th->ifinfo);
+	err = ifinfo_link(th, ifindex, &th->ifinfo);
 	if (err) {
-		err(th, "Failed create interface info.");
+		err(th, "Failed to find team interface info.");
 		return err;
 	}
 
@@ -621,6 +632,7 @@ TEAM_EXPORT
 void team_free(struct team_handle *th)
 {
 	close(th->event_fd);
+	ifinfo_list_free(th);
 	port_list_free(th);
 	option_list_free(th);
 	nl_cache_free(th->nl_cli.link_cache);

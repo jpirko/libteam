@@ -105,9 +105,14 @@ int port_list_alloc(struct team_handle *th);
 int port_list_init(struct team_handle *th);
 void port_list_free(struct team_handle *th);
 int ifinfo_event_handler(struct nl_msg *msg, void *arg);
-int ifinfo_create(struct team_handle *th, uint32_t ifindex,
-		  struct team_port *port, struct team_ifinfo **p_ifinfo);
-void ifinfo_destroy(struct team_handle *th, uint32_t ifindex);
+int ifinfo_list_alloc(struct team_handle *th);
+int ifinfo_list_init(struct team_handle *th);
+void ifinfo_list_free(struct team_handle *th);
+int ifinfo_link_with_port(struct team_handle *th, uint32_t ifindex,
+			  struct team_port *port, struct team_ifinfo **p_ifinfo);
+int ifinfo_link(struct team_handle *th, uint32_t ifindex,
+		struct team_ifinfo **p_ifinfo);
+void ifinfo_unlink(struct team_ifinfo *ifinfo);
 int get_options_handler(struct nl_msg *msg, void *arg);
 int option_list_alloc(struct team_handle *th);
 int option_list_init(struct team_handle *th);
