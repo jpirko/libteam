@@ -163,9 +163,6 @@ int get_port_list_handler(struct nl_msg *msg, void *arg)
 			memcpy(port->orig_hwaddr,
 			       nla_data(port_attrs[TEAM_ATTR_PORT_ORIG_ADDR]),
 			       port->orig_hwaddr_len);
-		} else {
-			port->orig_hwaddr_len = 0;
-			memset(port->orig_hwaddr, 0, sizeof(port->orig_hwaddr));
 		}
 	}
 
