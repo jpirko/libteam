@@ -822,6 +822,8 @@ static int teamd_hwaddr_check_change(struct teamd_context *ctx,
 		return 0;
 	hwaddr = team_get_port_orig_hwaddr(tdport->team_port);
 	hwaddr_len = team_get_port_orig_hwaddr_len(tdport->team_port);
+	if (!hwaddr_len)
+		return 0; /* original addr not present, so just skip out */
 	if (hwaddr_len != ctx->hwaddr_len) {
 		teamd_log_err("%s: Port original hardware address has different length (%d) than team device has (%d).",
 			      tdport->ifname, hwaddr_len, ctx->hwaddr_len);
