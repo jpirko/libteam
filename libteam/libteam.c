@@ -710,7 +710,12 @@ static int get_sock_event_fd(struct team_handle *th)
 
 static int sock_event_handler(struct team_handle *th)
 {
-	nl_recvmsgs_default(th->nl_sock_event);
+	int ret;
+
+	ret = nl_recvmsgs_default(th->nl_sock_event);
+	if (ret)
+		return -nl2syserr(ret);
+
 	th->msg_recv_started = false;
 	return check_call_change_handlers(th, TEAM_PORT_CHANGE |
 					      TEAM_OPTION_CHANGE |
