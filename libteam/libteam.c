@@ -120,10 +120,9 @@ int send_and_recv(struct team_handle *th, struct nl_msg *msg,
 	int err;
 
 	err = nl_send_auto(th->nl_sock, msg);
-	if (err < 0) {
-		err = -nl2syserr(err);
-		goto out;
-	}
+	nlmsg_free(msg);
+	if (err < 0)
+		return -nl2syserr(err);
 
 	th->nl_sock_err = 1;
 
@@ -136,8 +135,6 @@ int send_and_recv(struct team_handle *th, struct nl_msg *msg,
 
 	err = th->nl_sock_err;
 
- out:
-	nlmsg_free(msg);
 	return err;
 }
 
