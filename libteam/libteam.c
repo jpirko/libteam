@@ -25,6 +25,7 @@
 #include <syslog.h>
 #include <sys/select.h>
 #include <sys/epoll.h>
+#include <time.h>
 #include <netlink/netlink.h>
 #include <netlink/genl/genl.h>
 #include <netlink/genl/ctrl.h>
@@ -113,55 +114,68 @@ int nl2syserr(int nl_error)
  * @short_description: Various netlink helpers
  */
 
+static int ack_handler(struct nl_msg *msg, void *arg)
+{
+	bool *acked = arg;
+
+	*acked = true;
+	return NL_STOP;
+}
+
+static int seq_check_handler(struct nl_msg *msg, void *arg)
+{
+	unsigned int *seq = arg;
+	struct nlmsghdr *hdr = nlmsg_hdr(msg);
+
+	if (hdr->nlmsg_seq != *seq)
+		return NL_SKIP;
+	return NL_OK;
+}
+
 int send_and_recv(struct team_handle *th, struct nl_msg *msg,
 		  int (*valid_handler)(struct nl_msg *, void *),
 		  void *valid_data)
 {
-	int err;
+	int ret;
+	struct nl_cb *cb;
+	struct nl_cb *orig_cb;
+	bool acked;
+	unsigned int seq = th->nl_sock_seq++;
 
-	err = nl_send_auto(th->nl_sock, msg);
+	ret = nl_send_auto(th->nl_sock, msg);
 	nlmsg_free(msg);
-	if (err < 0)
-		return -nl2syserr(err);
+	if (ret < 0)
+		return -nl2syserr(ret);
 
-	th->nl_sock_err = 1;
+	orig_cb = nl_socket_get_cb(th->nl_sock);
+	cb = nl_cb_clone(orig_cb);
+	nl_cb_put(orig_cb);
+	if (!cb)
+		return -ENOMEM;
 
+	nl_cb_set(cb, NL_CB_ACK, NL_CB_CUSTOM, ack_handler, &acked);
+	nl_cb_set(cb, NL_CB_SEQ_CHECK, NL_CB_CUSTOM, seq_check_handler, &seq);
 	if (valid_handler)
-		nl_socket_modify_cb(th->nl_sock, NL_CB_VALID, NL_CB_CUSTOM,
-				    valid_handler, valid_data);
+		nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM,
+			  valid_handler, valid_data);
 
-	while (th->nl_sock_err > 0)
-		nl_recvmsgs_default(th->nl_sock);
+	/* There is a bug in libnl. When implicit sequence number checking is in
+	 * use the expected next number is increased when NLMSG_DONE is
+	 * received. The ACK which comes after that correctly includes the
+	 * original sequence number. However libnl is checking that number
+	 * against the incremented one and therefore ack handler is never called
+	 * and nl_recvmsgs finished with an error. To resolve this, custom
+	 * sequence number checking is used here.
+	 */
 
-	err = th->nl_sock_err;
+	acked = false;
+	while (!acked) {
+		ret = nl_recvmsgs(th->nl_sock, cb);
+		if (ret)
+			return -nl2syserr(ret);
+	}
 
-	return err;
-}
-
-static int ack_handler(struct nl_msg *msg, void *arg)
-{
-	int *err = arg;
-
-	*err = 0;
-	return NL_STOP;
-}
-
-static int finish_handler(struct nl_msg *msg, void *arg)
-{
-	struct team_handle *th = arg;
-
-	th->msg_recv_started = false;
-	th->nl_sock_err = 0;
-	return NL_SKIP;
-}
-
-static int error_handler(struct sockaddr_nl *nla, struct nlmsgerr *nl_err,
-			 void *arg)
-{
-	int *err = arg;
-
-	*err = nl_err->error;
-	return NL_SKIP;
+	return 0;
 }
 
 static int cli_cache_refill(struct team_handle *th)
@@ -512,8 +526,7 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 	}
 	th->ifindex = ifindex;
 
-	nl_socket_disable_seq_check(th->nl_sock_event);
-
+	th->nl_sock_seq = time(NULL);
 	err = genl_connect(th->nl_sock);
 	if (err) {
 		err(th, "Failed to connect to netlink sock.");
@@ -564,16 +577,9 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 		return -nl2syserr(err);
 	}
 
-	nl_socket_modify_err_cb(th->nl_sock, NL_CB_CUSTOM,
-				error_handler, &th->nl_sock_err);
-	nl_socket_modify_cb(th->nl_sock, NL_CB_FINISH, NL_CB_CUSTOM,
-			    finish_handler, th);
-	nl_socket_modify_cb(th->nl_sock, NL_CB_ACK, NL_CB_CUSTOM,
-			    ack_handler, &th->nl_sock_err);
+	nl_socket_disable_seq_check(th->nl_sock_event);
 	nl_socket_modify_cb(th->nl_sock_event, NL_CB_VALID, NL_CB_CUSTOM,
 			    event_handler, th);
-	nl_socket_modify_cb(th->nl_sock_event, NL_CB_FINISH, NL_CB_CUSTOM,
-			    finish_handler, th);
 
 	nl_socket_disable_seq_check(th->nl_cli.sock_event);
 	nl_socket_modify_cb(th->nl_cli.sock_event, NL_CB_VALID,
@@ -705,16 +711,7 @@ static int get_sock_event_fd(struct team_handle *th)
 static int sock_event_handler(struct team_handle *th)
 {
 	nl_recvmsgs_default(th->nl_sock_event);
-
-	/*
-	 * Port list messages are not multipart and therefore
-	 * finish_handler() is not called. So clear recv started here
-	 * instead.
-	 *
-	 * TODO: remove this once port list messages are multipart as well.
-	 */
 	th->msg_recv_started = false;
-
 	return check_call_change_handlers(th, TEAM_PORT_CHANGE |
 					      TEAM_OPTION_CHANGE |
 					      TEAM_IFINFO_CHANGE);

@@ -36,7 +36,7 @@
 struct team_handle {
 	int			event_fd;
 	struct nl_sock *	nl_sock;
-	int			nl_sock_err;
+	unsigned int		nl_sock_seq;
 	struct nl_sock *	nl_sock_event;
 	bool			msg_recv_started;
 	int			family;

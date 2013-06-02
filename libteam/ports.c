@@ -179,10 +179,11 @@ static int get_port_list(struct team_handle *th)
 	if (!msg)
 		return -ENOMEM;
 
-	genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, th->family, 0, 0,
+	genlmsg_put(msg, NL_AUTO_PID, th->nl_sock_seq, th->family, 0, 0,
 			 TEAM_CMD_PORT_LIST_GET, 0);
 	NLA_PUT_U32(msg, TEAM_ATTR_TEAM_IFINDEX, th->ifindex);
 
+	th->msg_recv_started = false;
 	err = send_and_recv(th, msg, get_port_list_handler, th);
 	if (err)
 		return err;

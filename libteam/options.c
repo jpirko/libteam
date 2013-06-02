@@ -337,10 +337,11 @@ static int get_options(struct team_handle *th)
 	if (!msg)
 		return -ENOMEM;
 
-	genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, th->family, 0, 0,
+	genlmsg_put(msg, NL_AUTO_PID, th->nl_sock_seq, th->family, 0, 0,
 			 TEAM_CMD_OPTIONS_GET, 0);
 	NLA_PUT_U32(msg, TEAM_ATTR_TEAM_IFINDEX, th->ifindex);
 
+	th->msg_recv_started = false;
 	err = send_and_recv(th, msg, get_options_handler, th);
 	if (err)
 		return err;
@@ -720,7 +721,7 @@ static int set_option_value(struct team_handle *th, struct team_option *option,
 	if (!msg)
 		return -ENOMEM;
 
-	genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, th->family, 0, 0,
+	genlmsg_put(msg, NL_AUTO_PID, th->nl_sock_seq, th->family, 0, 0,
 		    TEAM_CMD_OPTIONS_SET, 0);
 	NLA_PUT_U32(msg, TEAM_ATTR_TEAM_IFINDEX, th->ifindex);
 	option_list = nla_nest_start(msg, TEAM_ATTR_LIST_OPTION);
