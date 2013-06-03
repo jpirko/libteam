@@ -51,7 +51,6 @@ struct team_handle {
 	} change_handler;
 	struct {
 		struct nl_sock *	sock;
-		struct nl_cache *	link_cache;
 		struct nl_sock *	sock_event;
 	} nl_cli;
 	void (*log_fn)(struct team_handle *th, int priority,

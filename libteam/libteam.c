@@ -178,11 +178,6 @@ int send_and_recv(struct team_handle *th, struct nl_msg *msg,
 	return 0;
 }
 
-static int cli_cache_refill(struct team_handle *th)
-{
-	return nl_cache_refill(th->nl_cli.sock, th->nl_cli.link_cache);
-}
-
 /**
  * SECTION: Change handlers
  * @short_description: event change handlers handling
@@ -374,13 +369,9 @@ struct team_handle *team_alloc(void)
 	err = nl_cli_connect(th->nl_cli.sock, NETLINK_ROUTE);
 	if (err)
 		goto err_cli_connect;
-	th->nl_cli.link_cache = nl_cli_link_alloc_cache(th->nl_cli.sock);
-	if (!th->nl_cli.link_cache)
-		goto err_cli_alloc_cache;
 
 	return th;
 
-err_cli_alloc_cache:
 err_cli_connect:
 	nl_socket_free(th->nl_cli.sock);
 
@@ -638,7 +629,6 @@ void team_free(struct team_handle *th)
 	ifinfo_list_free(th);
 	port_list_free(th);
 	option_list_free(th);
-	nl_cache_free(th->nl_cli.link_cache);
 	nl_socket_free(th->nl_cli.sock);
 	nl_socket_free(th->nl_cli.sock_event);
 	nl_socket_free(th->nl_sock_event);
@@ -1231,9 +1221,16 @@ int team_set_port_priority(struct team_handle *th,
 TEAM_EXPORT
 uint32_t team_ifname2ifindex(struct team_handle *th, const char *ifname)
 {
-	if (cli_cache_refill(th))
+	struct rtnl_link *link;
+	uint32_t ifindex;
+	int err;
+
+	err = rtnl_link_get_kernel(th->nl_cli.sock, 0, ifname, &link);
+	if (err)
 		return 0;
-	return rtnl_link_name2i(th->nl_cli.link_cache, ifname);
+	ifindex = rtnl_link_get_ifindex(link);
+	rtnl_link_put(link);
+	return ifindex;
 }
 
 /**
@@ -1252,9 +1249,15 @@ TEAM_EXPORT
 char *team_ifindex2ifname(struct team_handle *th, uint32_t ifindex,
 			  char *ifname, unsigned int maxlen)
 {
-	if (cli_cache_refill(th))
+	struct rtnl_link *link;
+	int err;
+
+	err = rtnl_link_get_kernel(th->nl_cli.sock, ifindex, NULL, &link);
+	if (err)
 		return NULL;
-	return rtnl_link_i2name(th->nl_cli.link_cache, ifindex, ifname, maxlen);
+	mystrlcpy(ifname, rtnl_link_get_name(link), maxlen);
+	rtnl_link_put(link);
+	return ifname;
 }
 
 /**
