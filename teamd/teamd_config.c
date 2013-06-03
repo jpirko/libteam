@@ -205,6 +205,23 @@ static int teamd_config_object_get(struct teamd_context *ctx,
 	return 0;
 }
 
+static int teamd_config_object_build_type_get(struct teamd_context *ctx,
+					      json_t **p_json_obj,
+					      json_type obj_type,
+					      const char *fmt, va_list ap)
+{
+	int err;
+
+	err = teamd_json_path_lite_build_type_va(p_json_obj, ctx->config_json,
+						 obj_type, fmt, ap);
+	if (err) {
+		if (err == -EINVAL)
+			teamd_log_err("Failed to get value from config: Wrong path format");
+		return err;
+	}
+	return 0;
+}
+
 struct teamd_config_path_cookie *
 teamd_config_path_cookie_get(struct teamd_context *ctx, const char *fmt, ...)
 {
@@ -265,6 +282,31 @@ int teamd_config_string_get(struct teamd_context *ctx, const char **p_str_val,
 	return 0;
 }
 
+int teamd_config_string_set(struct teamd_context *ctx, const char *str_val,
+			    const char *fmt, ...)
+{
+	va_list ap;
+	json_t *json_obj = json_obj;
+	int err;
+	int ret;
+
+	va_start(ap, fmt);
+	err = teamd_config_object_build_type_get(ctx, &json_obj,
+						 JSON_STRING, fmt, ap);
+	va_end(ap);
+	if (err)
+		return err;
+
+	if (!json_is_string(json_obj)) {
+		teamd_log_err("Failed to get string from non-string object");
+		return -ENOENT;
+	}
+	ret = json_string_set(json_obj, str_val);
+	if (ret == -1)
+		return -ENOMEM;
+	return 0;
+}
+
 int teamd_config_int_get(struct teamd_context *ctx, int *p_int_val,
 			 const char *fmt, ...)
 {
@@ -283,6 +325,28 @@ int teamd_config_int_get(struct teamd_context *ctx, int *p_int_val,
 		return -ENOENT;
 	}
 	*p_int_val = json_integer_value(json_obj);
+	return 0;
+}
+
+int teamd_config_int_set(struct teamd_context *ctx, int int_val,
+			 const char *fmt, ...)
+{
+	va_list ap;
+	json_t *json_obj = json_obj;
+	int err;
+
+	va_start(ap, fmt);
+	err = teamd_config_object_build_type_get(ctx, &json_obj,
+						 JSON_INTEGER, fmt, ap);
+	va_end(ap);
+	if (err)
+		return err;
+
+	if (!json_is_integer(json_obj)) {
+		teamd_log_err("Failed to get integer from non-integer object");
+		return -ENOENT;
+	}
+	json_integer_set(json_obj, int_val);
 	return 0;
 }
 
