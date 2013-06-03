@@ -32,5 +32,10 @@ int teamd_json_path_lite_build_va(json_t **p_json_obj, json_t *json_root,
 				  const char *fmt, va_list ap);
 int teamd_json_path_lite_build(json_t **p_json_obj, json_t *json_root,
 			       const char *fmt, ...);
+int teamd_json_path_lite_build_type_va(json_t **p_json_obj, json_t *json_root,
+				       json_type obj_type,
+				       const char *fmt, va_list ap);
+int teamd_json_path_lite_build_type(json_t **p_json_obj, json_t *json_root,
+				    json_type obj_type, const char *fmt, ...);
 
 #endif /* _TEAMD_JSON_H_ */

@@ -44,8 +44,11 @@ static char *__strchrs(char *str, char *chars)
 
 #define TEAMD_JSON_PATH_MAXLEN 128
 
-int __teamd_json_path_lite_va(json_t **p_json_obj, json_t *json_root,
-			      bool build, const char *fmt, va_list ap)
+typedef json_t *(*obj_constructor_t)(void);
+
+static int __teamd_json_path_lite_va(json_t **p_json_obj, json_t *json_root,
+				     obj_constructor_t obj_constructor,
+				     const char *fmt, va_list ap)
 {
 	json_t *json_obj = json_root;
 	json_t *prev_json_obj;
@@ -80,8 +83,8 @@ int __teamd_json_path_lite_va(json_t **p_json_obj, json_t *json_root,
 			}
 			prev_json_obj = json_obj;
 			json_obj = json_object_get(prev_json_obj, ptr);
-			if (!json_obj && build) {
-				json_obj = json_object();
+			if (!json_obj && obj_constructor) {
+				json_obj = obj_constructor();
 				if (!json_obj)
 					return -ENOMEM;
 				ret = json_object_set_new(prev_json_obj, ptr,
@@ -120,7 +123,7 @@ int __teamd_json_path_lite_va(json_t **p_json_obj, json_t *json_root,
 int teamd_json_path_lite_va(json_t **p_json_obj, json_t *json_root,
 			    const char *fmt, va_list ap)
 {
-	return __teamd_json_path_lite_va(p_json_obj, json_root, false, fmt, ap);
+	return __teamd_json_path_lite_va(p_json_obj, json_root, NULL, fmt, ap);
 }
 
 int teamd_json_path_lite(json_t **p_json_obj, json_t *json_root,
@@ -138,7 +141,8 @@ int teamd_json_path_lite(json_t **p_json_obj, json_t *json_root,
 int teamd_json_path_lite_build_va(json_t **p_json_obj, json_t *json_root,
 				  const char *fmt, va_list ap)
 {
-	return __teamd_json_path_lite_va(p_json_obj, json_root, true, fmt, ap);
+	return __teamd_json_path_lite_va(p_json_obj, json_root,
+					 json_object, fmt, ap);
 }
 
 int teamd_json_path_lite_build(json_t **p_json_obj, json_t *json_root,
@@ -149,6 +153,65 @@ int teamd_json_path_lite_build(json_t **p_json_obj, json_t *json_root,
 
 	va_start(ap, fmt);
 	err = teamd_json_path_lite_build_va(p_json_obj, json_root, fmt, ap);
+	va_end(ap);
+	return err;
+}
+
+static json_t *string_constructor()
+{
+	return json_string("");
+}
+
+static json_t *int_constructor()
+{
+	return json_integer(0);
+}
+
+static json_t *true_constructor()
+{
+	return json_true();
+}
+
+static json_t *false_constructor()
+{
+	return json_false();
+}
+
+int teamd_json_path_lite_build_type_va(json_t **p_json_obj, json_t *json_root,
+				       json_type obj_type,
+				       const char *fmt, va_list ap)
+{
+	obj_constructor_t obj_constructor;
+
+	switch (obj_type) {
+	case JSON_STRING:
+		obj_constructor = string_constructor;
+		break;
+	case JSON_INTEGER:
+		obj_constructor = int_constructor;
+		break;
+	case JSON_TRUE:
+		obj_constructor = true_constructor;
+		break;
+	case JSON_FALSE:
+		obj_constructor = false_constructor;
+		break;
+	default:
+		return -EINVAL;
+	}
+	return __teamd_json_path_lite_va(p_json_obj, json_root,
+					 obj_constructor, fmt, ap);
+}
+
+int teamd_json_path_lite_build_type(json_t **p_json_obj, json_t *json_root,
+				    json_type obj_type, const char *fmt, ...)
+{
+	va_list ap;
+	int err;
+
+	va_start(ap, fmt);
+	err = teamd_json_path_lite_build_type_va(p_json_obj, json_root,
+						 obj_type, fmt, ap);
 	va_end(ap);
 	return err;
 }
