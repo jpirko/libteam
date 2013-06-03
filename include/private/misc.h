@@ -22,10 +22,24 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static inline void *myzalloc(size_t size)
 {
 	return calloc(1, size);
+}
+
+static inline size_t mystrlcpy(char *dst, const char *src, size_t size)
+{
+	size_t ret = strlen(src);
+
+	if (size) {
+		size_t len = (ret >= size) ? size - 1 : ret;
+
+		memcpy(dst, src, len);
+		dst[len] = '\0';
+	}
+	return ret;
 }
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
