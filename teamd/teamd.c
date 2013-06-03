@@ -1342,13 +1342,19 @@ static int teamd_get_devname(struct teamd_context *ctx)
 
 		err = teamd_config_string_get(ctx, &team_name, "$.device");
 		if (err) {
-			teamd_log_err("Failed to get team device name.");
+			teamd_log_err("Failed to get team device name from config.");
 			return err;
 		}
 		ctx->team_devname = strdup(team_name);
 		if (!ctx->team_devname) {
 			teamd_log_err("Failed allocate memory for device name.");
 			return -ENOMEM;
+		}
+	} else {
+		err = teamd_config_string_set(ctx, ctx->team_devname, "$.device");
+		if (err) {
+			teamd_log_err("Failed to set team device name in config.");
+			return err;
 		}
 	}
 	teamd_log_dbg("Using team device \"%s\".", ctx->team_devname);
