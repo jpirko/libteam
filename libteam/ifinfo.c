@@ -36,6 +36,8 @@ struct team_ifinfo {
 	struct team_port *	port; /* NULL if device is not team port */
 	char			hwaddr[MAX_ADDR_LEN];
 	size_t			hwaddr_len;
+	char			orig_hwaddr[MAX_ADDR_LEN];
+	size_t			orig_hwaddr_len;
 	char			ifname[IFNAMSIZ];
 	uint32_t		master_ifindex;
 	int			changed;
@@ -70,14 +72,19 @@ static void update_hwaddr(struct team_ifinfo *ifinfo, struct rtnl_link *link)
 	nl_addr = rtnl_link_get_addr(link);
 	if (!nl_addr)
 		return;
+
 	hwaddr_len = nl_addr_get_len(nl_addr);
 	if (ifinfo->hwaddr_len != hwaddr_len) {
 		ifinfo->hwaddr_len = hwaddr_len;
+		if (!ifinfo->master_ifindex)
+			ifinfo->orig_hwaddr_len = hwaddr_len;
 		set_changed(ifinfo, CHANGED_HWADDR_LEN);
 	}
 	hwaddr = nl_addr_get_binary_addr(nl_addr);
 	if (memcmp(ifinfo->hwaddr, hwaddr, hwaddr_len)) {
 		memcpy(ifinfo->hwaddr, hwaddr, hwaddr_len);
+		if (!ifinfo->master_ifindex)
+			memcpy(ifinfo->orig_hwaddr, hwaddr, hwaddr_len);
 		set_changed(ifinfo, CHANGED_HWADDR);
 	}
 }
@@ -106,9 +113,9 @@ static void update_master(struct team_ifinfo *ifinfo, struct rtnl_link *link)
 
 static void ifinfo_update(struct team_ifinfo *ifinfo, struct rtnl_link *link)
 {
-	update_hwaddr(ifinfo, link);
 	update_ifname(ifinfo, link);
 	update_master(ifinfo, link);
+	update_hwaddr(ifinfo, link);
 }
 
 static struct team_ifinfo *ifinfo_find(struct team_handle *th, uint32_t ifindex)
@@ -407,6 +414,34 @@ TEAM_EXPORT
 bool team_is_ifinfo_hwaddr_len_changed(struct team_ifinfo *ifinfo)
 {
 	return is_changed(ifinfo, CHANGED_HWADDR_LEN);
+}
+
+/**
+ * team_get_ifinfo_orig_hwaddr:
+ * @ifinfo: ifinfo structure
+ *
+ * Get ifinfo original hardware address.
+ *
+ * Returns: pointer to memory place where hwaddr is.
+ **/
+TEAM_EXPORT
+char *team_get_ifinfo_orig_hwaddr(struct team_ifinfo *ifinfo)
+{
+	return ifinfo->orig_hwaddr;
+}
+
+/**
+ * team_get_ifinfo_orig_hwaddr_len:
+ * @ifinfo: ifinfo structure
+ *
+ * Get ifinfo original hardware address length.
+ *
+ * Returns: hardware address length.
+ **/
+TEAM_EXPORT
+uint8_t team_get_ifinfo_orig_hwaddr_len(struct team_ifinfo *ifinfo)
+{
+	return ifinfo->orig_hwaddr_len;
 }
 
 /**
