@@ -59,4 +59,8 @@ size_t teamd_config_arr_size(struct teamd_context *ctx, const char *fmt, ...);
 #define teamd_config_for_each_arr_index(index, ctx, args...)	\
 	for (index = 0; index < teamd_config_arr_size(ctx, ##args); index++)
 
+size_t teamd_config_arr_string_append(struct teamd_context *ctx,
+				      const char *str_val,
+				      const char *fmt, ...);
+
 #endif /* _TEAMD_CONFIG_H_ */

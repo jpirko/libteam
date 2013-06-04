@@ -395,3 +395,28 @@ size_t teamd_config_arr_size(struct teamd_context *ctx, const char *fmt, ...)
 		return 0;
 	return json_array_size(json_obj);
 }
+
+size_t teamd_config_arr_string_append(struct teamd_context *ctx,
+				      const char *str_val,
+				      const char *fmt, ...)
+{
+	va_list ap;
+	json_t *json_arr = json_arr;
+	json_t *json_str;
+	int err;
+	int ret;
+
+	va_start(ap, fmt);
+	err = teamd_config_object_build_type_get(ctx, &json_arr,
+						 JSON_ARRAY, fmt, ap);
+	va_end(ap);
+	if (err)
+		return err;
+	json_str = json_string(str_val);
+	if (!json_str)
+		return -ENOMEM;
+	ret = json_array_append_new(json_arr, json_str);
+	if (ret == -1)
+		return -ENOMEM;
+	return 0;
+}

@@ -180,6 +180,11 @@ static json_t *false_constructor()
 	return json_false();
 }
 
+static json_t *array_constructor()
+{
+	return json_array();
+}
+
 int teamd_json_path_lite_build_type_va(json_t **p_json_obj, json_t *json_root,
 				       json_type obj_type,
 				       const char *fmt, va_list ap)
@@ -199,6 +204,9 @@ int teamd_json_path_lite_build_type_va(json_t **p_json_obj, json_t *json_root,
 		break;
 	case JSON_FALSE:
 		obj_constructor = false_constructor;
+		break;
+	case JSON_ARRAY:
+		obj_constructor = array_constructor;
 		break;
 	default:
 		return -EINVAL;
