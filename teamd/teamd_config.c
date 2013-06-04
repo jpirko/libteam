@@ -26,7 +26,7 @@
 #include "teamd_config.h"
 #include "teamd_json.h"
 
-#define TEAMD_IMPLICIT_CONFIG "{\"device\": \"team0\", \"runner\": {\"name\": \"roundrobin\"}}"
+#define TEAMD_IMPLICIT_CONFIG "{\"device\": \"team0\"}"
 
 int teamd_config_load(struct teamd_context *ctx)
 {

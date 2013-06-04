@@ -72,6 +72,8 @@ static const struct teamd_runner *teamd_find_runner(const char *runner_name)
 	return NULL;
 }
 
+#define TEAMD_DEFAULT_RUNNER_NAME "roundrobin"
+
 static void libteam_log_daemon(struct team_handle *th, int priority,
 			       const char *file, int line, const char *fn,
 			       const char *format, va_list args)
@@ -898,10 +900,17 @@ static int teamd_runner_init(struct teamd_context *ctx)
 
 	err = teamd_config_string_get(ctx, &runner_name, "$.runner.name");
 	if (err) {
-		teamd_log_err("Failed to get team runner name from config.");
-		return err;
+		teamd_log_dbg("Failed to get team runner name from config.");
+		runner_name = TEAMD_DEFAULT_RUNNER_NAME;
+		err = teamd_config_string_set(ctx, runner_name, "$.runner.name");
+		if (err) {
+			teamd_log_err("Failed to set default team runner name in config.");
+			return err;
+		}
+		teamd_log_dbg("Using default team runner \"%s\".", runner_name);
+	} else {
+		teamd_log_dbg("Using team runner \"%s\".", runner_name);
 	}
-	teamd_log_dbg("Using team runner \"%s\".", runner_name);
 	ctx->runner = teamd_find_runner(runner_name);
 	if (!ctx->runner) {
 		teamd_log_err("No runner named \"%s\" available.", runner_name);
