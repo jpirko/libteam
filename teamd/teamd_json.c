@@ -73,7 +73,7 @@ static int __teamd_json_path_lite_va(json_t **p_json_obj, json_t *json_root,
 
 	while (ptr - path < pathlen) {
 		if (*ptr == '.') {
-			char tmp;
+			char tmp = tmp;
 
 			ptr++;
 			end = __strchrs(ptr, ".[");
@@ -84,7 +84,10 @@ static int __teamd_json_path_lite_va(json_t **p_json_obj, json_t *json_root,
 			prev_json_obj = json_obj;
 			json_obj = json_object_get(prev_json_obj, ptr);
 			if (!json_obj && obj_constructor) {
-				json_obj = obj_constructor();
+				/* In case new object is not supposed to be
+				 * leaf, use json_object() as a constructor.
+				 */
+				json_obj = end ? json_object() : obj_constructor();
 				if (!json_obj)
 					return -ENOMEM;
 				ret = json_object_set_new(prev_json_obj, ptr,
