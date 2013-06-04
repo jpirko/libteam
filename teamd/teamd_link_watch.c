@@ -1531,6 +1531,8 @@ static int link_watch_load_config(struct teamd_context *ctx,
 	return 0;
 }
 
+#define TEAMD_DEFAULT_LINK_WATCH_NAME "ethtool"
+
 static int link_watch_event_watch_port_added(struct teamd_context *ctx,
 					     struct teamd_port *tdport,
 					     void *priv)
@@ -1550,15 +1552,29 @@ static int link_watch_event_watch_port_added(struct teamd_context *ctx,
 
 	cpcookie = teamd_config_path_cookie_get(ctx, "$.link_watch");
 	if (cpcookie) {
-		teamd_log_dbg("Got link watch from global config.");
+		teamd_log_dbg("%s: Got link watch from global config.",
+			      tdport->ifname);
 		err = link_watch_load_config(ctx, tdport, cpcookie);
 		if (err)
 			return err;
 	}
 
 	if (!teamd_get_first_port_priv_by_creator(tdport,
-						  LW_PORT_PRIV_CREATOR_PRIV))
-		teamd_log_info("%s: Using no link watch.", tdport->ifname);
+						  LW_PORT_PRIV_CREATOR_PRIV)) {
+		/* In case no link watch was found for this port, edit config
+		 * by adding implicit one and call this function recursively.
+		 */
+		err = teamd_config_string_set(ctx, TEAMD_DEFAULT_LINK_WATCH_NAME,
+					      "$.ports.%s.link_watch.name",
+					      tdport->ifname);
+		if (err) {
+			teamd_log_err("%s: Failed to set implicit link watch name in config.",
+				      tdport->ifname);
+			return err;
+		}
+		teamd_log_dbg("%s: Using implicit link watch.", tdport->ifname);
+		return link_watch_event_watch_port_added(ctx, tdport, priv);
+	}
 	return 0;
 }
 
