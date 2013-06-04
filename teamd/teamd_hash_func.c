@@ -188,14 +188,35 @@ static void teamd_hash_func_fini(struct sock_fprog *fprog)
 	teamd_bpf_desc_compile_release(fprog);
 }
 
+static const char *teamd_hash_default_frags[] = {
+	"eth", "ipv4", "ipv6",
+};
+
+static int teamd_hash_func_add_default_frags(struct teamd_context *ctx)
+{
+	int i;
+	int err;
+
+	for (i = 0; i < ARRAY_SIZE(teamd_hash_default_frags); i++) {
+		err = teamd_config_arr_string_append(ctx,
+						     teamd_hash_default_frags[i],
+						     "$.runner.tx_hash");
+		if (err)
+			return err;
+	}
+	return 0;
+}
+
 int teamd_hash_func_set(struct teamd_context *ctx)
 {
 	struct sock_fprog fprog;
 	int err;
 
 	if (!teamd_config_path_exists(ctx, "$.runner.tx_hash")) {
-		teamd_log_warn("No Tx hash recipe found in config.");
-		return 0;
+		teamd_log_dbg("No Tx hash recipe found in config.");
+		err = teamd_hash_func_add_default_frags(ctx);
+		if (err)
+			return err;
 	}
 	err = teamd_hash_func_init(ctx, &fprog);
 	if (err) {
