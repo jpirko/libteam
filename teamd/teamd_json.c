@@ -185,6 +185,7 @@ int teamd_json_path_lite_build_type_va(json_t **p_json_obj, json_t *json_root,
 				       const char *fmt, va_list ap)
 {
 	obj_constructor_t obj_constructor;
+	int err;
 
 	switch (obj_type) {
 	case JSON_STRING:
@@ -202,8 +203,13 @@ int teamd_json_path_lite_build_type_va(json_t **p_json_obj, json_t *json_root,
 	default:
 		return -EINVAL;
 	}
-	return __teamd_json_path_lite_va(p_json_obj, json_root,
-					 obj_constructor, fmt, ap);
+	err = __teamd_json_path_lite_va(p_json_obj, json_root,
+					obj_constructor, fmt, ap);
+	if (err)
+		return err;
+	if (json_typeof(*p_json_obj) != obj_type)
+		return -EINVAL;
+	return 0;
 }
 
 int teamd_json_path_lite_build_type(json_t **p_json_obj, json_t *json_root,

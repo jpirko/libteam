@@ -295,11 +295,6 @@ int teamd_config_string_set(struct teamd_context *ctx, const char *str_val,
 	va_end(ap);
 	if (err)
 		return err;
-
-	if (!json_is_string(json_obj)) {
-		teamd_log_err("Failed to get string from non-string object");
-		return -ENOENT;
-	}
 	ret = json_string_set(json_obj, str_val);
 	if (ret == -1)
 		return -ENOMEM;
@@ -340,11 +335,6 @@ int teamd_config_int_set(struct teamd_context *ctx, int int_val,
 	va_end(ap);
 	if (err)
 		return err;
-
-	if (!json_is_integer(json_obj)) {
-		teamd_log_err("Failed to get integer from non-integer object");
-		return -ENOENT;
-	}
 	json_integer_set(json_obj, int_val);
 	return 0;
 }
