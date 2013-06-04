@@ -22,7 +22,13 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <inttypes.h>
+#include <sys/ioctl.h>
+#include <linux/if.h>
 
 static inline void *myzalloc(size_t size)
 {
@@ -69,6 +75,30 @@ static inline char *a_hwaddr_str(char *hwaddr, size_t len)
 		return NULL;
 	hwaddr_str(str, hwaddr, len);
 	return str;
+}
+
+static inline int ifname2ifindex(uint32_t *p_ifindex, char *ifname)
+{
+	int sock;
+	struct ifreq ifr;
+	int ret;
+
+	sock = socket(PF_PACKET, SOCK_DGRAM, 0);
+	if (sock == -1)
+		return -errno;
+	memset(&ifr, 0, sizeof(ifr));
+	strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
+	ret = ioctl(sock, SIOCGIFINDEX, &ifr);
+	close(sock);
+	if (ret == -1) {
+		if (errno == ENODEV)
+			*p_ifindex = 0;
+		else
+			return -errno;
+	} else {
+		*p_ifindex = ifr.ifr_ifindex;
+	}
+	return 0;
 }
 
 #endif /* _T_MISC_H_ */

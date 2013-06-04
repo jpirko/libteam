@@ -73,6 +73,7 @@ static const struct teamd_runner *teamd_find_runner(const char *runner_name)
 }
 
 #define TEAMD_DEFAULT_RUNNER_NAME "roundrobin"
+#define TEAMD_DEFAULT_DEVNAME_PREFIX "team"
 
 static void libteam_log_daemon(struct team_handle *th, int priority,
 			       const char *file, int line, const char *fn,
@@ -1342,7 +1343,32 @@ pid_file_remove:
 	return err;
 }
 
-static int teamd_get_devname(struct teamd_context *ctx)
+static int teamd_generate_devname(struct teamd_context *ctx)
+{
+	char buf[IFNAMSIZ];
+	int i = 0;
+	uint32_t ifindex = ifindex;
+	int ret;
+	int err;
+
+	do {
+		ret = snprintf(buf, sizeof(buf),
+			       TEAMD_DEFAULT_DEVNAME_PREFIX "%d", i++);
+		if (ret >= sizeof(buf))
+			return -EINVAL;
+		err = ifname2ifindex(&ifindex, buf);
+		if (err)
+			return err;
+	} while (ifindex);
+	teamd_log_dbg("Generated team device name \"%s\".", buf);
+
+	ctx->team_devname = strdup(buf);
+	if (!ctx->team_devname)
+		return -ENOMEM;
+	return 0;
+}
+
+static int teamd_get_devname(struct teamd_context *ctx, bool generate_enabled)
 {
 	int err;
 
@@ -1350,22 +1376,34 @@ static int teamd_get_devname(struct teamd_context *ctx)
 		const char *team_name;
 
 		err = teamd_config_string_get(ctx, &team_name, "$.device");
-		if (err) {
-			teamd_log_err("Failed to get team device name from config.");
-			return err;
-		}
-		ctx->team_devname = strdup(team_name);
-		if (!ctx->team_devname) {
-			teamd_log_err("Failed allocate memory for device name.");
-			return -ENOMEM;
-		}
-	} else {
-		err = teamd_config_string_set(ctx, ctx->team_devname, "$.device");
-		if (err) {
-			teamd_log_err("Failed to set team device name in config.");
-			return err;
+		if (!err) {
+			ctx->team_devname = strdup(team_name);
+			if (!ctx->team_devname) {
+				teamd_log_err("Failed allocate memory for device name.");
+				return -ENOMEM;
+			}
+			goto skip_set;
+		} else {
+			teamd_log_dbg("Failed to get team device name from config.");
+			if (generate_enabled) {
+				err = teamd_generate_devname(ctx);
+				if (err) {
+					teamd_log_err("Failed to generate team device name.");
+					return err;
+				}
+			} else {
+				teamd_log_err("Team device name not specified.");
+				return -EINVAL;
+			}
 		}
 	}
+	err = teamd_config_string_set(ctx, ctx->team_devname, "$.device");
+	if (err) {
+		teamd_log_err("Failed to set team device name in config.");
+		return err;
+	}
+
+skip_set:
 	teamd_log_dbg("Using team device \"%s\".", ctx->team_devname);
 
 	err = asprintf(&ctx->ident, "%s_%s", ctx->argv0, ctx->team_devname);
@@ -1464,7 +1502,7 @@ int main(int argc, char **argv)
 		teamd_log_err("Failed to load config.");
 		goto context_fini;
 	}
-	err = teamd_get_devname(ctx);
+	err = teamd_get_devname(ctx, ctx->cmd == DAEMON_CMD_RUN);
 	if (err)
 		goto config_free;
 

@@ -26,7 +26,7 @@
 #include "teamd_config.h"
 #include "teamd_json.h"
 
-#define TEAMD_IMPLICIT_CONFIG "{\"device\": \"team0\"}"
+#define TEAMD_IMPLICIT_CONFIG "{}"
 
 int teamd_config_load(struct teamd_context *ctx)
 {
@@ -37,7 +37,6 @@ int teamd_config_load(struct teamd_context *ctx)
 		ctx->config_text = strdup(TEAMD_IMPLICIT_CONFIG);
 		if (!ctx->config_text)
 			return -ENOMEM;
-		teamd_log_warn("No config passed, using implicit one.");
 	}
 	if (ctx->config_text) {
 		if (ctx->config_file)
