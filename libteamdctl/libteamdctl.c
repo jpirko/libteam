@@ -26,6 +26,8 @@
 #include <errno.h>
 #include <private/misc.h>
 #include <teamdctl.h>
+
+#include "config.h"
 #include "teamdctl_private.h"
 
 /**

@@ -4,6 +4,7 @@
 AC_INIT([libteam], [1.2], [jpirko@redhat.com])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
+AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE([-Wall foreign subdir-objects])
 #m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES(yes)], [])
 AM_PROG_AR

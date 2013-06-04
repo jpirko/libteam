@@ -24,6 +24,8 @@
 #include <syslog.h>
 #include <teamdctl.h>
 
+#include "config.h"
+
 #define TEAMDCTL_EXPORT __attribute__ ((visibility("default")))
 
 /**

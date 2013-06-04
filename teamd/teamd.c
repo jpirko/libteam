@@ -42,6 +42,7 @@
 #include <private/misc.h>
 #include <team.h>
 
+#include "config.h"
 #include "teamd.h"
 #include "teamd_workq.h"
 #include "teamd_config.h"

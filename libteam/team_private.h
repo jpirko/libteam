@@ -26,6 +26,8 @@
 #include <team.h>
 #include <private/list.h>
 
+#include "config.h"
+
 #define TEAM_EXPORT __attribute__ ((visibility("default")))
 
 /**

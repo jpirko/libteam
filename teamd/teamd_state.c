@@ -27,6 +27,7 @@
 #include <team.h>
 #include <private/misc.h>
 
+#include "config.h"
 #include "teamd.h"
 #include "teamd_state.h"
 #include "teamd_json.h"

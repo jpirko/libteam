@@ -27,6 +27,8 @@
 #include <private/misc.h>
 #include <teamdctl.h>
 
+#include "config.h"
+
 enum verbosity_level {
 	VERB1,
 	VERB2,

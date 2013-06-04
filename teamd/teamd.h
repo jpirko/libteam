@@ -33,11 +33,14 @@
 #include <jansson.h>
 #include <linux/filter.h>
 #include <linux/if_packet.h>
+#include <team.h>
+#include <private/list.h>
+
+#include "config.h"
+
 #ifdef ENABLE_DBUS
 #include <dbus/dbus.h>
 #endif
-#include <team.h>
-#include <private/list.h>
 
 #define teamd_log_err(args...) daemon_log(LOG_ERR, ##args)
 #define teamd_log_warn(args...) daemon_log(LOG_WARNING, ##args)
