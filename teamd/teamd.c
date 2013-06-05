@@ -94,7 +94,7 @@ static void print_help(const struct teamd_context *ctx) {
             "    -d --daemonize           Daemonize after startup\n"
             "    -k --kill                Kill running daemon instance\n"
             "    -e --check               Return 0 if a daemon is already running\n"
-            "    -V --version             Show version\n"
+            "    -v --version             Show version\n"
             "    -f --config-file=FILE    Load the specified configuration file\n"
             "    -c --config=TEXT         Use given config string (This causes configuration\n"
 	    "                             file will be ignored)\n"
