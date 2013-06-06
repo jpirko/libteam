@@ -861,6 +861,21 @@ static int check_command_params(struct command_type *command_type,
 	return 0;
 }
 
+static int check_team_devname(char *team_devname)
+{
+	int err;
+	uint32_t ifindex = ifindex;
+
+	err = ifname2ifindex(&ifindex, team_devname);
+	if (err)
+		return err;
+	if (!ifindex) {
+		pr_err("Device \"%s\" does not exist\n", team_devname);
+		return -ENODEV;
+	}
+	return 0;
+}
+
 static int call_command(struct teamdctl *tdc, int argc, char **argv,
 			struct command_type *command_type)
 {
@@ -980,6 +995,11 @@ int main(int argc, char **argv)
 		print_help(argv0);
 		return EXIT_FAILURE;
 	}
+
+	err = check_team_devname(team_devname);
+	if (err)
+		return EXIT_FAILURE;
+
 	tdc = teamdctl_alloc();
 	if (!tdc) {
 		pr_err("teamdctl_alloc failed\n");
