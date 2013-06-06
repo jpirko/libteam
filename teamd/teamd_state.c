@@ -245,7 +245,7 @@ static int teamd_state_val_dump(struct teamd_context *ctx,
 			free((void *) gsc.data.str_val.ptr);
 		break;
 	case TEAMD_STATE_ITEM_TYPE_BOOL:
-		val_json_obj = json_boolean(gsc.data.bool_val);
+		val_json_obj = gsc.data.bool_val ? json_true() : json_false();
 		break;
 	case TEAMD_STATE_ITEM_TYPE_NODE:
 		TEAMD_BUG();
