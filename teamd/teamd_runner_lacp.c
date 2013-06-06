@@ -1006,8 +1006,16 @@ static int lacp_port_link_update(struct lacp_port *lacp_port)
 	uint8_t duplex = team_get_port_duplex(team_port);
 	int err;
 
-	if (duplex != lacp_port->__link_last.duplex) {
-		if (duplex)
+	if (linkup != lacp_port->__link_last.up ||
+	    duplex != lacp_port->__link_last.duplex) {
+		/* If duplex is 0, meaning half-duplex, it should be set
+		 * to disabled state. However some drivers, like virtio_net
+		 * does not report speed and duplex. In that case, kernel
+		 * will provide speed == 0 and duplex == 0. If that is the
+		 * case now, do not set disabled state and allow such devices
+		 * to work properly.
+		 */
+		if (linkup && (!duplex == !speed))
 			err = lacp_port_set_state(lacp_port, PORT_STATE_EXPIRED);
 		else
 			err = lacp_port_set_state(lacp_port, PORT_STATE_DISABLED);
