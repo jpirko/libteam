@@ -579,8 +579,8 @@ void teamd_loop_callback_del(struct teamd_context *ctx, const char *cb_name,
 			close(lcb->fd);
 		teamd_log_dbg("Removed loop callback: %s, %p",
 			      lcb->name, lcb->priv);
-		free(lcb);
 		free(lcb->name);
+		free(lcb);
 		found = true;
 	}
 	if (found)
