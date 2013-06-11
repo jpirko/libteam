@@ -282,20 +282,24 @@ static int teamd_run_loop_do_callbacks(struct list_item *lcb_list, fd_set *fds,
 
 	list_for_each_node_entry_safe(lcb, tmp, lcb_list, list) {
 		for (i = 0; i < 3; i++) {
-			if (lcb->fd_event& (1 << i)) {
-				events = 0;
-				if (FD_ISSET(lcb->fd, &fds[i]))
-					events |= (1 << i);
-				if (events) {
-					if (lcb->is_period) {
-						err = handle_period_fd(lcb->fd);
-						if (err)
-							return err;
-					}
-					err = lcb->func(ctx, events, lcb->priv);
-					if (err)
-						return err;
-				}
+			if (!(lcb->fd_event & (1 << i)))
+				continue;
+			events = 0;
+			if (FD_ISSET(lcb->fd, &fds[i]))
+				events |= (1 << i);
+			if (!events)
+				continue;
+			if (lcb->is_period) {
+				err = handle_period_fd(lcb->fd);
+				if (err)
+					return err;
+			}
+			err = lcb->func(ctx, events, lcb->priv);
+			if (err) {
+				teamd_log_warn("Loop callback failed with: %s",
+					       strerror(-err));
+				teamd_log_dbg("Failed loop callback: %s, %p",
+					      lcb->name, lcb->priv);
 			}
 		}
 	}
@@ -475,6 +479,7 @@ int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 	lcb->fd = fd;
 	lcb->fd_event = fd_event & TEAMD_LOOP_FD_EVENT_MASK;
 	list_add(&ctx->run_loop.callback_list, &lcb->list);
+	teamd_log_dbg("Added loop callback: %s, %p", lcb->name, lcb->priv);
 	return 0;
 
 lcb_free:
@@ -572,6 +577,8 @@ void teamd_loop_callback_del(struct teamd_context *ctx, const char *cb_name,
 		list_del(&lcb->list);
 		if (lcb->is_period)
 			close(lcb->fd);
+		teamd_log_dbg("Removed loop callback: %s, %p",
+			      lcb->name, lcb->priv);
 		free(lcb);
 		free(lcb->name);
 		found = true;
