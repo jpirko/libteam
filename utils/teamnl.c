@@ -119,12 +119,15 @@ static int run_cmd_getoption(char *cmd_name, struct team_handle *th,
 	do {
 		bufsiz += BUFSIZSTEP;
 		buf = realloc(buf, bufsiz);
-		if (!buf)
+		if (!buf) {
+			free(buf);
 			return -ENOMEM;
+		}
 		trunc = team_option_value_str(option, buf, bufsiz);
 	} while(trunc);
 
 	printf("%s\n", buf);
+	free(buf);
 	return 0;
 }
 
