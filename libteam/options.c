@@ -437,6 +437,8 @@ struct team_option *team_get_option(struct team_handle *th,
 	}
 	va_end(ap);
 
+	if (!opt_id.name)
+		return NULL;
 	return find_option(th, &opt_id, must_exist);
 }
 
