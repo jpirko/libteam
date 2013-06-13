@@ -771,9 +771,11 @@ static int teamd_set_hwaddr(struct teamd_context *ctx)
 	if (hwaddr_len != ctx->hwaddr_len) {
 		teamd_log_err("Passed hardware address has different length (%d) than team device has (%d).",
 			      hwaddr_len, ctx->hwaddr_len);
-		return -EINVAL;
+		err = -EINVAL;
+		goto free_hwaddr;
 	}
 	err = team_hwaddr_set(ctx->th, ctx->ifindex, hwaddr, hwaddr_len);
+free_hwaddr:
 	free(hwaddr);
 	return err;
 }
