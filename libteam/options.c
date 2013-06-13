@@ -51,10 +51,12 @@ struct team_option {
 	int			data_len;
 	bool			changed;
 	bool			changed_locally;
+	bool			temporary;
 };
 
-static void free_option(struct team_option *option)
+static void destroy_option(struct team_option *option)
 {
+	list_del(&option->list);
 	free(option->id.name);
 	free(option->data);
 	free(option);
@@ -64,18 +66,19 @@ static void flush_option_list(struct team_handle *th)
 {
 	struct team_option *option, *tmp;
 
-	list_for_each_node_entry_safe(option, tmp, &th->option_list, list) {
-		list_del(&option->list);
-		free_option(option);
-	}
+	list_for_each_node_entry_safe(option, tmp, &th->option_list, list)
+		destroy_option(option);
 }
 
 static void option_list_cleanup_last_state(struct team_handle *th)
 {
-	struct team_option *option;
+	struct team_option *option, *tmp;
 
-	list_for_each_node_entry(option, &th->option_list, list)
+	list_for_each_node_entry_safe(option, tmp, &th->option_list, list) {
 		option->changed = false;
+		if (option->temporary)
+			destroy_option(option);
+	}
 }
 
 static struct team_option *do_find_option(struct team_handle *th,
@@ -120,7 +123,7 @@ static int get_option_data_size_by_type(int opt_type, const void *data,
 	}
 }
 
-static int create_option(struct team_option **poption,
+static int create_option(struct team_handle *th, struct team_option **poption,
 			 struct team_option_id *opt_id)
 {
 	struct team_option *option;
@@ -139,6 +142,8 @@ static int create_option(struct team_option **poption,
 	option->id.port_ifindex_used = opt_id->port_ifindex_used;
 	option->id.array_index = opt_id->array_index;
 	option->id.array_index_used = opt_id->array_index_used;
+
+	list_add(&th->option_list, &option->list);
 
 	*poption = option;
 	return 0;
@@ -191,7 +196,7 @@ static int update_option(struct team_handle *th, struct team_option **poption,
 
 	option = do_find_option(th, opt_id);
 	if (!option) {
-		err = create_option(&option, opt_id);
+		err = create_option(th, &option, opt_id);
 		if (err)
 			return err;
 		option_created = true;
@@ -200,11 +205,9 @@ static int update_option(struct team_handle *th, struct team_option **poption,
 			       changed, changed_locally);
 	if (err) {
 		if (option_created)
-			free_option(option);
+			destroy_option(option);
 		return err;
 	}
-	if (option_created)
-		list_add(&th->option_list, &option->list);
 	*poption = option;
 	return 0;
 }
@@ -318,10 +321,8 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 			err(th, "Failed to update option: %s", strerror(-err));
 			continue;
 		}
-		if (option_attrs[TEAM_ATTR_OPTION_REMOVED]) {
-			list_del(&option->list);
-			free_option(option);
-		}
+		if (option_attrs[TEAM_ATTR_OPTION_REMOVED])
+			destroy_option(option);
 	}
 
 	set_call_change_handlers(th, TEAM_OPTION_CHANGE);
@@ -393,9 +394,10 @@ static struct team_option *find_option(struct team_handle *th,
 	 * In case option does not exist, create new uninitialized one
 	 * which can be used for option tracking.
 	 */
-	err = create_option(&option, opt_id);
+	err = create_option(th, &option, opt_id);
 	if (err)
 		return NULL;
+	option->temporary = true;
 	return option;
 }
 
@@ -682,6 +684,8 @@ static int local_set_option_value(struct team_handle *th,
 
 	err = update_option(th, &option, opt_id, opt_type,
 			    data, data_len, true, true);
+	if (option->temporary)
+		destroy_option(option);
 	if (err)
 		return err;
 	return 0;
