@@ -89,6 +89,7 @@ static int dbus_op_get_args(void *ops_priv, const char *fmt, ...)
 	DBusMessageIter iter;
 	int arg_type;
 	char **pstr;
+	int err = 0;
 
 	dbus_message_iter_init(message, &iter);
 	va_start(ap, fmt);
@@ -96,25 +97,29 @@ static int dbus_op_get_args(void *ops_priv, const char *fmt, ...)
 		arg_type = dbus_message_iter_get_arg_type(&iter);
 		if (arg_type == DBUS_TYPE_INVALID) {
 			teamd_log_err("Insufficient number of arguments in message.");
-			return -EINVAL;
+			err = -EINVAL;
+			goto out;
 		}
 		switch (*fmt++) {
 		case 's': /* string */
 			if (arg_type != DBUS_TYPE_STRING) {
 				teamd_log_err("Unexpected argument type found in message.");
-				return -EINVAL;
+				err = -EINVAL;
+				goto out;
 			}
 			pstr = va_arg(ap, char **);
 			dbus_message_iter_get_basic(&iter, pstr);
 			break;
 		default:
 			teamd_log_err("Unknown argument type requested");
-			return -EINVAL;
+			err = -EINVAL;
+			goto out;
 		}
 		dbus_message_iter_next(&iter);
 	}
+out:
 	va_end(ap);
-	return 0;
+	return err;
 }
 
 static int dbus_op_reply_err(void *ops_priv, const char *err_code,
