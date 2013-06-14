@@ -95,7 +95,7 @@ static void update_ifname(struct team_ifinfo *ifinfo, struct rtnl_link *link)
 
 	ifname = rtnl_link_get_name(link);
 	if (ifname && strcmp(ifinfo->ifname, ifname)) {
-		strcpy(ifinfo->ifname, ifname);
+		mystrlcpy(ifinfo->ifname, ifname, sizeof(ifinfo->ifname));
 		set_changed(ifinfo, CHANGED_IFNAME);
 	}
 }
