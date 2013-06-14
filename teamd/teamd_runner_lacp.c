@@ -1667,8 +1667,8 @@ static int lacp_port_aggregator_select_work(struct teamd_context *ctx,
 
 	info = get_container(workq, struct lacp_port_selected_set_info, workq);
 	lacp = info->lacp;
-	free(info);
 	tdport = teamd_get_port(ctx, info->ifindex);
+	free(info);
 	if (!tdport)
 		/* Port disapeared in between, ignore */
 		return 0;
