@@ -84,8 +84,9 @@ static void flush_port_list(struct team_handle *th)
 static void port_list_cleanup_last_state(struct team_handle *th)
 {
 	struct team_port *port;
+	struct team_port *tmp;
 
-	list_for_each_node_entry(port, &th->port_list, list) {
+	list_for_each_node_entry_safe(port, tmp, &th->port_list, list) {
 		port->changed = false;
 		if (port->removed)
 			port_destroy(th, port);
