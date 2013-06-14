@@ -413,7 +413,7 @@ static void get_lacp_port_prio_info(struct lacp_port *lacp_port,
 			     lacp_port->partner.system, ETH_ALEN);
 	if (prio_diff < 0 || (prio_diff == 0 && system_diff < 0))
 		*prio_info = lacp_port->actor;
-	if (prio_diff > 0 || (prio_diff == 0 && system_diff > 0))
+	if (prio_diff > 0 || (prio_diff == 0 && system_diff >= 0))
 		*prio_info = lacp_port->partner;
 
 	/* adjust values for further memcmp comparison */
