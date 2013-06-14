@@ -449,6 +449,13 @@ static struct teamd_loop_callback *get_lcb_multi(struct teamd_context *ctx,
 	for (lcb = get_lcb_multi(ctx, cb_name, priv, NULL); lcb;	\
 	     lcb = get_lcb_multi(ctx, cb_name, priv, lcb))
 
+#define for_each_lcb_multi_match_safe(lcb, tmp, ctx, cb_name, priv)	\
+	for (lcb = get_lcb_multi(ctx, cb_name, priv, NULL),		\
+	     tmp = get_lcb_multi(ctx, cb_name, priv, lcb);		\
+	     lcb;							\
+	     lcb = tmp,							\
+	     tmp = get_lcb_multi(ctx, cb_name, priv, lcb))
+
 int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 			       const char *cb_name, void *priv,
 			       teamd_loop_callback_func_t func,
@@ -571,9 +578,10 @@ void teamd_loop_callback_del(struct teamd_context *ctx, const char *cb_name,
 			     void *priv)
 {
 	struct teamd_loop_callback *lcb;
+	struct teamd_loop_callback *tmp;
 	bool found = false;
 
-	for_each_lcb_multi_match(lcb, ctx, cb_name, priv) {
+	for_each_lcb_multi_match_safe(lcb, tmp, ctx, cb_name, priv) {
 		list_del(&lcb->list);
 		if (lcb->is_period)
 			close(lcb->fd);
