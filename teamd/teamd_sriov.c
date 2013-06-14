@@ -47,6 +47,7 @@ static int teamd_sriov_physfn_addr(struct pcie_addr *addr, const char *ifname)
 	free(path);
 	if (ret == -1)
 		return -errno;
+	link[ret] = '\0';
 
 	start = strrchr(link, '/');
 	if (!start)
