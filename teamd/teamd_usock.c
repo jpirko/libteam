@@ -52,6 +52,7 @@ static int usock_op_get_args(void *ops_priv, const char *fmt, ...)
 	char **pstr;
 	char *str;
 	char *rest = usock_ops_priv->rcv_msg_args;
+	int err = 0;
 
 	va_start(ap, fmt);
 	while (*fmt) {
@@ -61,17 +62,20 @@ static int usock_op_get_args(void *ops_priv, const char *fmt, ...)
 			str = teamd_usock_msg_getline(&rest);
 			if (!str) {
 				teamd_log_err("Insufficient number of arguments in message.");
-				return -EINVAL;
+				err = -EINVAL;
+				goto out;
 			}
 			*pstr = str;
 			break;
 		default:
 			teamd_log_err("Unknown argument type requested");
-			return -EINVAL;
+			err = -EINVAL;
+			goto out;
 		}
 	}
+out:
 	va_end(ap);
-	return 0;
+	return err;
 }
 
 static void usock_send(struct usock_ops_priv *usock_ops_priv,
