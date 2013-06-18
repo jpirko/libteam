@@ -23,15 +23,17 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-struct teamd_bpf_pattern {
-	size_t		offset;
-	uint8_t		type; /* BPF_B / BPF_H / BPF_W */
-	uint32_t	value;
-};
-
-struct teamd_bpf_hash_field {
-	size_t		offset; /* offset of element in header */
-	uint8_t		type; /* BPF_B / BPF_H / BPF_W */
+enum hashing_protos {
+	PROTO_ETH,
+	PROTO_VLAN,
+	PROTO_IP,
+	PROTO_IPV4,
+	PROTO_IPV6,
+	PROTO_L3,
+	PROTO_TCP,
+	PROTO_UDP,
+	PROTO_SCTP,
+	PROTO_L4,
 };
 
 /*
@@ -41,16 +43,14 @@ struct teamd_bpf_hash_field {
  */
 struct teamd_bpf_desc_frag {
 	char *					name;
-	const struct teamd_bpf_pattern *	pattern;
-	unsigned int				pattern_count;
-	const struct teamd_bpf_hash_field *	hash_field;
-	unsigned int				hash_field_count;
+	enum hashing_protos			hproto;
 };
 
 void teamd_bpf_desc_compile_start(struct sock_fprog *fprog);
 void teamd_bpf_desc_compile_release(struct sock_fprog *fprog);
+int teamd_bpf_desc_compile(struct sock_fprog *fprog);
 int teamd_bpf_desc_compile_finish(struct sock_fprog *fprog);
-int teamd_bpf_desc_compile_frag(struct sock_fprog *fprog,
-				const struct teamd_bpf_desc_frag *frag);
+int teamd_bpf_desc_add_frag(struct sock_fprog *fprog,
+			    const struct teamd_bpf_desc_frag *frag);
 
 #endif /* _TEAMD_BPF_CHEF_H_ */

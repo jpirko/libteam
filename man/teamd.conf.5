@@ -103,11 +103,32 @@ List of fragment types (strings) which should be used for packet Tx hash computa
 .BR "eth "\(em
 Uses source and destination MAC addresses.
 .PP
+.BR "vlan "\(em
+Uses VLAN id.
+.PP
 .BR "ipv4 "\(em
 Uses source and destination IPv4 addresses.
 .PP
 .BR "ipv6 "\(em
 Uses source and destination IPv6 addresses.
+.PP
+.BR "ip "\(em
+Uses source and destination IPv4 and IPv6 addresses.
+.PP
+.BR "l3 "\(em
+Uses source and destination IPv4 and IPv6 addresses.
+.PP
+.BR "tcp "\(em
+Uses source and destination TCP ports.
+.PP
+.BR "udp "\(em
+Uses source and destination UDP ports.
+.PP
+.BR "sctp "\(em
+Uses source and destination SCTP ports.
+.PP
+.BR "l4 "\(em
+Uses source and destination TCP and UDP and SCTP ports.
 .RE
 .TP
 .BR "runner.tx_balancer.name " (string)
