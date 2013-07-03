@@ -141,6 +141,7 @@ int send_and_recv(struct team_handle *th, struct nl_msg *msg,
 	struct nl_cb *orig_cb;
 	bool acked;
 	unsigned int seq = th->nl_sock_seq++;
+	int err;
 
 	ret = nl_send_auto(th->nl_sock, msg);
 	nlmsg_free(msg);
@@ -171,11 +172,16 @@ int send_and_recv(struct team_handle *th, struct nl_msg *msg,
 	acked = false;
 	while (!acked) {
 		ret = nl_recvmsgs(th->nl_sock, cb);
-		if (ret)
-			return -nl2syserr(ret);
+		if (ret) {
+			err = -nl2syserr(ret);
+			goto put_cb;
+		}
 	}
 
-	return 0;
+	err = 0;
+put_cb:
+	nl_cb_put(cb);
+	return err;
 }
 
 /**
