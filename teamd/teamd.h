@@ -42,6 +42,10 @@
 #include <dbus/dbus.h>
 #endif
 
+#ifdef ENABLE_ZMQ
+#include <zmq.h>
+#endif
+
 #define teamd_log_err(args...) daemon_log(LOG_ERR, ##args)
 #define teamd_log_warn(args...) daemon_log(LOG_WARNING, ##args)
 #define teamd_log_info(args...) daemon_log(LOG_INFO, ##args)
@@ -126,6 +130,14 @@ struct teamd_context {
 		bool			enabled;
 		DBusConnection *	con;
 	} dbus;
+#endif
+#ifdef ENABLE_ZMQ
+	struct {
+		bool			enabled;
+		void *			context;
+		void *			sock;
+		char *			addr;
+	} zmq;
 #endif
 	struct {
 		bool			enabled;

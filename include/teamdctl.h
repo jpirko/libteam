@@ -43,7 +43,7 @@ void teamdctl_set_log_fn(struct teamdctl *tdc,
 int teamdctl_get_log_priority(struct teamdctl *tdc);
 void teamdctl_set_log_priority(struct teamdctl *tdc, int priority);
 int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
-		     const char *cli_type);
+		     const char* addr, const char *cli_type);
 void teamdctl_disconnect(struct teamdctl *tdc);
 int teamdctl_refresh(struct teamdctl *tdc);
 int teamdctl_port_add(struct teamdctl *tdc, const char *port_devname);

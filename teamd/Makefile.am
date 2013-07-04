@@ -8,13 +8,13 @@ AM_CPPFLAGS='-DLOCALSTATEDIR="$(localstatedir)"'
 
 teamd_CFLAGS= $(LIBDAEMON_CFLAGS) $(JANSSON_CFLAGS) $(DBUS_CFLAGS) -I${top_srcdir}/include -D_GNU_SOURCE
 
-teamd_LDADD = $(top_builddir)/libteam/libteam.la $(LIBDAEMON_LIBS) $(JANSSON_LIBS) $(DBUS_LIBS)
+teamd_LDADD = $(top_builddir)/libteam/libteam.la $(LIBDAEMON_LIBS) $(JANSSON_LIBS) $(DBUS_LIBS) $(ZMQ_LIBS)
 
 bin_PROGRAMS=teamd
 teamd_SOURCES=teamd.c teamd_common.c teamd_json.c teamd_config.c teamd_state.c \
 	      teamd_workq.c teamd_events.c teamd_per_port.c \
 	      teamd_option_watch.c teamd_ifinfo_watch.c teamd_link_watch.c \
-	      teamd_ctl.c teamd_dbus.c teamd_usock.c teamd_sriov.c \
+	      teamd_ctl.c teamd_dbus.c teamd_zmq.c teamd_usock.c teamd_sriov.c \
 	      teamd_bpf_chef.c teamd_hash_func.c teamd_balancer.c \
 	      teamd_runner_basic_ones.c teamd_runner_activebackup.c \
 	      teamd_runner_loadbalance.c teamd_runner_lacp.c
