@@ -572,6 +572,13 @@ static int ab_init(struct teamd_context *ctx, void *priv)
 	struct ab *ab = priv;
 	int err;
 
+	if (!teamd_config_path_exists(ctx, "$.notify_peers.count")) {
+		err = teamd_config_int_set(ctx, 1, "$.notify_peers.count");
+		if (err) {
+			teamd_log_err("Failed to set notify_peers count config value.");
+			return err;
+		}
+	}
 	err = ab_load_config(ctx, ab);
 	if (err) {
 		teamd_log_err("Failed to load config values.");

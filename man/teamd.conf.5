@@ -1,4 +1,4 @@
-.TH TEAMD.CONF 5 "2013-04-01" "libteam" "Team daemon configuration"
+.TH TEAMD.CONF 5 "2013-07-04" "libteam" "Team daemon configuration"
 .SH NAME
 teamd.conf \(em libteam daemon configuration file
 .SH DESCRIPTION
@@ -37,7 +37,11 @@ Number of bursts of unsolicited NAs and gratuitous ARPs sent after port is enabl
 .RS 7
 .PP
 Default:
-.BR "0" (disabled)
+.BR "0"
+(disabled)
+.PP
+Default for activebackup runner:
+.BR "1"
 .RE
 .TP
 .BR "notify_peers.interval " (int)
