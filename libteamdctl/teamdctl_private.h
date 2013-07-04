@@ -40,6 +40,7 @@ struct teamdctl {
 		       const char *file, int line, const char *fn,
 		       const char *format, va_list args);
 	int log_priority;
+	char *addr;
 	const struct teamdctl_cli *cli;
 	void *cli_priv;
 	struct {
@@ -97,6 +98,7 @@ struct teamdctl_cli {
 
 const struct teamdctl_cli *teamdctl_cli_usock_get(void);
 const struct teamdctl_cli *teamdctl_cli_dbus_get(void);
+const struct teamdctl_cli *teamdctl_cli_zmq_get(void);
 
 #define TEAMDCTL_REPLY_TIMEOUT 5000 /* ms */
 
