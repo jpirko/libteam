@@ -609,7 +609,7 @@ static int setup_state_dbus_enabled_get(struct teamd_context *ctx,
 					struct team_state_gsc *gsc,
 					void *priv)
 {
-#ifdef ENABLED_DBUS
+#ifdef ENABLE_DBUS
 	gsc->data.bool_val = ctx->dbus.enabled;
 #else
 	gsc->data.bool_val = false;
