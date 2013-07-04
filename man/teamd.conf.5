@@ -32,6 +32,22 @@ To do passive load balancing, runner only sets up BPF hash function which will d
 Implements 802.3ad LACP protocol. Can use same Tx port selection possibilities as loadbalance runner.
 .RE
 .TP
+.BR "notify_peers.count " (int)
+Number of bursts of unsolicited NAs and gratuitous ARPs sent after port is enabled/disabled.
+.RS 7
+.PP
+Default:
+.BR "0" (disabled)
+.RE
+.TP
+.BR "notify_peers.interval " (int)
+Value is positive number in milliseconds. Specifies an interval between notify peers bursts.
+.RS 7
+.PP
+Default:
+.BR "0"
+.RE
+.TP
 .BR "link_watch.name "| " ports.PORTIFNAME.link_watch.name " (string)
 Name of link watcher to be used. There are the following link watchers available:
 .RS 7

@@ -974,6 +974,52 @@ static void teamd_runner_fini(struct teamd_context *ctx)
 	ctx->runner = NULL;
 }
 
+static int teamd_post_runner_init(struct teamd_context *ctx)
+{
+	int err;
+	int tmp;
+
+	err = teamd_config_int_get(ctx, &tmp, "$.notify_peers.count");
+	if (!err) {
+		uint32_t count;
+
+		if (tmp < 0) {
+			teamd_log_err("\"count\" must not be negative number.");
+			return -EINVAL;
+		}
+		count = tmp;
+		err = team_set_notify_peers_count(ctx->th, count);
+		if (err) {
+			if (err == -ENOENT) {
+				teamd_log_warn("Failed to set \"notify_peers_count\". Kernel probably does not support this option yet.");
+			} else {
+				teamd_log_err("Failed to set \"notify_peers_count\".");
+				return err;
+			}
+		}
+	}
+	err = teamd_config_int_get(ctx, &tmp, "$.notify_peers.interval");
+	if (!err) {
+		uint32_t interval;
+
+		if (tmp < 0) {
+			teamd_log_err("\"interval\" must not be negative number.");
+			return -EINVAL;
+		}
+		interval = tmp;
+		err = team_set_notify_peers_interval(ctx->th, interval);
+		if (err) {
+			if (err == -ENOENT) {
+				teamd_log_warn("Failed to set \"notify_peers_interval\". Kernel probably does not support this option yet.");
+			} else {
+				teamd_log_err("Failed to set \"notify_peers_interval\".");
+				return err;
+			}
+		}
+	}
+	return 0;
+}
+
 static void debug_log_port_list(struct teamd_context *ctx)
 {
 	struct team_port *port;
@@ -1163,6 +1209,12 @@ static int teamd_init(struct teamd_context *ctx)
 	if (err) {
 		teamd_log_err("Failed to init runner.");
 		goto link_watch_fini;
+	}
+
+	err = teamd_post_runner_init(ctx);
+	if (err) {
+		teamd_log_err("Failed to do post-runner initializations.");
+		goto runner_fini;
 	}
 
 	err = teamd_state_basics_init(ctx);
