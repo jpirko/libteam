@@ -579,6 +579,13 @@ static int ab_init(struct teamd_context *ctx, void *priv)
 			return err;
 		}
 	}
+	if (!teamd_config_path_exists(ctx, "$.mcast_rejoin.count")) {
+		err = teamd_config_int_set(ctx, 1, "$.mcast_rejoin.count");
+		if (err) {
+			teamd_log_err("Failed to set mcast_rejoin count config value.");
+			return err;
+		}
+	}
 	err = ab_load_config(ctx, ab);
 	if (err) {
 		teamd_log_err("Failed to load config values.");
