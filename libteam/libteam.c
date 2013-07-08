@@ -995,7 +995,7 @@ int team_set_notify_peers_count(struct team_handle *th, uint32_t count)
  * @th: libteam library context
  * @interval: where the interval will be stored
  *
- * Get interval (in milliseconds)  in which bursts of NAs and ARPs notifications
+ * Get interval (in milliseconds) in which bursts of NAs and ARPs notifications
  * are sent to peers.
  *
  * Returns: zero on success or negative number in case of an error.
@@ -1028,6 +1028,88 @@ int team_set_notify_peers_interval(struct team_handle *th, uint32_t interval)
 	struct team_option *option;
 
 	option = team_get_option(th, "n!", "notify_peers_interval");
+	if (!option)
+		return -ENOENT;
+	return team_set_option_value_u32(th, option, interval);
+}
+
+/**
+ * team_get_mcast_rejoin_count:
+ * @th: libteam library context
+ * @count: where the count will be stored
+ *
+ * Get number of bursts of multicast group rejoins to be sent.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_get_mcast_rejoin_count(struct team_handle *th, uint32_t *count)
+{
+	struct team_option *option;
+
+	option = team_get_option(th, "n", "mcast_rejoin_count");
+	if (!option)
+		return -ENOENT;
+	*count = team_get_option_value_u32(option);
+	return 0;
+}
+
+/**
+ * team_set_mcast_rejoin_count:
+ * @th: libteam library context
+ * @count: number of bursts
+ *
+ * Set number of bursts of multicast group rejoins to be sent.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_set_mcast_rejoin_count(struct team_handle *th, uint32_t count)
+{
+	struct team_option *option;
+
+	option = team_get_option(th, "n!", "mcast_rejoin_count");
+	if (!option)
+		return -ENOENT;
+	return team_set_option_value_u32(th, option, count);
+}
+
+/**
+ * team_get_mcast_rejoin_interval:
+ * @th: libteam library context
+ * @interval: where the interval will be stored
+ *
+ * Get interval (in milliseconds) in which bursts of rejoins are sent.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_get_mcast_rejoin_interval(struct team_handle *th, uint32_t *interval)
+{
+	struct team_option *option;
+
+	option = team_get_option(th, "n", "mcast_rejoin_interval");
+	if (!option)
+		return -ENOENT;
+	*interval = team_get_option_value_u32(option);
+	return 0;
+}
+
+/**
+ * team_set_mcast_rejoin_interval:
+ * @th: libteam library context
+ * @interval: interval of bursts
+ *
+ * Set interval (in milliseconds) in which bursts of rejoins are sent.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_set_mcast_rejoin_interval(struct team_handle *th, uint32_t interval)
+{
+	struct team_option *option;
+
+	option = team_get_option(th, "n!", "mcast_rejoin_interval");
 	if (!option)
 		return -ENOENT;
 	return team_set_option_value_u32(th, option, interval);
