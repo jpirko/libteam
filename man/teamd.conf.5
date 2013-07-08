@@ -52,6 +52,23 @@ Default:
 .BR "0"
 .RE
 .TP
+.BR "mcast_rejoin.count " (int)
+Number of bursts of multicast group rejoins sent after port is enabled/disabled.
+.RS 7
+.PP
+Default:
+.BR "0"
+(disabled)
+.RE
+.TP
+.BR "mcast_rejoin.interval " (int)
+Value is positive number in milliseconds. Specifies an interval between multicast group rejoin bursts.
+.RS 7
+.PP
+Default:
+.BR "0"
+.RE
+.TP
 .BR "link_watch.name "| " ports.PORTIFNAME.link_watch.name " (string)
 Name of link watcher to be used. There are the following link watchers available:
 .RS 7

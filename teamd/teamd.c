@@ -1017,6 +1017,44 @@ static int teamd_post_runner_init(struct teamd_context *ctx)
 			}
 		}
 	}
+	err = teamd_config_int_get(ctx, &tmp, "$.mcast_rejoin.count");
+	if (!err) {
+		uint32_t count;
+
+		if (tmp < 0) {
+			teamd_log_err("\"count\" must not be negative number.");
+			return -EINVAL;
+		}
+		count = tmp;
+		err = team_set_mcast_rejoin_count(ctx->th, count);
+		if (err) {
+			if (err == -ENOENT) {
+				teamd_log_warn("Failed to set \"mcast_rejoin_count\". Kernel probably does not support this option yet.");
+			} else {
+				teamd_log_err("Failed to set \"mcast_rejoin_count\".");
+				return err;
+			}
+		}
+	}
+	err = teamd_config_int_get(ctx, &tmp, "$.mcast_rejoin.interval");
+	if (!err) {
+		uint32_t interval;
+
+		if (tmp < 0) {
+			teamd_log_err("\"interval\" must not be negative number.");
+			return -EINVAL;
+		}
+		interval = tmp;
+		err = team_set_mcast_rejoin_interval(ctx->th, interval);
+		if (err) {
+			if (err == -ENOENT) {
+				teamd_log_warn("Failed to set \"mcast_rejoin_interval\". Kernel probably does not support this option yet.");
+			} else {
+				teamd_log_err("Failed to set \"mcast_rejoin_interval\".");
+				return err;
+			}
+		}
+	}
 	return 0;
 }
 
