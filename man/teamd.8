@@ -1,4 +1,4 @@
-.TH TEAMD 8 "2013-05-24" "libteam" "Team daemon"
+.TH TEAMD 8 "2013-07-10" "libteam" "Team daemon"
 .SH NAME
 teamd \(em team network device control daemon
 .SH SYNOPSIS
@@ -67,6 +67,9 @@ Turns on debugging messages. Repeating the option increases verbosity.
 .TP
 .B "\-r, \-\-force-recreate"
 Force team device recreation in case it already exists.
+.TP
+.B "\-o, \-\-take-over"
+Take over the device if it already exists. This option also ensures that the team device is not removed after teamd finishes.
 .TP
 .BI "\-t " devicename ", \-\-team-dev " devicename
 Use the specified team device name (overrides "device" key in the configuration).

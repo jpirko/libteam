@@ -102,6 +102,7 @@ static void print_help(const struct teamd_context *ctx) {
             "    -g --debug               Increase verbosity\n"
             "    -r --force-recreate      Force team device recreation in case it\n"
             "                             already exists\n"
+            "    -o --take-over           Take over the device if it already exists\n"
             "    -t --team-dev=DEVNAME    Use the specified team device\n"
             "    -n --no-ports            Start without ports\n"
             "    -D --dbus-enable         Enable D-Bus interface\n"
@@ -131,6 +132,7 @@ static int parse_command_line(struct teamd_context *ctx,
 		{ "pid-file",		required_argument,	NULL, 'p' },
 		{ "debug",		no_argument,		NULL, 'g' },
 		{ "force-recreate",	no_argument,		NULL, 'r' },
+		{ "take-over",		no_argument,		NULL, 'o' },
 		{ "team-dev",		required_argument,	NULL, 't' },
 		{ "no-ports",		no_argument,		NULL, 'n' },
 		{ "dbus-enable",	no_argument,		NULL, 'D' },
@@ -139,7 +141,7 @@ static int parse_command_line(struct teamd_context *ctx,
 		{ NULL, 0, NULL, 0 }
 	};
 
-	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:grt:nDUu",
+	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:grot:nDUu",
 				  long_options, NULL)) >= 0) {
 
 		switch(opt) {
@@ -180,6 +182,9 @@ static int parse_command_line(struct teamd_context *ctx,
 			break;
 		case 'r':
 			ctx->force_recreate = true;
+			break;
+		case 'o':
+			ctx->take_over = true;
 			break;
 		case 't':
 			free(ctx->team_devname);
@@ -937,11 +942,21 @@ static int teamd_runner_init(struct teamd_context *ctx)
 	}
 
 	if (ctx->runner->team_mode_name) {
-		err = team_set_mode_name(ctx->th, ctx->runner->team_mode_name);
+		char *cur_mode;
+		const char *new_mode = ctx->runner->team_mode_name;
+
+		err = team_get_mode_name(ctx->th, &cur_mode);
 		if (err) {
-			teamd_log_err("Failed to set team mode \"%s\".",
-				      ctx->runner->team_mode_name);
+			teamd_log_err("Failed to det team mode.");
 			return err;
+		}
+		if (strcmp(cur_mode, new_mode)) {
+			err = team_set_mode_name(ctx->th, new_mode);
+			if (err) {
+				teamd_log_err("Failed to set team mode \"%s\".",
+					      new_mode);
+				return err;
+			}
 		}
 	} else {
 		teamd_log_warn("Note \"%s\" runner does not select team mode resulting in no functionality!",
@@ -1151,6 +1166,10 @@ static int teamd_init(struct teamd_context *ctx)
 
 	team_set_log_fn(ctx->th, libteam_log_daemon);
 
+	ctx->ifindex = team_ifname2ifindex(ctx->th, ctx->team_devname);
+	if (ctx->ifindex && ctx->take_over)
+		goto skip_create;
+
 	if (ctx->force_recreate)
 		err = team_recreate(ctx->th, ctx->team_devname);
 	else
@@ -1166,6 +1185,7 @@ static int teamd_init(struct teamd_context *ctx)
 		err = -ENODEV;
 		goto team_destroy;
 	}
+skip_create:
 
 	err = team_init(ctx->th, ctx->ifindex);
 	if (err) {
@@ -1328,7 +1348,8 @@ workq_fini:
 run_loop_fini:
 	teamd_run_loop_fini(ctx);
 team_destroy:
-	team_destroy(ctx->th);
+	if (!ctx->take_over)
+		team_destroy(ctx->th);
 team_free:
 	team_free(ctx->th);
 	return err;
@@ -1350,7 +1371,8 @@ static void teamd_fini(struct teamd_context *ctx)
 	teamd_unregister_default_handlers(ctx);
 	teamd_workq_fini(ctx);
 	teamd_run_loop_fini(ctx);
-	team_destroy(ctx->th);
+	if (!ctx->take_over)
+		team_destroy(ctx->th);
 	team_free(ctx->th);
 }
 
