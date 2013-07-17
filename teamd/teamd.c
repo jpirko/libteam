@@ -49,6 +49,7 @@
 #include "teamd_state.h"
 #include "teamd_usock.h"
 #include "teamd_dbus.h"
+#include "teamd_zmq.h"
 #include "teamd_sriov.h"
 
 static const struct teamd_runner *teamd_runner_list[] = {
@@ -97,7 +98,7 @@ static void print_help(const struct teamd_context *ctx) {
             "    -v --version             Show version\n"
             "    -f --config-file=FILE    Load the specified configuration file\n"
             "    -c --config=TEXT         Use given config string (This causes configuration\n"
-	    "                             file will be ignored)\n"
+            "                             file will be ignored)\n"
             "    -p --pid-file=FILE       Use the specified PID file\n"
             "    -g --debug               Increase verbosity\n"
             "    -r --force-recreate      Force team device recreation in case it\n"
@@ -106,6 +107,7 @@ static void print_help(const struct teamd_context *ctx) {
             "    -t --team-dev=DEVNAME    Use the specified team device\n"
             "    -n --no-ports            Start without ports\n"
             "    -D --dbus-enable         Enable D-Bus interface\n"
+            "    -Z --zmq-enable=ADDRESS  Enable ZeroMQ interface\n"
             "    -U --usock-enable        Enable UNIX domain socket interface\n"
             "    -u --usock-disable       Disable UNIX domain socket interface\n",
             ctx->argv0);
@@ -136,12 +138,13 @@ static int parse_command_line(struct teamd_context *ctx,
 		{ "team-dev",		required_argument,	NULL, 't' },
 		{ "no-ports",		no_argument,		NULL, 'n' },
 		{ "dbus-enable",	no_argument,		NULL, 'D' },
+		{ "zmq-enable",		required_argument,	NULL, 'Z' },
 		{ "usock-enable",	no_argument,		NULL, 'U' },
 		{ "usock-disable",	no_argument,		NULL, 'u' },
 		{ NULL, 0, NULL, 0 }
 	};
 
-	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:grot:nDUu",
+	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:grot:nDZ:Uu",
 				  long_options, NULL)) >= 0) {
 
 		switch(opt) {
@@ -199,6 +202,15 @@ static int parse_command_line(struct teamd_context *ctx,
 			return -1;
 #else
 			ctx->dbus.enabled = true;
+#endif
+			break;
+		case 'Z':
+#ifndef ENABLE_ZMQ
+			fprintf(stderr, "ZeroMQ support is not compiled-in\n");
+			return -1;
+#else
+			ctx->zmq.enabled = true;
+			ctx->zmq.addr = optarg;
 #endif
 			break;
 		case 'U':
@@ -1299,10 +1311,16 @@ skip_create:
 		goto usock_fini;
 	}
 
+	err = teamd_zmq_init(ctx);
+	if (err) {
+		teamd_log_err("Failed to init zmq.");
+		goto dbus_fini;
+	}
+
 	err = teamd_add_ports(ctx);
 	if (err) {
 		teamd_log_err("Failed to add ports.");
-		goto dbus_fini;
+		goto zmq_fini;
 	}
 
 	/*
@@ -1312,11 +1330,12 @@ skip_create:
 	err = teamd_dbus_expose_name(ctx);
 	if (err) {
 		teamd_log_err("Failed to expose dbus name.");
-		goto dbus_fini;
+		goto zmq_fini;
 	}
 
 	return 0;
-
+zmq_fini:
+	teamd_zmq_fini(ctx);
 dbus_fini:
 	teamd_dbus_fini(ctx);
 usock_fini:
@@ -1357,6 +1376,7 @@ team_free:
 
 static void teamd_fini(struct teamd_context *ctx)
 {
+	teamd_zmq_fini(ctx);
 	teamd_dbus_fini(ctx);
 	teamd_usock_fini(ctx);
 	teamd_sriov_fini(ctx);

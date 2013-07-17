@@ -76,6 +76,18 @@ AC_ARG_ENABLE([dbus],
 	fi
 fi
 
+have_zmq=no
+AC_ARG_ENABLE([zmq],
+	AS_HELP_STRING([--disable-zmq], [disable ZeroMQ API @<:@default=enabled@:>@]))
+	if test "x$enable_zmq" != "xno"; then
+		PKG_CHECK_MODULES([ZMQ], [libzmq >= 3.2.0],
+				  [AC_DEFINE(ENABLE_ZMQ, [1], [ZMQ API.]) have_zmq=yes],
+				  have_zmq=no)
+	if test "x$have_zmq$enable_zmq" = xnoyes; then
+		AC_MSG_ERROR([*** ZeroMQ support requested but libraries not found])
+	fi
+fi
+
 AC_CONFIG_FILES([Makefile
 include/Makefile \
 libteam/Makefile \

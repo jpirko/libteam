@@ -226,7 +226,7 @@ static void cli_fini(struct teamdctl *tdc)
  **/
 TEAMDCTL_EXPORT
 int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
-		     const char *cli_type)
+		     const char *addr, const char *cli_type)
 {
 	int err;
 	int i;
@@ -234,6 +234,9 @@ int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
 		teamdctl_cli_usock_get(),
 #ifdef ENABLE_DBUS
 		teamdctl_cli_dbus_get(),
+#endif
+#ifdef ENABLE_ZMQ
+		teamdctl_cli_zmq_get(),
 #endif
 	};
 #define TEAMDCTL_CLI_LIST_SIZE ARRAY_SIZE(teamdctl_cli_list)
@@ -257,6 +260,8 @@ int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
 		 */
 		if (!cli_type && orig_log_prio < LOG_DEBUG)
 			teamdctl_set_log_priority(tdc, LOG_EMERG);
+
+		tdc->addr = (char *) addr;
 
 		err = cli_init(tdc, team_name);
 

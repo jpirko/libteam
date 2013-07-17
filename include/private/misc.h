@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <stdarg.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <inttypes.h>

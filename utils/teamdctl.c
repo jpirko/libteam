@@ -148,17 +148,19 @@ static int stateview_json_setup_process(char **prunner_name, json_t *dump_json)
 	char *runner_name;
 	char *kernel_team_mode_name;
 	int dbus_enabled;
+	int zmq_enabled;
 	int debug_level;
 	int daemonized;
 	int pid;
 	char *pid_file;
 
 	pr_out("setup:\n");
-	err = json_unpack(dump_json, "{s:{s:s, s:s, s:b, s:i, s:b, s:i, s:s}}",
+	err = json_unpack(dump_json, "{s:{s:s, s:s, s:b, s:b, s:i, s:b, s:i, s:s}}",
 			  "setup",
 			  "runner_name", &runner_name,
 			  "kernel_team_mode_name", &kernel_team_mode_name,
 			  "dbus_enabled", &dbus_enabled,
+			  "zmq_enabled", &zmq_enabled,
 			  "debug_level", &debug_level,
 			  "daemonized", &daemonized,
 			  "pid", &pid,
@@ -171,6 +173,7 @@ static int stateview_json_setup_process(char **prunner_name, json_t *dump_json)
 	pr_out("runner: %s\n", runner_name);
 	pr_out2("kernel team mode: %s\n", kernel_team_mode_name);
 	pr_out2("D-BUS enabled: %s\n", boolyesno(dbus_enabled));
+	pr_out2("ZeroMQ enabled: %s\n", boolyesno(zmq_enabled));
 	pr_out2("debug level: %d\n", debug_level);
 	pr_out2("daemonized: %s\n", boolyesno(daemonized));
 	pr_out2("PID: %d\n", pid);
@@ -291,6 +294,7 @@ static int stateview_json_port_link_watches_list_process(json_t *port_link_watch
 	}
 	return 0;
 }
+
 static int stateview_json_port_link_watches_process(json_t *port_link_watches_json)
 {
 	int err;
@@ -775,6 +779,7 @@ static struct command_type command_types[] = {
 		.params = {"PORTDEV"},
 	},
 };
+
 #define COMMAND_TYPE_COUNT ARRAY_SIZE(command_types)
 
 static bool __cmd_executable(struct command_type *command_type)
@@ -876,6 +881,31 @@ static int check_team_devname(char *team_devname)
 	return 0;
 }
 
+static int check_teamd_team_devname(struct teamdctl *tdc,
+				    const char *team_devname)
+{
+	int ret = 0;
+	json_t* root;
+	json_error_t error;
+	json_t* j_device_name;
+	const char* teamd_device_name;
+
+	root = json_loads(teamdctl_config_get_raw(tdc), 0, &error);
+	j_device_name = json_object_get(root, "device");
+
+	teamd_device_name = json_string_value(j_device_name);
+
+	if (strcmp(team_devname, teamd_device_name) != 0) {
+		pr_err("Unable to access to %s through connected teamd daemon because daemon controls %s.\n",
+		       team_devname, teamd_device_name);
+		ret = -1;
+	}
+
+	json_decref(j_device_name);
+	json_decref(root);
+	return ret;
+}
+
 static int call_command(struct teamdctl *tdc, int argc, char **argv,
 			struct command_type *command_type)
 {
@@ -900,8 +930,9 @@ static void print_help(const char *argv0) {
 	       "    -v --verbose             Increase output verbosity\n"
 	       "    -o --oneline             Force output to one line if possible\n"
 	       "    -D --force-dbus          Force to use D-Bus interface\n"
+	       "    -Z --force-zmq=ADDRESS   Force to use ZeroMQ interface [-Z[Address]]\n"
 	       "    -U --force-usock         Force to use UNIX domain socket interface\n",
-            argv0);
+	       argv0);
 	pr_out("Commands:\n");
 	for (i = 0; i < COMMAND_TYPE_COUNT; i++) {
 		command_type = &command_types[i];
@@ -924,6 +955,7 @@ int main(int argc, char **argv)
 		{ "verbose",		no_argument,		NULL, 'v' },
 		{ "oneline",		no_argument,		NULL, 'o' },
 		{ "force-dbus",		no_argument,		NULL, 'D' },
+		{ "force-zmq",		required_argument,	NULL, 'Z' },
 		{ "force-usock",	no_argument,		NULL, 'U' },
 		{ NULL, 0, NULL, 0 }
 	};
@@ -932,10 +964,12 @@ int main(int argc, char **argv)
 	struct command_type *command_type;
 	struct teamdctl *tdc;
 	int ret;
+	char *addr = NULL;
 	bool force_dbus = false;
+	bool force_zmq = false;
 	bool force_usock = false;
 
-	while ((opt = getopt_long(argc, argv, "hvoDU",
+	while ((opt = getopt_long(argc, argv, "hvoDZ:U",
 				  long_options, NULL)) >= 0) {
 
 		switch(opt) {
@@ -956,6 +990,15 @@ int main(int argc, char **argv)
 			force_dbus = true;
 #endif
 			break;
+		case 'Z':
+#ifndef ENABLE_ZMQ
+			fprintf(stderr, "ZeroMQ support is not compiled-in\n");
+			return EXIT_FAILURE;
+#else
+			force_zmq = true;
+			addr = optarg;
+#endif
+			break;
 		case 'U':
 			force_usock = true;
 			break;
@@ -970,8 +1013,10 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (force_usock && force_dbus) {
-		pr_err("Either UNIX domain socket interface or D-Bus interface can be forced at a time.\n");
+	if ((force_usock && force_dbus) ||
+	    (force_usock && force_zmq) ||
+	    (force_dbus && force_zmq)) {
+		pr_err("Only one interface could be forced at a time (UNIX domain socket, D-Bus, ZMQ).\n");
 		print_help(argv0);
 		return EXIT_FAILURE;
 	}
@@ -1005,13 +1050,21 @@ int main(int argc, char **argv)
 		pr_err("teamdctl_alloc failed\n");
 		return EXIT_FAILURE;
 	}
-	err = teamdctl_connect(tdc, team_devname,
-			       force_usock ? "usock" : (force_dbus ? "dbus" : NULL));
+
+	err = teamdctl_connect(tdc, team_devname, addr,
+			       (force_usock ? "usock" : (force_dbus ?
+			        "dbus": (force_zmq ? "zmq" :NULL))));
 	if (err) {
 		pr_err("teamdctl_connect failed (%s)\n", strerror(-err));
 		ret = EXIT_FAILURE;
 		goto teamdctl_free;
 	}
+
+	if (check_teamd_team_devname(tdc, team_devname)) {
+		ret = EXIT_FAILURE;
+		goto teamdctl_disconnect;
+	}
+
 	err = call_command(tdc, argc, argv, command_type);
 	if (err) {
 		pr_err("command call failed (%s)\n", strerror(-err));

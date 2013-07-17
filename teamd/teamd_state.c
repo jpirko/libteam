@@ -617,6 +617,18 @@ static int setup_state_dbus_enabled_get(struct teamd_context *ctx,
 	return 0;
 }
 
+static int setup_state_zmq_enabled_get(struct teamd_context *ctx,
+					struct team_state_gsc *gsc,
+					void *priv)
+{
+#ifdef ENABLE_ZMQ
+	gsc->data.bool_val = ctx->zmq.enabled;
+#else
+	gsc->data.bool_val = false;
+#endif
+	return 0;
+}
+
 static int setup_state_debug_level_get(struct teamd_context *ctx,
 				       struct team_state_gsc *gsc,
 				       void *priv)
@@ -664,6 +676,11 @@ static const struct teamd_state_val setup_state_vals[] = {
 		.subpath = "dbus_enabled",
 		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
 		.getter = setup_state_dbus_enabled_get,
+	},
+	{
+		.subpath = "zmq_enabled",
+		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
+		.getter = setup_state_zmq_enabled_get,
 	},
 	{
 		.subpath = "debug_level",
