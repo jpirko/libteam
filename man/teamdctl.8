@@ -26,6 +26,9 @@ Force output to one line if possible.
 .B "\-D, \-\-force-dbus"
 Force to use D-Bus interface.
 .TP
+.BI "\-Z " address ", \-\-force-zmq " address
+Force to use ZMQ interface. Possible address formats are "tcp://ip:port", "ipc://path" and others. Detailed description of ZMQ library is in page http://zguide.zeromq.org/page:all.
+.TP
 .B "\-U, \-\-force-usock"
 Force to use UNIX domain socket interface. This is the default behavior.
 .SH COMMAND

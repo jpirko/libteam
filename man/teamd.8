@@ -19,12 +19,16 @@ teamd \(em team network device control daemon
 .RB [ \-p
 .IR pid_file ]
 .RB [ \-gdrD ]
+.RB [ \-Z
+.IR address ]
 .br
 .B teamd
 .BI \-f " config_file"
 .RB [ \-p
 .IR pid_file ]
 .RB [ \-gdrD ]
+.RB [ \-Z
+.IR address ]
 .br
 .B teamd
 .BR  \-h | \-V
@@ -79,6 +83,9 @@ Start without ports, even if they are listed in the configuration.
 .TP
 .B "\-D, \-\-dbus-enable"
 Enable D-Bus interface.
+.TP
+.BI "\-Z " address ", \-\-zmq-enable " address
+Enable ZMQ interface. Possible address formats are "tcp://ip:port", "ipc://path" and others. Detailed description of ZMQ library is in page http://zguide.zeromq.org/page:all.
 .TP
 .B "\-U, \-\-usock-enable"
 Enable UNIX domain socket interface. This is enabled by default.
