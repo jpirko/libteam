@@ -46,16 +46,16 @@ static int cli_dbus_check_error_msg(struct teamdctl *tdc, DBusMessage *msg)
 	err_msg = dbus_message_get_error_name(msg);
 	if (!err_msg)
 		return 0;
-	err(tdc, "Error message received: \"%s\"", err_msg);
+	err(tdc, "dbus: Error message received: \"%s\"", err_msg);
 
 	dbres = dbus_message_iter_init(msg, &args);
 	if (dbres == TRUE) {
 		if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
-			err(tdc, "Received argument is not string as expected.");
+			err(tdc, "dbus: Received argument is not string as expected.");
 			return -EINVAL;
 		}
 		dbus_message_iter_get_basic(&args, &param);
-		err(tdc, "Error message content: \"%s\"", param);
+		err(tdc, "dbus: Error message content: \"%s\"", param);
 	}
 	return -EINVAL;
 }
@@ -74,7 +74,7 @@ static int cli_dbus_get_reply_str(struct teamdctl *tdc, char **p_reply,
 	}
 
 	if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_STRING) {
-		err(tdc, "Received argument is not string as expected.");
+		err(tdc, "dbus: Received argument is not string as expected.");
 		return -EINVAL;
 	}
 	dbus_message_iter_get_basic(&args, &param);
@@ -95,12 +95,12 @@ static int cli_dbus_method_call(struct teamdctl *tdc, const char *method_name,
 	char *reply;
 	int err;
 
-	dbg(tdc, "Calling method \"%s\"", method_name);
+	dbg(tdc, "dbus: Calling method \"%s\"", method_name);
 	msg = dbus_message_new_method_call(cli_dbus->service_name,
 					   TEAMD_DBUS_PATH, TEAMD_DBUS_IFACE,
 					   method_name);
 	if (!msg) {
-		err(tdc, "Failed to create message.");
+		err(tdc, "dbus: Failed to create message.");
 		return -ENOMEM;
 	}
 	dbus_message_iter_init_append(msg, &iter);
@@ -112,13 +112,13 @@ static int cli_dbus_method_call(struct teamdctl *tdc, const char *method_name,
 							       DBUS_TYPE_STRING,
 							       &str);
 			if (dbres == FALSE) {
-				err(tdc, "Failed to construct message.");
+				err(tdc, "dbus: Failed to construct message.");
 				err = -ENOMEM;
 				goto free_msg;
 			}
 			break;
 		default:
-			err(tdc, "Unknown argument type requested.");
+			err(tdc, "dbus: Unknown argument type requested.");
 			err = -EINVAL;
 			goto free_msg;
 		}
@@ -127,12 +127,12 @@ static int cli_dbus_method_call(struct teamdctl *tdc, const char *method_name,
 	dbres = dbus_connection_send_with_reply(cli_dbus->conn, msg,
 						&pending, TEAMDCTL_REPLY_TIMEOUT);
 	if (dbres == FALSE) {
-		err(tdc, "Send with reply failed.");
+		err(tdc, "dbus: Send with reply failed.");
 		err = -ENOMEM;
 		goto free_msg;
 	}
 	if (!pending) {
-		err(tdc, "Pending call not created.");
+		err(tdc, "dbus: Pending call not created.");
 		err = -ENOMEM;
 		goto free_msg;
 	}
@@ -143,7 +143,7 @@ static int cli_dbus_method_call(struct teamdctl *tdc, const char *method_name,
 	msg = dbus_pending_call_steal_reply(pending);
 	dbus_pending_call_unref(pending);
 	if (!msg) {
-		err(tdc, "Failed to get reply.");
+		err(tdc, "dbus: Failed to get reply.");
 		err = -EINVAL;
 		goto out;
 	}
@@ -186,7 +186,7 @@ static int cli_dbus_init(struct teamdctl *tdc, const char *team_name, void *priv
 	dbus_error_init(&error);
 	cli_dbus->conn = dbus_bus_get(DBUS_BUS_SYSTEM, &error);
 	if (!cli_dbus->conn) {
-		err(tdc, "Could not acquire the system bus: %s - %s",
+		err(tdc, "dbus: Could not acquire the system bus: %s - %s",
 			 error.name, error.message);
 		err = -EINVAL;
 		goto free_service_name;

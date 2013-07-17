@@ -52,16 +52,16 @@ static int cli_usock_process_msg(struct teamdctl *tdc, char *msg,
 			err(tdc, "usock: Incomplete message.\n");
 			return -EINVAL;;
 		}
-		err(tdc, "Error message received: \"%s\"", str);
+		err(tdc, "usock: Error message received: \"%s\"", str);
 		str = teamd_usock_msg_getline(&rest);
 		if (!str) {
 			err(tdc, "usock: Incomplete message.\n");
 			return -EINVAL;;
 		}
-		err(tdc, "Error message content: \"%s\"", str);
+		err(tdc, "usock: Error message content: \"%s\"", str);
 		return -EINVAL;;
 	} else {
-		err(tdc, "Unsupported message type.\n");
+		err(tdc, "usock: Unsupported message type.\n");
 		return -EINVAL;
 	}
 	return 0;
@@ -126,7 +126,7 @@ static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 	char *replystr;
 	int err;
 
-	dbg(tdc, "Calling method \"%s\"", method_name);
+	dbg(tdc, "usock: Calling method \"%s\"", method_name);
 	err= myasprintf(&msg, "%s\n%s\n", TEAMD_USOCK_REQUEST_PREFIX,
 					  method_name);
 	if (err)
@@ -140,7 +140,7 @@ static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 				goto free_msg;
 			break;
 		default:
-			err(tdc, "Unknown argument type requested.");
+			err(tdc, "usock: Unknown argument type requested.");
 			err = -EINVAL;
 			goto free_msg;
 		}
@@ -153,7 +153,7 @@ static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 	err = cli_usock_wait_recv(cli_usock->sock);
 	if (err) {
 		if (err == -ETIMEDOUT)
-			dbg(tdc, "Wait for reply timed-out.");
+			dbg(tdc, "usock: Wait for reply timed-out.");
 		goto free_msg;
 	}
 
@@ -195,14 +195,15 @@ static int cli_usock_init(struct teamdctl *tdc, const char *team_name,
 
 	cli_usock->sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
 	if (cli_usock->sock == -1) {
-		err(tdc, "Failed to create socket.");
+		err(tdc, "usock: Failed to create socket.");
 		return -errno;
 	}
 
 	err = connect(cli_usock->sock, (struct sockaddr *) &addr,
 		      strlen(addr.sun_path) + sizeof(addr.sun_family));
 	if (err == -1) {
-		err(tdc, "Failed to connect socket (%s).", addr.sun_path);
+		err(tdc, "usock: Failed to connect socket (%s).",
+		    addr.sun_path);
 		close(cli_usock->sock);
 		return -errno;
 	}
