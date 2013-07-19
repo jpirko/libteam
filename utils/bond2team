@@ -1,0 +1,1309 @@
+#!/bin/bash
+#
+# Translate tool from bonding configuration to team.
+#
+# Copyright (C) 2013 Flavio Leitner <fbl@redhat.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 2,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
+#
+
+VERSION="0.97"
+
+PR_QUIET=0
+PR_ERR=1
+PR_WARN=2
+PR_INFO=3
+PR_DBG=4
+
+#defaults
+ARGC=$#
+
+FORMAT_IFCFG=0
+FORMAT_JANSSON=1
+OUTPUT_FORMAT=${FORMAT_IFCFG}
+
+MODE_IFCFG=0
+MODE_NOIFCFG=1
+MODE=${MODE_IFCFG}
+
+OUTPUT_FILE=
+RENAME=
+DEVICE=
+BOND_MASTER=
+STDOUT=1
+BONDING_OPTS=
+CONFIGDIR="/etc/sysconfig/network-scripts"
+PR_LVL=3
+OUTPUT_DIR=
+OUTPUT_TMP_DIR=
+TMP_FILES=()
+RUNNER_OPTS=()
+LWATCH_OPTS=()
+# array: ( 'port ifname', 'opt1', 'opt2', 'optn', 'opt4', 'port ifname', ... )
+PORT_LIST=
+PORTS_OPTS=()
+PRIMARY=
+PRIMARY_RESELECT=
+
+# building file scratch memory area
+VFILE=
+
+show_examples()
+{
+	cat << EOF
+
+The following commands will deliver the ifcfg files into a temporary
+directory. You can review the files and copy to the right location.
+
+Add the following argument to the commands below to print the output
+to the screen instead of writing to files.
+  --stdout
+
+Add the following arguments to the commands below to set the
+destination directory for the output files.
+  --outputdir </path/to/dir>
+
+Add the following argument to the commands below to output the
+files in teamd format (JSON) instead of the default ifcfg format.
+  --json
+
+To convert the current "bond0" ifcfg configuration to team ifcfg:
+# $0 --master bond0
+
+To convert the current "bond0" ifcfg configuration out of the
+standard ifcfg-:
+# $0 --master bond0 --configdir </path/to/ifcfg>
+
+To convert the current "bond0" ifcfg configuration to team ifcfg
+renaming the interface name to "team0". (carefull: firewall rules,
+aliases interfaces, etc., will break after the renaming because the
+tool will only change the ifcfg file, nothing else)
+# $0 --master bond0 --rename team0
+
+To convert given bonding parameters without any ifcfg:
+# $0 --bonding_opts "mode=1 miimon=500"
+
+To convert given bonding parameters without any ifcfg with ports:
+# $0 --bonding_opts "mode=1 miimon=500 primary=eth1 primary_reselect-0" \\
+     --port eth1 --port eth2 --port eth3 --port eth4
+
+EOF
+}
+usage()
+{
+	cat << EOF
+usage: $0 [options]
+
+This tool translates bonding configuration to team.
+See bond2team(1) for detailed information.
+
+OPTIONS:
+
+  --master <interface>	set the master interface name or ifcfg
+
+  --rename <iface>	rename the master interface to <iface>
+
+  --ifcfg		set the output format to ifcfg style
+
+  --json		set the output format to teamd style
+
+  --bonding_opts	pass the bonding options instead of reading
+			from the ifcfg- file
+
+  --port <iface>	add the interface to the port's list
+
+  --configdir <dir>	set where the ifcfg- files are
+			default: /etc/sysconfig/network-scripts
+
+  --outputdir <dir>	set the output diretory
+			default: temporary diretory
+
+  --stdout		print to stdout instead of
+			modify the system's files.
+
+  --debug		increase debug level
+
+  --quiet		no messages
+
+  --version		show the tool version
+
+  --help		this screen
+
+  --examples		show command examples
+
+EOF
+}
+
+# Output Functions
+pr()
+{
+	if [ $1 -le $PR_LVL ]; then
+		shift;
+		echo "$*" > /dev/stderr
+	fi
+}
+
+pr_error()
+{
+	pr ${PR_ERR} "ERROR: " $*
+}
+
+pr_warn()
+{
+	pr ${PR_WARN} "WARNING: " $*
+}
+
+pr_info()
+{
+	pr ${PR_INFO} "INFO: " $*
+}
+
+pr_dbg()
+{
+	pr ${PR_DBG} "DEBUG: " $*
+}
+
+to_stdout()
+{
+	return ${STDOUT}
+}
+
+create_output_file()
+{
+	local f=$1
+
+	if [ ! -d "${OUTPUT_TMP_DIR}" ]; then
+		OUTPUT_TMP_DIR=$(LANG=C mktemp -d /tmp/bond2team.XXXXXX)
+	fi
+
+	if [ ! -d "${OUTPUT_TMP_DIR}" ]; then
+		pr_error "${FUNCNAME} can't create dir ${OUTPUT_TMP_DIR}"
+		return 1
+	fi
+
+	local tmpfile=${OUTPUT_TMP_DIR}/${f}
+	touch ${tmpfile}
+	if [ ! -f ${tmpfile} ]; then
+		pr_error "${FUNCNAME} can't create file ${tmpfile}"
+		return 1
+	fi
+
+	local pos=${#TMP_FILES[*]}
+	TMP_FILES[${pos}]="${tmpfile}"
+	OUTPUT_FILE=${tmpfile}
+}
+
+show_output_files()
+{
+	echo ""
+	echo "Resulted files:"
+	for tmpf in $(seq 0 $((${#TMP_FILES[@]} - 1)))
+	do
+		echo "  ${TMP_FILES[$tmpf]}"
+	done
+}
+
+clean_up()
+{
+	pr_dbg "${FUNCNAME} $*"
+	for tmpf in $(seq 0 $((${#TMP_FILES[@]} - 1)))
+	do
+		pr_dbg "rm -f ${TMP_FILES[$tmpf]}"
+		rm -f ${TMP_FILES[$tmpf]}
+	done
+
+	if [ -d "{OUTPUT_TMP_DIR}" ]; then
+		rmdir ${OUTPUT_TMP_DIR}
+	fi
+}
+
+ifcfg_get_device()
+{
+	local ifcfg=$1
+	if [ ! -f ${ifcfg} ]; then
+		pr_error "file not found: ${ifcfg}"
+		return 1
+	fi
+
+	DEVICE=`LANG=C sed -n \
+		"s@^[[:space:]]*DEVICE=[\"]*\(.*\)\([[:space:]#]\|\"\|$\)@\1@p" \
+		$ifcfg`
+
+	if [ -z "${DEVICE}" ]; then
+		pr_error "ifcfg file not supported: ${ifcfg}"
+		return 1
+	fi
+}
+
+ifcfg_get_master_file()
+{
+	local dev=${1}
+	MASTER="${dev}"
+
+	if [ "${MODE}" -eq "${MODE_NOIFCFG}" ]; then
+		return 0
+	fi
+
+	if [ ! -f ${MASTER} ]; then
+		MASTER="${CONFIGDIR}/ifcfg-${dev}"
+		if [ -f ${MASTER} ]; then
+			return 0
+		fi
+
+		if [ -n "${BONDING_OPTS}" ]; then
+			# options provided, set noifcfg
+			MODE=${MODE_NOIFCFG}
+			MASTER=${dev}
+			return 0
+		fi
+
+		pr_error "Can't find ifcfg file for ${dev}"
+		return 1
+	fi
+
+	return 0
+}
+
+ifcfg_overwrite_files()
+{
+	pr_dbg "${FUNCNAME} $*"
+
+	/bin/cp -f ${OUTPUT_TMP_DIR}/ifcfg* ${OUTPUT_DIR}
+}
+
+ifcfg_get_bond_opts()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local ifcfg=$1
+
+	if [ -n "${BONDING_OPTS}" ]; then
+		pr_dbg "${FUNCNAME} bonding_opts=${BONDING_OPTS}"
+		return 0
+	fi
+
+	if [ ! -f ${ifcfg} ]; then
+		pr_error "File not found: ${ifcfg}"
+		return 1
+	fi
+
+	BONDING_OPTS=`LANG=C sed -n \
+		"s@^[[:space:]]*BONDING_OPTS=[\"]*\(.*\)\([[:space:]#]\|\"\|$\)@\1@p" \
+		$ifcfg`
+
+	if [ -z "${BONDING_OPTS}" ]; then
+		pr_error "ifcfg file not supported: ${MASTER}"
+		return 1
+	fi
+
+	pr_dbg "${FUNCNAME} bonding_opts=${BONDING_OPTS}"
+	return 0
+}
+
+vfile_reset()
+{
+	VFILE=()
+}
+
+vfile_load_ifcfg()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local ifcfg=$1
+
+	vfile_reset
+
+	if [ ${MODE} -eq ${MODE_NOIFCFG} ]; then
+		return 0
+	fi
+
+	# filter out bonding and team options and
+	#  don't break lines with spaces
+	oIFS="$IFS"
+	IFS=$'\n'
+	VFILE=( $(LANG=C \
+		grep -iv 'BONDING_OPTS\|SLAVE\|MASTER\|DEVICETYPE\|TEAM' \
+		$ifcfg ))
+	IFS="$oIFS"
+}
+
+vfile_write_to_file()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local output=$1
+	for ln in $(seq 0 $((${#VFILE[@]} - 1)))
+	do
+		echo "${VFILE[$ln]}" >> $output
+	done
+
+	return 0
+}
+
+ifcfg_dump_stdout()
+{
+	local dev="${1}"
+	local ifcfg="ifcfg-${dev}"
+	if [ -z "${dev}" ]; then
+		ifcfg="ifcfg-<interface name>"
+	fi
+
+	for ln in $(seq 0 $((${#VFILE[@]} - 1)))
+	do
+		[ $ln -eq 0 ] && echo "---8<--- ${ifcfg} ---8<---"
+		echo "${VFILE[$ln]}"
+	done
+
+	echo "---8<--- ${ifcfg} ---8<---"
+	echo ""
+
+	return 0
+}
+
+vfile_get_device()
+{
+	pr_dbg "${FUNCNAME} $*"
+	if [ ${MODE} -eq ${MODE_NOIFCFG} ]; then
+		pr_dbg "${FUNCNAME} using DEVICE=${MASTER}"
+		DEVICE=${MASTER}
+		return 0
+	fi
+
+	for ln in $(seq 0 $((${#VFILE[@]} - 1)))
+	do
+		local line=${VFILE[$ln]}
+		if [ "${line%%=*}" = "DEVICE" ]; then
+			local name_line="${line##*=}"
+			local name="${name_line%%[ #	]*}"
+			DEVICE=${name}
+			pr_dbg "${FUNCNAME} from file: DEVICE=${DEVICE}"
+			return 0
+		fi
+	done
+
+	pr_error "Failed to find the device's name"
+	return 1
+}
+
+vfile_get_ipaddr()
+{
+	for ln in $(seq 0 $((${#VFILE[@]} - 1)))
+	do
+		local line=${VFILE[$ln]}
+		if [ "${line%%=*}" = "IPADDR" ]; then
+			local ipaddr_line="${line##*=}"
+			local ipaddr="${ipaddr_line%%[ #	]*}"
+			echo "${ipaddr}"
+		fi
+	done
+}
+
+vfile_add_line()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local pos=${#VFILE[*]}
+	VFILE[${pos}]="$1"
+}
+
+ifcfg_device_rename()
+{
+	local device=$1
+	local rename=$2
+
+	# neither device nor rename was provided
+	if [ -z "${rename}" ]; then
+		return 0
+	fi
+
+	# renaming with no ifcfg?
+	if [ ${MODE} -eq ${MODE_NOIFCFG} ]; then
+		return 0
+	fi
+
+	for ln in $(seq 0 $((${#VFILE[@]} - 1)))
+	do
+		local line=${VFILE[$ln]}
+		if [ "${line%%=*}" = "DEVICE" ]; then
+			newdev="${line/${device}/${rename}}"
+			VFILE[$ln]="$newdev"
+			TEAM_MASTER=${rename}
+			return 0
+		fi
+	done
+	pr_error "Failed to rename $device to $rename"
+	return 1
+}
+
+team_port_set_devtype()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local master=$1
+	vfile_add_line "DEVICETYPE=\"TeamPort\""
+	vfile_add_line "TEAM_MASTER=\"$master\""
+}
+
+team_port_set_config()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local port=$1
+	local team_port_config=""
+
+	if [ "${PRIMARY}" ==  "$port" ]; then
+		team_port_config="'{ \"prio\" : -10"
+	else
+		team_port_config="'{ \"prio\" : -100"
+	fi
+
+	if [ -n "${PRIMARY_RESELECT}" ]; then
+		if [ "${PRIMARY}" ==  "$port" ]; then
+			if [ -z "${team_port_config}" ]; then
+				team_port_config="'{ \"sticky\" : true }'"
+			else
+				team_port_config="${team_port_config}, \"sticky\" : true }'"
+			fi
+		else
+			if [ -z "${team_port_config}" ]; then
+				team_port_config="{ \"sticky\" : false }'"
+			else
+				team_port_config="${team_port_config}, \"sticky\" : false }'"
+			fi
+		fi
+	else
+		if [ -n "${team_port_config}" ]; then
+			team_port_config="${team_port_config} }'"
+		fi
+
+	fi
+
+	if [ -n "$team_port_config" ]; then
+		vfile_add_line "TEAM_PORT_CONFIG=$team_port_config"
+	fi
+}
+
+team_port_ifcfg_create()
+{
+	local dev=$1
+	vfile_load_ifcfg $dev
+
+	if ! vfile_get_device; then
+		return  1
+	fi
+
+	team_port_set_devtype ${TEAM_MASTER}
+	team_port_set_config ${DEVICE}
+	return 0
+}
+
+team_master_set_devtype()
+{
+	pr_dbg "${FUNCNAME} $*"
+	vfile_add_line "DEVICETYPE=\"Team\""
+}
+
+team_master_set_config()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local team_config="'{ \"runner\" : { "
+	local nr_opt=0
+
+	nr_opt=${#RUNNER_OPTS[@]}
+	if [ $nr_opt -eq 0 ]; then
+		# default to miimon/ethtool
+		team_config="${team_config} \"name\" : \"roundrobin\" }"
+	else
+		# add runner options
+		for pos in $(seq 0 $((${#RUNNER_OPTS[@]} - 1)))
+		do
+			if [ $pos -ne 0 ]; then
+				team_config="${team_config}, "
+			fi
+
+			team_config="${team_config} ${RUNNER_OPTS[$pos]}"
+		done
+
+		team_config="${team_config} }"
+	fi
+
+	nr_opt=${#LWATCH_OPTS[@]}
+	if [ $nr_opt -eq 0 ]; then
+		# default to miimon/ethtool
+		team_config="${team_config}, \"link_watch\" : { \"name\" : \"ethtool\" }"
+	else
+		team_config="${team_config}, \"link_watch\" : { "
+		# add linkwatch options
+		for pos in $(seq 0 $(($nr_opt - 1)))
+		do
+			if [ $pos -ne 0 ]; then
+				team_config="${team_config}, "
+			fi
+
+			team_config="${team_config} ${LWATCH_OPTS[$pos]}"
+		done
+
+		team_config="${team_config} }"
+
+	fi
+
+	team_config="${team_config} }'"
+	pr_dbg "built team_config=${team_config}"
+	vfile_add_line "TEAM_CONFIG=${team_config}"
+	return 0
+}
+
+team_ifcfg_dump_stdout()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local dev=$1
+	if ! ifcfg_dump_stdout ${dev}; then
+		return 1
+	fi
+
+	return 0
+}
+
+team_ifcfg_write_file()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local dev=$1
+	OUTPUT_FILE=
+
+	local filenm="ifcfg-${dev}"
+	if [ -z "${dev}" ]; then
+		filenm="ifcfg"
+	fi
+
+	create_output_file ${filenm}
+	if [ ! -f "${OUTPUT_FILE}" ]; then
+		return 1
+	fi
+
+	if ! vfile_write_to_file ${OUTPUT_FILE}; then
+		return 1
+	fi
+
+	return 0
+}
+
+team_master_ifcfg_create()
+{
+	pr_dbg "${FUNCNAME} $*"
+	if ! team_master_set_devtype; then
+		return 1
+	fi
+
+	if ! team_master_set_config; then
+		return 1
+	fi
+
+	return 0
+}
+
+team_ifcfg_write()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local dev=${1}
+
+	if to_stdout; then
+		team_ifcfg_dump_stdout ${dev} || return 1
+	else
+		team_ifcfg_write_file ${dev} || return 1
+	fi
+
+	return 0
+}
+
+team_ifcfg_deliver()
+{
+	pr_dbg "${FUNCNAME} $*"
+	if [ ! to_stdout ]; then
+		return 0
+	fi
+
+	if [ -z "${OUTPUT_DIR}" ]; then
+		show_output_files
+	else
+		ifcfg_overwrite_files
+		clean_up
+	fi
+
+	return 0
+}
+
+teamd_config_create()
+{
+	vfile_reset
+	vfile_add_line "{"
+	# add runner options
+	vfile_add_line "  \"device\" : \"${DEVICE}\","
+	vfile_add_line "  \"runner\" : {"
+	local runner_nr=${#RUNNER_OPTS[@]}
+	if [ ${runner_nr} -eq 0 ]; then
+		# default roundrobin
+		vfile_add_line "     \"runner\" : \"roundrobin\" "
+	else
+		local last_pos=$((${runner_nr} - 1))
+		for pos in $(seq 0 ${last_pos})
+		do
+			if [ $pos -eq ${last_pos} ]; then
+				vfile_add_line "     ${RUNNER_OPTS[$pos]}"
+			else
+				vfile_add_line "     ${RUNNER_OPTS[$pos]},"
+			fi
+		done
+	fi
+
+	vfile_add_line "  },"
+	vfile_add_line "  \"link_watch\" : {"
+
+	local lwatch_nr=${#LWATCH_OPTS[@]}
+	if [ ${lwatch_nr} -eq 0 ]; then
+		# default to miimon
+		lwatch_add_opt "\"name\" : \"ethtool\""
+	else
+		for pos in $(seq 0 ${last_pos})
+		do
+			last_pos=$((${lwatch_nr} - 1))
+			if [ $pos -eq ${last_pos} ]; then
+				vfile_add_line "     ${LWATCH_OPTS[$pos]}"
+			else
+				vfile_add_line "     ${LWATCH_OPTS[$pos]},"
+			fi
+		done
+	fi
+
+	vfile_add_line "  },"
+	return 0
+}
+
+teamd_config_close()
+{
+	vfile_add_line "}"
+	return 0
+}
+
+teamd_dump_stdout()
+{
+	for ln in $(seq 0 $((${#VFILE[@]} - 1)))
+	do
+		[ $ln -eq 0 ] && echo "---8<--- teamd.conf ---8<---"
+		echo "${VFILE[$ln]}"
+	done
+
+	echo "---8<--- teamd.conf ---8<---"
+	echo ""
+
+	return 0
+}
+
+teamd_write_file()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local dev=$1
+	OUTPUT_FILE=
+
+	create_output_file "teamd.conf"
+	if [ ! -f "${OUTPUT_FILE}" ]; then
+		return 1
+	fi
+
+	if ! vfile_write_to_file ${OUTPUT_FILE}; then
+		return 1
+	fi
+
+	return 0
+}
+
+
+teamd_config_write()
+{
+	pr_dbg "${FUNCNAME} $*"
+
+	if to_stdout; then
+		teamd_dump_stdout || return 1
+	else
+		teamd_write_file ${dev} || return 1
+		show_output_files
+	fi
+
+	return 0
+}
+
+teamd_port_create()
+{
+	vfile_add_line "  \"ports\" : {"
+	return 0
+}
+
+teamd_port_close()
+{
+	vfile_add_line "  }"
+	return 0
+}
+
+teamd_port_add()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local dev=${1}
+	local lastone=${2}
+
+	if [ -n "${PORT_LIST}" ]; then
+		DEVICE=${dev}
+	else
+		if ! ifcfg_get_device ${dev}; then
+			return  1
+		fi
+	fi
+
+	vfile_add_line "    \"${DEVICE}\" : {"
+	if [ "${PRIMARY}" ==  "${DEVICE}" ]; then
+		vfile_add_line "        \"prio\" : -10,"
+	else
+		vfile_add_line "        \"prio\" : -100,"
+	fi
+
+	if [ -n "${PRIMARY_RESELECT}" ]; then
+		if [ "${PRIMARY}" ==  "$port" ]; then
+			vfile_add_line "        \"sticky\" : true "
+		else
+			vfile_add_line "        \"sticky\" : false "
+		fi
+	else
+		vfile_add_line "        \"sticky\" : false "
+	fi
+
+	if [ ${lastone} -eq 1 ]; then
+		vfile_add_line "    }"
+	else
+		vfile_add_line "    },"
+	fi
+
+	return 0
+}
+
+# Runner Functions
+runner_add_opt()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local pos=${#RUNNER_OPTS[*]}
+	RUNNER_OPTS[${pos}]="$1"
+}
+
+runner_parse_adselect()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local value=$1
+
+	case $value in
+	"0"|"stable")
+		runner_add_opt "\"agg_select_policy\" : \"bandwidth\"" || return 1
+		;;
+	"1"|"bandwidth")
+		runner_add_opt "\"agg_select_policy\" : \"bandwidth\"" || return 1
+		;;
+	"2"|"count")
+		runner_add_opt "\"agg_select_policy\" : \"count\"" || return 1
+		;;
+	*)
+		pr_error "parameter ad_select=$value is not supported"
+		return 1
+		esac
+}
+
+runner_parse_failovermac()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local value=$1
+
+	case $value in
+	"0")
+		runner_add_opt "\"hwaddr_policy\" : \"same_all\"" || return 1
+		;;
+	"1"|"active")
+		runner_add_opt "\"hwaddr_policy\" : \"by_active\"" || return 1
+		;;
+	"2"|"follow")
+		runner_add_opt "\"hwaddr_policy\" : \"only_active\"" || return 1
+		;;
+	*)
+		pr_error "parameter fail_over_mac $value is not supported"
+		return 1
+		;;
+	esac
+
+}
+
+runner_parse_lacprate()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local value=$1
+
+	case $value in
+	"slow"|"0")
+		runner_add_opt "\"fast_rate\" : 0" || return 1
+		;;
+	"fast"|"1")
+		runner_add_opt "\"fast_rate\" : 1" || return 1
+		;;
+	*)
+		pr_error "parameter lacp_rate=$value is not supported"
+		return 1
+		;;
+	esac
+}
+
+runner_parse_xmit_policy()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local value=$1
+
+	case $value in
+	"layer2")
+		runner_add_opt "\"tx_hash\" : [ \"eth\" ]" || return 1
+		;;
+	"layer2+3")
+		runner_add_opt "\"tx_hash\" : [ \"eth\", \"l3\" ]" || return 1
+		;;
+	"layer3+4")
+		runner_add_opt "\"tx_hash\" : [ \"l3\", \"l4\" ]" || return 1
+		;;
+	*)
+		pr_error "parameter xmit_hash_policy=$value is not supported"
+		return 1
+	esac
+}
+
+runner_parse_mode()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local value=$1
+
+	case $value in
+	"0"|"balance-rr")
+		runner_add_opt "\"name\" : \"roundrobin\"" || return 1
+		;;
+	"1"|"active-backup")
+		runner_add_opt "\"name\" : \"activebackup\"" || return 1
+		;;
+	"2"|"balance-xor")
+		# FIXME
+		runner_add_opt "\"name\" : \"loadbalance\"" || return 1
+		;;
+	"3"|"broadcast")
+		runner_add_opt "\"name\" : \"broadcast\"" || return 1
+		;;
+	"4"|"802.3ad")
+		runner_add_opt "\"name\" : \"lacp\"" || return 1
+		;;
+	"5"|"balance-tlb")
+		runner_add_opt "\"name\" : \"loadbalance\"" || return 1
+		;;
+	"6"|"balance-alb")
+		pr_error "parameter mode=$value is not supported"
+		return 1
+		;;
+	*)
+		pr_error "parameter mode=$value is not supported"
+		return 1
+		;;
+	esac
+}
+
+runner_parse_opt()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local param=$1
+	local value=$2
+
+	case $param in
+	"ad_select")
+		runner_parse_adselect $value || return 1
+		;;
+	"fail_over_mac")
+		runner_parse_failovermac $value || return 1
+		;;
+	"lacp_rate")
+		runner_parse_lacprate $value || return 1
+		;;
+	"min_links")
+		runner_add_opt "\"min_ports\" : $value" || return 1
+		;;
+	"mode")
+		runner_parse_mode $value || return 1
+		;;
+	"xmit_hash_policy")
+		runner_parse_xmit_policy $value || return 1
+		;;
+	esac
+}
+
+# Link Watch functions
+lwatch_add_opt()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local pos=${#LWATCH_OPTS[*]}
+	LWATCH_OPTS[${pos}]="$1"
+}
+
+lwatch_parse_arp_validate()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local value=$1
+
+	case $value in
+	"0"|"none")
+		;;
+	"1"|"active")
+		lwatch_add_opt "\"validate_active\" : 1" || return 1
+		;;
+	"2"|"backup")
+		lwatch_add_opt "\"validate_inactive\" : 1" || return 1
+		;;
+	"3"|"all")
+		lwatch_add_opt "\"validate_active\" : 1" || return 1
+		lwatch_add_opt "\"validate_inactive\" : 1" || return 1
+		;;
+	*)
+		pr_error "parameter arp_validate=$value is not supported"
+		return 1
+	;;
+	esac
+
+}
+
+lwatch_parse_arpiptarget()
+{
+	#FIXME: supports only one arp_ip_target address.
+	# otherwise a new linkwatch section must be create
+	pr_dbg "${FUNCNAME} $*"
+	local ip_addrs=$1
+	local ip_list=${ip_addrs//,/ }
+	local ip_array=($ip_list)
+	if [ ${#ip_array[*]} -ne 1 ]; then
+		pr_error "parameter arp_ip_target= with multiple IP addresses is not supported"
+		return 1
+	fi
+
+	for addr in ${ip_list}
+	do
+		lwatch_add_opt "\"target_host\" : \"$addr\""
+		source_host=$(vfile_get_ipaddr)
+		if [ -z ${source_host} ]; then
+			pr_warn "could not find the source IP address required"
+			pr_warn "to convert arp_ip_target= parameter"
+			pr_warn "please fix the source_host parameter in the master ifcfg file"
+			lwatch_add_opt "\"source_host\" : \"$addr\""
+		else
+			lwatch_add_opt "\"source_host\" : \"$source_host\""
+		fi
+	done
+}
+
+lwatch_parse_opt()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local param=$1
+	local value=$2
+
+	case $param in
+	"arp_interval")
+		lwatch_add_opt "\"interval\" : $value"
+		;;
+	"arp_ip_target")
+		lwatch_add_opt "\"name\" : \"arp_ping\""
+		if ! lwatch_parse_arpiptarget $value; then
+			return 1
+		fi
+		;;
+	"arp_validate")
+		lwatch_parse_arp_validate $value
+		;;
+	"downdelay")
+		lwatch_add_opt "\"delay_down\" : $value"
+		;;
+	"miimon")
+		lwatch_add_opt "\"name\" : \"ethtool\""
+		;;
+	"updelay")
+		lwatch_add_opt "\"delay_up\" : $value"
+		;;
+	*)
+		pr_error "parameter $param=$value is not supported"
+		return 1
+		;;
+	esac
+}
+
+port_parse_opt()
+{
+	pr_dbg "${FUNCNAME} $*"
+	local param=$1
+	local value=$2
+
+	case $param in
+	"primary")
+		PRIMARY="$value"
+		;;
+	"primary_reselect")
+		case $value in
+		"0"|"always")
+			PRIMARY_RESELECT=1
+			;;
+		"1"|"better")
+			;;
+		"2"|"failure")
+			;;
+		*)
+			pr_error "parameter $param=$value is not supported"
+			return 1
+		esac
+		;;
+	*)
+		pr_error "parameter $param=$value is not supported"
+		return 1
+		;;
+	esac
+
+}
+
+convert_bond_opts()
+{
+	local bonding_opts=$1
+	pr_dbg "${FUNCNAME} $*"
+
+	for arg in $bonding_opts
+	do
+		key=${arg%%=*};
+		value=${arg##*=};
+		pr_dbg "parsing $key=$value"
+		case "$key" in
+			"active_slave"|"max_bonds"|"use_carrier")
+				pr_info "parameter $key not supported, ignoring"
+				continue
+				;;
+			"all_slaves_active"|"resend_igmp"|"num_grat_arp"|"num_unsol_na")
+				pr_error "parameter $key not supported, aborting"
+				return 1
+				;;
+			"ad_select"|"fail_over_mac"|"lacp_rate"|"min_links"|"mode"|"xmit_hash_policy")
+				runner_parse_opt $key $value || return 1
+				;;
+			"arp_interval"|"arp_ip_target"|"arp_validate"|"downdelay"|"miimon"|"updelay")
+				lwatch_parse_opt $key $value || return 1
+				;;
+			"primary"|"primary_reselect")
+				port_parse_opt $key $value || return 1
+				;;
+			*)
+				pr_error "unknown parameter $key=$value, aborting"
+				return 1
+				;;
+		esac
+	done
+}
+
+
+
+# Parse command line options
+while :;
+do
+	case "$1" in
+	"--master")
+		MASTER="$2"
+		shift 2
+		;;
+	"--bonding_opts")
+		BONDING_OPTS="$2"
+		shift 2
+		;;
+	"--ifcfg")
+		OUTPUT_FORMAT=${FORMAT_IFCFG}
+		shift
+		;;
+	"--json")
+		OUTPUT_FORMAT=${FORMAT_JANSSON}
+		shift
+		;;
+        "--quiet")
+		PR_LVL=${PR_QUIET}
+		shift
+		;;
+        "--debug")
+		PR_LVL=`expr ${PR_LVL} + 1`
+		shift
+		;;
+	"--outputdir")
+		OUTPUT_DIR="$2"
+		shift 2
+		;;
+	"--configdir")
+		CONFIGDIR="$2"
+		shift 2
+		;;
+	"--rename")
+		[ -n "${RENAME}" ] && usage && exit 1
+		RENAME="$2"
+		shift 2
+		;;
+	"--stdout")
+		STDOUT=0
+		shift
+		;;
+	"--port")
+		PORT_LIST="${PORT_LIST} $2"
+		shift 2
+		;;
+	"--version")
+		echo "$VERSION"
+		exit 0
+		;;
+	"--help")
+		usage
+		exit 0
+		;;
+	"--examples")
+		show_examples
+		exit 0
+		;;
+	*)
+		if [ -z "$1" ]; then
+			break
+		fi
+		pr_error "unknown parameter: $1"
+		usage
+		exit 1
+		;;
+	esac
+done
+
+if [ -n "${OUTPUT_DIR}" -a ! -d "${OUTPUT_DIR}" ]; then
+	pr_error "Invalid output diretory: ${OUTPUT_DIR}"
+	usage
+	exit 1
+fi
+
+if [ -z "${MASTER}" -a -z "${BONDING_OPTS}" ]; then
+	pr_error "No master interface or bonding options specified"
+	usage
+	exit 1
+fi
+
+# no master means no ifcfg to read
+if [ -z "${MASTER}" ]; then
+	MODE=${MODE_NOIFCFG}
+fi
+
+if [ ${OUTPUT_FORMAT} -eq ${FORMAT_JANSSON} -a -z "${MASTER}" ]; then
+	MASTER="team0"
+fi
+
+if ! ifcfg_get_master_file ${MASTER}; then
+	exit 1
+fi
+
+# load the ifcfg file
+if ! vfile_load_ifcfg ${MASTER}; then
+	exit 1
+fi
+
+# get the bonding options
+if ! ifcfg_get_bond_opts ${MASTER}; then
+	exit 1
+fi
+
+if ! convert_bond_opts "${BONDING_OPTS}"; then
+	exit 1
+fi
+
+if ! vfile_get_device; then
+	exit 1
+fi
+
+TEAM_MASTER=${DEVICE}
+if ! ifcfg_device_rename ${DEVICE} ${RENAME}; then
+	exit 1
+fi
+
+BOND_MASTER=${DEVICE}
+
+if [ ${OUTPUT_FORMAT} -eq ${FORMAT_IFCFG} ]; then
+	if ! team_master_ifcfg_create; then
+		exit 1
+	fi
+
+	if ! team_ifcfg_write ${TEAM_MASTER}; then
+		clean_up
+		exit 1
+	fi
+
+	# process all ports
+	for portcfg in $(LANG=C grep -s -l "^[[:space:]]*MASTER=\"\?${BOND_MASTER}\"\?\([[:space:]#]\|$\)" ${CONFIGDIR}/ifcfg-*)
+	do
+		if ! team_port_ifcfg_create $portcfg; then
+			clean_up
+			exit 1
+		fi
+
+		if ! team_ifcfg_write ${DEVICE}; then
+			clean_up
+			exit 1
+		fi
+
+	done
+
+	team_ifcfg_deliver
+else
+	if ! teamd_config_create; then
+		exit 1
+	fi
+
+	if ! teamd_port_create; then
+		exit 1
+	fi
+
+	if [ -n "${PORT_LIST}" ]; then
+		portcfg_list=${PORT_LIST}
+	else
+		portcfg_list=$(LANG=C grep -s -l "^[[:space:]]*MASTER=\"\?${BOND_MASTER}\"\?\([[:space:]#]\|$\)" ${CONFIGDIR}/ifcfg-*)
+	fi
+	# count number of ports
+	portcfg_total=0
+	for portcfg in ${portcfg_list}
+	do
+		portcfg_total=$((${portcfg_total} + 1))
+	done
+	# process all ports
+	portcfg_nr=0
+	lastone=0
+	for portcfg in ${portcfg_list}
+	do
+		portcfg_nr=$((${portcfg_nr} + 1))
+		if [ ${portcfg_nr} -eq ${portcfg_total} ]; then
+			lastone=1
+		fi
+
+		if ! teamd_port_add ${portcfg} ${lastone}; then
+			exit 1
+		fi
+	done
+
+	if ! teamd_port_close; then
+		exit 1
+	fi
+
+	if ! teamd_config_close; then
+		exit 1
+	fi
+
+	if ! teamd_config_write; then
+		exit 1
+	fi
+
+fi
