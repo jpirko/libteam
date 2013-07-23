@@ -378,7 +378,7 @@ static int teamd_run_loop_run(struct teamd_context *ctx)
 				switch(ctrl_byte) {
 				case 'q':
 					if (quit_in_progress)
-						continue;
+						return -EBUSY;
 					err = teamd_flush_ports(ctx);
 					if (err)
 						return err;
