@@ -51,6 +51,7 @@ struct ab {
 	uint32_t active_ifindex;
 	char active_orig_hwaddr[MAX_ADDR_LEN];
 	const struct ab_hwaddr_policy *hwaddr_policy;
+	struct teamd_workq link_watch_handler_workq;
 };
 
 struct ab_port {
@@ -126,7 +127,7 @@ static int ab_hwaddr_policy_by_active_active_set(struct teamd_context *ctx,
 			      team_get_ifinfo_hwaddr(tdport->team_ifinfo),
 			      ctx->hwaddr_len);
 	if (err) {
-		teamd_log_err("Failed to team hardware address.");
+		teamd_log_err("Failed to set team hardware address.");
 		return err;
 	}
 	return 0;
@@ -262,16 +263,21 @@ static int ab_set_active_port(struct teamd_context *ctx, struct ab *ab,
 	if (err) {
 		teamd_log_err("%s: Failed to set as active port.",
 			      tdport->ifname);
-		return err;
+		goto err_set_active_port;
 	}
-	ab->active_ifindex = tdport->ifindex;
 	if (ab->hwaddr_policy->active_set) {
 		err =  ab->hwaddr_policy->active_set(ctx, ab, tdport);
 		if (err)
-			return err;
+			goto err_hwaddr_policy_active_set;
 	}
+	ab->active_ifindex = tdport->ifindex;
 	teamd_log_info("Changed active port to \"%s\".", tdport->ifname);
 	return 0;
+
+err_set_active_port:
+err_hwaddr_policy_active_set:
+	team_set_port_enabled(ctx->th, tdport->ifindex, false);
+	return err;
 }
 
 struct ab_port_state_info {
@@ -313,9 +319,17 @@ static int ab_change_active_port(struct teamd_context *ctx, struct ab *ab,
 	int err;
 
 	err = ab_clear_active_port(ctx, ab, active_tdport);
-	if (err)
+	if (err && !TEAMD_ENOENT(err))
 		return err;
-	return ab_set_active_port(ctx, ab, new_active_tdport);
+	err = ab_set_active_port(ctx, ab, new_active_tdport);
+	if (err) {
+		if (TEAMD_ENOENT(err))
+			/* Queue another best port selection */
+			teamd_workq_schedule_work(ctx, &ab->link_watch_handler_workq);
+		else
+			return err;
+	}
+	return 0;
 }
 
 static int ab_link_watch_handler(struct teamd_context *ctx, struct ab *ab)
@@ -379,6 +393,15 @@ static int ab_link_watch_handler(struct teamd_context *ctx, struct ab *ab)
 	return 0;
 }
 
+static int ab_link_watch_handler_work(struct teamd_context *ctx,
+				      struct teamd_workq *workq)
+{
+	struct ab *ab;
+
+	ab = get_container(workq, struct ab, link_watch_handler_workq);
+	return ab_link_watch_handler(ctx, ab);
+}
+
 static int ab_event_watch_hwaddr_changed(struct teamd_context *ctx, void *priv)
 {
 	struct ab *ab = priv;
@@ -421,7 +444,7 @@ static int ab_port_added(struct teamd_context *ctx,
 	err = team_set_port_enabled(ctx->th, tdport->ifindex, false);
 	if (err) {
 		teamd_log_err("%s: Failed to disable port.", tdport->ifname);
-		return err;
+		return TEAMD_ENOENT(err) ? 0 : err;
 	}
 
 	if (ab->hwaddr_policy->port_added)
@@ -601,6 +624,8 @@ static int ab_init(struct teamd_context *ctx, void *priv)
 		teamd_log_err("Failed to register state value group.");
 		goto event_watch_unregister;
 	}
+	teamd_workq_init_work(&ab->link_watch_handler_workq,
+			      ab_link_watch_handler_work);
 	return 0;
 
 event_watch_unregister:
