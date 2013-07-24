@@ -361,4 +361,6 @@ static inline bool timespec_is_zero(struct timespec *ts)
 	return !ts->tv_sec && !ts->tv_nsec;
 }
 
+#define TEAMD_ENOENT(err) (err == -ENOENT || err == -ENODEV)
+
 #endif /* _TEAMD_H_ */
