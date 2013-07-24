@@ -363,7 +363,8 @@ static int lacp_port_update_enabled(struct lacp_port *lacp_port)
 	if (err) {
 		teamd_log_err("%s: Failed to %s port.", tdport->ifname,
 			      new_enabled_state ? "enable": "disable");
-		return err;;
+		if (!TEAMD_ENOENT(err))
+			return err;
 	}
 	return 0;
 }
@@ -1252,7 +1253,8 @@ static int lacp_port_added(struct teamd_context *ctx,
 	err = team_set_port_enabled(ctx->th, tdport->ifindex, false);
 	if (err) {
 		teamd_log_err("%s: Failed to disable port.", tdport->ifname);
-		goto timeout_callback_del;
+		if (!TEAMD_ENOENT(err))
+			goto timeout_callback_del;
 	}
 
 	err = lacp_port_set_mac(ctx, tdport);
