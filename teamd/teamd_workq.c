@@ -69,10 +69,10 @@ int teamd_workq_init(struct teamd_context *ctx)
 	ctx->workq.pipe_r = fds[0];
 	ctx->workq.pipe_w = fds[1];
 
-	err = teamd_loop_callback_fd_add(ctx, WORKQ_CB_NAME, ctx,
-					 teamd_workq_callback_socket,
-					 ctx->workq.pipe_r,
-					 TEAMD_LOOP_FD_EVENT_READ);
+	err = teamd_loop_callback_fd_add_tail(ctx, WORKQ_CB_NAME, ctx,
+					      teamd_workq_callback_socket,
+					      ctx->workq.pipe_r,
+					      TEAMD_LOOP_FD_EVENT_READ);
 	if (err) {
 		teamd_log_err("Failed add workq callback.");
 		goto close_pipe;
