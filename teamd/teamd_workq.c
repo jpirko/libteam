@@ -49,6 +49,7 @@ again:
 
 	list_for_each_node_entry_safe(workq, tmp, &ctx->workq.work_list, list) {
 		list_del(&workq->list);
+		list_init(&workq->list);
 		err = workq->func(ctx, workq);
 		if (err)
 			return err;
@@ -92,8 +93,10 @@ void teamd_workq_fini(struct teamd_context *ctx)
 	teamd_loop_callback_del(ctx, WORKQ_CB_NAME, ctx);
 	close(ctx->workq.pipe_r);
 	close(ctx->workq.pipe_w);
-	list_for_each_node_entry_safe(workq, tmp, &ctx->workq.work_list, list)
+	list_for_each_node_entry_safe(workq, tmp, &ctx->workq.work_list, list) {
 		list_del(&workq->list);
+		list_init(&workq->list);
+	}
 }
 
 static void teamd_workq_set_for_process(struct teamd_context *ctx)
@@ -108,8 +111,17 @@ retry:
 	teamd_loop_callback_enable(ctx, WORKQ_CB_NAME, ctx);
 }
 
-void teamd_workq_schedule(struct teamd_context *ctx, struct teamd_workq *workq)
+void teamd_workq_schedule_work(struct teamd_context *ctx,
+			       struct teamd_workq *workq)
 {
+	if (!list_empty(&workq->list))
+		return;
 	list_add_tail(&ctx->workq.work_list, &workq->list);
 	teamd_workq_set_for_process(ctx);
+}
+
+void teamd_workq_init_work(struct teamd_workq *workq, teamd_workq_func_t func)
+{
+	workq->func = func;
+	list_init(&workq->list);
 }

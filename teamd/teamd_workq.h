@@ -32,6 +32,8 @@ struct teamd_workq {
 
 int teamd_workq_init(struct teamd_context *ctx);
 void teamd_workq_fini(struct teamd_context *ctx);
-void teamd_workq_schedule(struct teamd_context *ctx, struct teamd_workq *workq);
+void teamd_workq_schedule_work(struct teamd_context *ctx,
+			       struct teamd_workq *workq);
+void teamd_workq_init_work(struct teamd_workq *workq, teamd_workq_func_t func);
 
 #endif /* _TEAMD_WORKQ_H_ */

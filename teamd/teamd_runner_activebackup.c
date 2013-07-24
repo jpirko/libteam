@@ -545,10 +545,10 @@ static int ab_state_active_port_set(struct teamd_context *ctx,
 	info = malloc(sizeof(*info));
 	if (!info)
 		return -ENOMEM;
-	info->workq.func = ab_active_port_set_work;
+	teamd_workq_init_work(&info->workq, ab_active_port_set_work);
 	info->ab = ab;
 	info->ifindex = tdport->ifindex;
-	teamd_workq_schedule(ctx, &info->workq);
+	teamd_workq_schedule_work(ctx, &info->workq);
 	return 0;
 }
 

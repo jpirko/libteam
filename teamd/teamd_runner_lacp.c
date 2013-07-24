@@ -1694,10 +1694,10 @@ static int lacp_port_state_aggregator_selected_set(struct teamd_context *ctx,
 	info = malloc(sizeof(*info));
 	if (!info)
 		return -ENOMEM;
-	info->workq.func = lacp_port_aggregator_select_work;
+	teamd_workq_init_work(&info->workq, lacp_port_aggregator_select_work);
 	info->lacp = lacp;
 	info->ifindex = gsc->info.tdport->ifindex;
-	teamd_workq_schedule(ctx, &info->workq);
+	teamd_workq_schedule_work(ctx, &info->workq);
 	return 0;
 }
 
