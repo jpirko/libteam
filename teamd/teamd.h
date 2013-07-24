@@ -226,6 +226,10 @@ int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 			       const char *cb_name, void *priv,
 			       teamd_loop_callback_func_t func,
 			       int fd, int fd_event);
+int teamd_loop_callback_fd_add_tail(struct teamd_context *ctx,
+				    const char *cb_name, void *priv,
+				    teamd_loop_callback_func_t func,
+				    int fd, int fd_event);
 int teamd_loop_callback_timer_add_set(struct teamd_context *ctx,
 				      const char *cb_name, void *priv,
 				      teamd_loop_callback_func_t func,

@@ -473,10 +473,10 @@ static struct teamd_loop_callback *get_lcb_multi(struct teamd_context *ctx,
 	     lcb = tmp,							\
 	     tmp = get_lcb_multi(ctx, cb_name, priv, lcb))
 
-int teamd_loop_callback_fd_add(struct teamd_context *ctx,
-			       const char *cb_name, void *priv,
-			       teamd_loop_callback_func_t func,
-			       int fd, int fd_event)
+static int __teamd_loop_callback_fd_add(struct teamd_context *ctx,
+					const char *cb_name, void *priv,
+					teamd_loop_callback_func_t func,
+					int fd, int fd_event, bool tail)
 {
 	int err;
 	struct teamd_loop_callback *lcb;
@@ -502,13 +502,34 @@ int teamd_loop_callback_fd_add(struct teamd_context *ctx,
 	lcb->func = func;
 	lcb->fd = fd;
 	lcb->fd_event = fd_event & TEAMD_LOOP_FD_EVENT_MASK;
-	list_add(&ctx->run_loop.callback_list, &lcb->list);
+	if (tail)
+		list_add_tail(&ctx->run_loop.callback_list, &lcb->list);
+	else
+		list_add(&ctx->run_loop.callback_list, &lcb->list);
 	teamd_log_dbg("Added loop callback: %s, %p", lcb->name, lcb->priv);
 	return 0;
 
 lcb_free:
 	free(lcb);
 	return err;
+}
+
+int teamd_loop_callback_fd_add(struct teamd_context *ctx,
+			       const char *cb_name, void *priv,
+			       teamd_loop_callback_func_t func,
+			       int fd, int fd_event)
+{
+	return __teamd_loop_callback_fd_add(ctx, cb_name, priv, func,
+					    fd, fd_event, false);
+}
+
+int teamd_loop_callback_fd_add_tail(struct teamd_context *ctx,
+				    const char *cb_name, void *priv,
+				    teamd_loop_callback_func_t func,
+				    int fd, int fd_event)
+{
+	return __teamd_loop_callback_fd_add(ctx, cb_name, priv, func,
+					    fd, fd_event, true);
 }
 
 static int __timerfd_reset(int fd, struct timespec *interval,
