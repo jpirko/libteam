@@ -120,6 +120,7 @@ struct teamd_context {
 	struct team_ifinfo *		ifinfo;
 	char *				hwaddr;
 	uint32_t			hwaddr_len;
+	bool				hwaddr_explicit;
 	struct {
 		struct list_item		callback_list;
 		int				ctrl_pipe_r;

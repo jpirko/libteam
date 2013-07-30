@@ -821,6 +821,8 @@ static int teamd_set_hwaddr(struct teamd_context *ctx)
 		goto free_hwaddr;
 	}
 	err = team_hwaddr_set(ctx->th, ctx->ifindex, hwaddr, hwaddr_len);
+	if (!err)
+		ctx->hwaddr_explicit = true;
 free_hwaddr:
 	free(hwaddr);
 	return err;
@@ -877,7 +879,7 @@ static int teamd_hwaddr_check_change(struct teamd_context *ctx,
 	unsigned char hwaddr_len;
 	int err;
 
-	if (ctx->port_obj_list_count != 1)
+	if (ctx->port_obj_list_count != 1 || ctx->hwaddr_explicit)
 		return 0;
 	hwaddr = team_get_ifinfo_orig_hwaddr(tdport->team_ifinfo);
 	hwaddr_len = team_get_ifinfo_orig_hwaddr_len(tdport->team_ifinfo);
