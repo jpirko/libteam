@@ -82,6 +82,22 @@ static bool teamd_phys_port_sriovsysfs_cmp(struct teamd_port *tdport1,
 	return false;
 }
 
+static bool teamd_phys_port_ifinfo_cmp(struct teamd_port *tdport1,
+				       struct teamd_port *tdport2)
+{
+	const char *id1 = team_get_ifinfo_phys_port_id(tdport1->team_ifinfo);
+	const char *id2 = team_get_ifinfo_phys_port_id(tdport2->team_ifinfo);
+	size_t id1_len = team_get_ifinfo_phys_port_id_len(tdport1->team_ifinfo);
+	size_t id2_len = team_get_ifinfo_phys_port_id_len(tdport2->team_ifinfo);
+
+	if (!id1_len || !id2_len || id1_len != id2_len)
+		return false;
+
+	if (!memcmp(id1, id2, id1_len))
+		return true;
+	return false;
+}
+
 static int teamd_phys_port_check_event_watch_port_added(struct teamd_context *ctx,
 							struct teamd_port *tdport,
 							void *priv)
@@ -91,8 +107,13 @@ static int teamd_phys_port_check_event_watch_port_added(struct teamd_context *ct
 	teamd_for_each_tdport(cur_tdport, ctx) {
 		if (cur_tdport == tdport)
 			continue;
-		if (teamd_phys_port_sriovsysfs_cmp(tdport, cur_tdport))
-			teamd_log_warn("%s: port is virtual function of same physical function as port %s. Note that teaming virtual functions of the same physical function makes no sense.",
+		/* Once all drivers implement ndo_get_phys_port_id() function,
+		 * teamd_phys_port_sriovsysfs_cmp() would not be needed to be
+		 * called here.
+		 */
+		if (teamd_phys_port_ifinfo_cmp(tdport, cur_tdport) ||
+		    teamd_phys_port_sriovsysfs_cmp(tdport, cur_tdport))
+			teamd_log_warn("%s: device is using the same physical port as device %s. Note that teaming multiple devices which use the same physical port makes no sense.",
 				       tdport->ifname, cur_tdport->ifname);
 	}
 	return 0;
