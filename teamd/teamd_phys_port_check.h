@@ -1,5 +1,5 @@
 /*
- *   teamd_sriov.h - SR-IOV support for teamd
+ *   teamd_phys_port_check.h - Physical port checking support for teamd
  *   Copyright (C) 2013 Jiri Pirko <jiri@resnulli.us>
  *
  *   This library is free software; you can redistribute it and/or
@@ -17,12 +17,12 @@
  *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef _TEAMD_SRIOV_H_
-#define _TEAMD_SRIOV_H_
+#ifndef _TEAMD_PHYS_PORT_CHECK_H_
+#define _TEAMD_PHYS_PORT_CHECK_H_
 
 #include <jansson.h>
 
-int teamd_sriov_init(struct teamd_context *ctx);
-void teamd_sriov_fini(struct teamd_context *ctx);
+int teamd_phys_port_check_init(struct teamd_context *ctx);
+void teamd_phys_port_check_fini(struct teamd_context *ctx);
 
-#endif /* _TEAMD_SRIOV_H_ */
+#endif /* _TEAMD_PHYS_PORT_CHECK_H_ */

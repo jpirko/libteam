@@ -1,5 +1,5 @@
 /*
- *   teamd_sriov.c - SR-IOV support for teamd
+ *   teamd_phys_port_check.c - Physical port checking support for teamd
  *   Copyright (C) 2013 Jiri Pirko <jiri@resnulli.us>
  *
  *   This library is free software; you can redistribute it and/or
@@ -63,42 +63,50 @@ static int teamd_sriov_physfn_addr(struct pcie_addr *addr, const char *ifname)
 	return 0;
 }
 
-static int teamd_sriov_event_watch_port_added(struct teamd_context *ctx,
-					      struct teamd_port *tdport,
-					      void *priv)
+static bool teamd_phys_port_sriovsysfs_cmp(struct teamd_port *tdport1,
+					   struct teamd_port *tdport2)
 {
-	struct pcie_addr physfnaddr;
-	struct pcie_addr cur_physfnaddr;
-	struct teamd_port *cur_tdport;
+	struct pcie_addr physfnaddr1;
+	struct pcie_addr physfnaddr2;
 	int err;
 
-	err = teamd_sriov_physfn_addr(&physfnaddr, tdport->ifname);
+	err = teamd_sriov_physfn_addr(&physfnaddr1, tdport1->ifname);
 	if (err)
-		return 0;
+		return false;
+
+	err = teamd_sriov_physfn_addr(&physfnaddr2, tdport2->ifname);
+	if (err)
+		return false;
+	if (!memcmp(&physfnaddr1, &physfnaddr2, sizeof(physfnaddr1)))
+		return true;
+	return false;
+}
+
+static int teamd_phys_port_check_event_watch_port_added(struct teamd_context *ctx,
+							struct teamd_port *tdport,
+							void *priv)
+{
+	struct teamd_port *cur_tdport;
 
 	teamd_for_each_tdport(cur_tdport, ctx) {
 		if (cur_tdport == tdport)
 			continue;
-		err = teamd_sriov_physfn_addr(&cur_physfnaddr,
-					      cur_tdport->ifname);
-		if (err)
-			continue;
-		if (!memcmp(&physfnaddr, &cur_physfnaddr, sizeof(physfnaddr)))
+		if (teamd_phys_port_sriovsysfs_cmp(tdport, cur_tdport))
 			teamd_log_warn("%s: port is virtual function of same physical function as port %s. Note that teaming virtual functions of the same physical function makes no sense.",
 				       tdport->ifname, cur_tdport->ifname);
 	}
 	return 0;
 }
 
-static const struct teamd_event_watch_ops teamd_sriov_event_watch_ops = {
-	.port_added = teamd_sriov_event_watch_port_added,
+static const struct teamd_event_watch_ops teamd_phys_port_check_event_watch_ops = {
+	.port_added = teamd_phys_port_check_event_watch_port_added,
 };
 
-int teamd_sriov_init(struct teamd_context *ctx)
+int teamd_phys_port_check_init(struct teamd_context *ctx)
 {
 	int err;
 
-	err = teamd_event_watch_register(ctx, &teamd_sriov_event_watch_ops,
+	err = teamd_event_watch_register(ctx, &teamd_phys_port_check_event_watch_ops,
 					 NULL);
 	if (err) {
 		teamd_log_err("Failed to register event watch.");
@@ -107,8 +115,8 @@ int teamd_sriov_init(struct teamd_context *ctx)
 	return 0;
 }
 
-void teamd_sriov_fini(struct teamd_context *ctx)
+void teamd_phys_port_check_fini(struct teamd_context *ctx)
 {
-	teamd_event_watch_unregister(ctx, &teamd_sriov_event_watch_ops,
+	teamd_event_watch_unregister(ctx, &teamd_phys_port_check_event_watch_ops,
 				     NULL);
 }
