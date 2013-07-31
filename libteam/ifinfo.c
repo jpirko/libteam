@@ -47,6 +47,8 @@ struct team_ifinfo {
 #define CHANGED_HWADDR_LEN	(1 << 1)
 #define CHANGED_IFNAME		(1 << 2)
 #define CHANGED_MASTER_IFINDEX	(1 << 3)
+#define CHANGED_ANY		(CHANGED_HWADDR | CHANGED_HWADDR_LEN |	\
+				 CHANGED_IFNAME | CHANGED_MASTER_IFINDEX)
 
 static void set_changed(struct team_ifinfo *ifinfo, int bit)
 {
@@ -512,6 +514,5 @@ bool team_is_ifinfo_master_ifindex_changed(struct team_ifinfo *ifinfo)
 TEAM_EXPORT
 bool team_is_ifinfo_changed(struct team_ifinfo *ifinfo)
 {
-	return is_changed(ifinfo, CHANGED_HWADDR | CHANGED_HWADDR_LEN |
-				  CHANGED_IFNAME);
+	return is_changed(ifinfo, CHANGED_ANY);
 }
