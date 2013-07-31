@@ -147,6 +147,10 @@ char *team_get_ifinfo_ifname(struct team_ifinfo *ifinfo);
 bool team_is_ifinfo_ifname_changed(struct team_ifinfo *ifinfo);
 uint32_t team_get_ifinfo_master_ifindex(struct team_ifinfo *ifinfo);
 bool team_is_ifinfo_master_ifindex_changed(struct team_ifinfo *ifinfo);
+char *team_get_ifinfo_phys_port_id(struct team_ifinfo *ifinfo);
+bool team_is_ifinfo_phys_port_id_changed(struct team_ifinfo *ifinfo);
+size_t team_get_ifinfo_phys_port_id_len(struct team_ifinfo *ifinfo);
+bool team_is_ifinfo_phys_port_id_len_changed(struct team_ifinfo *ifinfo);
 bool team_is_ifinfo_changed(struct team_ifinfo *ifinfo);
 
 /*

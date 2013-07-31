@@ -22,6 +22,7 @@
 #include <netlink/netlink.h>
 #include <netlink/cli/utils.h>
 #include <netlink/cli/link.h>
+#include <netlink/data.h>
 #include <linux/netdevice.h>
 #include <linux/types.h>
 #include <team.h>
@@ -40,15 +41,21 @@ struct team_ifinfo {
 	size_t			orig_hwaddr_len;
 	char			ifname[IFNAMSIZ];
 	uint32_t		master_ifindex;
+#define MAX_PHYS_PORT_ID_LEN 32
+	char			phys_port_id[MAX_PHYS_PORT_ID_LEN];
+	size_t			phys_port_id_len;
 	int			changed;
 };
 
-#define CHANGED_HWADDR		(1 << 0)
-#define CHANGED_HWADDR_LEN	(1 << 1)
-#define CHANGED_IFNAME		(1 << 2)
-#define CHANGED_MASTER_IFINDEX	(1 << 3)
-#define CHANGED_ANY		(CHANGED_HWADDR | CHANGED_HWADDR_LEN |	\
-				 CHANGED_IFNAME | CHANGED_MASTER_IFINDEX)
+#define CHANGED_HWADDR			(1 << 0)
+#define CHANGED_HWADDR_LEN		(1 << 1)
+#define CHANGED_IFNAME			(1 << 2)
+#define CHANGED_MASTER_IFINDEX		(1 << 3)
+#define CHANGED_PHYS_PORT_ID		(1 << 4)
+#define CHANGED_PHYS_PORT_ID_LEN	(1 << 5)
+#define CHANGED_ANY	(CHANGED_HWADDR | CHANGED_HWADDR_LEN |		\
+			 CHANGED_IFNAME | CHANGED_MASTER_IFINDEX |	\
+			 CHANGED_PHYS_PORT_ID |	CHANGED_PHYS_PORT_ID_LEN)
 
 static void set_changed(struct team_ifinfo *ifinfo, int bit)
 {
@@ -113,11 +120,37 @@ static void update_master(struct team_ifinfo *ifinfo, struct rtnl_link *link)
 	}
 }
 
+static void update_phys_port_id(struct team_ifinfo *ifinfo,
+				struct rtnl_link *link)
+{
+#ifdef HAVE_RTNL_LINK_GET_PHYS_ID
+	struct nl_data *nl_data;
+	char *phys_port_id = NULL;
+	size_t phys_port_id_len = 0;
+
+	nl_data = rtnl_link_get_phys_port_id(link);
+	if (nl_data) {
+		phys_port_id_len = nl_data_get_size(nl_data);
+		phys_port_id = nl_data_get(nl_data);
+	}
+
+	if (ifinfo->phys_port_id_len != phys_port_id_len) {
+		ifinfo->phys_port_id_len = phys_port_id_len;
+		set_changed(ifinfo, CHANGED_PHYS_PORT_ID_LEN);
+	}
+	if (memcmp(ifinfo->phys_port_id, phys_port_id, phys_port_id_len)) {
+		memcpy(ifinfo->phys_port_id, phys_port_id, phys_port_id_len);
+		set_changed(ifinfo, CHANGED_PHYS_PORT_ID);
+	}
+#endif
+}
+
 static void ifinfo_update(struct team_ifinfo *ifinfo, struct rtnl_link *link)
 {
 	update_ifname(ifinfo, link);
 	update_master(ifinfo, link);
 	update_hwaddr(ifinfo, link);
+	update_phys_port_id(ifinfo, link);
 }
 
 static struct team_ifinfo *ifinfo_find(struct team_handle *th, uint32_t ifindex)
@@ -502,6 +535,61 @@ bool team_is_ifinfo_master_ifindex_changed(struct team_ifinfo *ifinfo)
 	return is_changed(ifinfo, CHANGED_MASTER_IFINDEX);
 }
 
+/**
+ * team_get_ifinfo_phys_port_id:
+ * @ifinfo: ifinfo structure
+ *
+ * Get ifinfo physical port ID.
+ *
+ * Returns: pointer to memory place where physical por ID is.
+ **/
+TEAM_EXPORT
+char *team_get_ifinfo_phys_port_id(struct team_ifinfo *ifinfo)
+{
+	return ifinfo->phys_port_id;
+}
+
+/**
+ * team_is_ifinfo_phys_port_id_changed:
+ * @ifinfo: ifinfo structure
+ *
+ * See if ifinfo physical port ID got changed.
+ *
+ * Returns: true if physical port ID. got changed.
+ **/
+TEAM_EXPORT
+bool team_is_ifinfo_phys_port_id_changed(struct team_ifinfo *ifinfo)
+{
+	return is_changed(ifinfo, CHANGED_PHYS_PORT_ID);
+}
+
+/**
+ * team_get_ifinfo_phys_port_id_len:
+ * @ifinfo: ifinfo structure
+ *
+ * Get ifinfo physical port ID length.
+ *
+ * Returns: physical port ID length.
+ **/
+TEAM_EXPORT
+size_t team_get_ifinfo_phys_port_id_len(struct team_ifinfo *ifinfo)
+{
+	return ifinfo->phys_port_id_len;
+}
+
+/**
+ * team_is_ifinfo_phys_port_id_len_changed:
+ * @ifinfo: ifinfo structure
+ *
+ * See if ifinfo physical port ID length got changed.
+ *
+ * Returns: true if ifinfo physical port ID length changed.
+ **/
+TEAM_EXPORT
+bool team_is_ifinfo_phys_port_id_len_changed(struct team_ifinfo *ifinfo)
+{
+	return is_changed(ifinfo, CHANGED_PHYS_PORT_ID_LEN);
+}
 
 /**
  * team_is_ifinfo_changed:
