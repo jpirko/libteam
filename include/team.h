@@ -263,7 +263,7 @@ int team_port_add(struct team_handle *th, uint32_t port_ifindex);
 int team_port_remove(struct team_handle *th, uint32_t port_ifindex);
 bool team_is_our_port(struct team_handle *th, uint32_t port_ifindex);
 int team_carrier_set(struct team_handle *th, bool carrier_up);
-bool team_carrier_get(struct team_handle *th);
+int team_carrier_get(struct team_handle *th, bool *carrier_up);
 int team_hwaddr_set(struct team_handle *th, uint32_t ifindex,
 		    const char *addr, unsigned int addr_len);
 int team_hwaddr_get(struct team_handle *th, uint32_t ifindex,

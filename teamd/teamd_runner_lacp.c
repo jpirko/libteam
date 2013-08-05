@@ -464,13 +464,12 @@ static int lacp_set_carrier(struct lacp *lacp, bool carrier_up)
 	int err;
 
 	if (lacp->carrier_up != carrier_up) {
+		lacp->carrier_up = carrier_up;
 		err = team_carrier_set(ctx->th, carrier_up);
 		if (err)
-			return err;
-
+			return err == -EOPNOTSUPP ? 0 : err;
 		teamd_log_info("carrier changed to %s",
 			       carrier_up ? "UP" : "DOWN" );
-		lacp->carrier_up = carrier_up;
 	}
 
 	return 0;
@@ -1341,7 +1340,7 @@ static int lacp_carrier_init(struct teamd_context *ctx, struct lacp *lacp)
 
 	/* initialize carrier control */
 	err = team_carrier_set(ctx->th, false);
-	if (err) {
+	if (err && err != -EOPNOTSUPP) {
 		teamd_log_err("Failed to set carrier down.");
 		return err;
 	}
@@ -1356,7 +1355,7 @@ static int lacp_carrier_fini(struct teamd_context *ctx, struct lacp *lacp)
 	int err;
 
 	err = team_carrier_set(ctx->th, false);
-	if (err) {
+	if (err && err != -EOPNOTSUPP) {
 		teamd_log_err("Failed to set carrier down.");
 		return err;
 	}

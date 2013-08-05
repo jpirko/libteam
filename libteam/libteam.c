@@ -1506,6 +1506,7 @@ int team_port_remove(struct team_handle *th, uint32_t port_ifindex)
 TEAM_EXPORT
 int team_carrier_set(struct team_handle *th, bool carrier_up)
 {
+#ifdef HAVE_RTNL_LINK_SET_CARRIER
 	struct rtnl_link *link;
 	int err;
 
@@ -1525,19 +1526,24 @@ int team_carrier_set(struct team_handle *th, bool carrier_up)
 		return 0;
 	}
 	return err;
+#else
+	return -EOPNOTSUPP;
+#endif
 }
 
 /**
  * team_carrier_get:
  * @th: libteam library context
+ * @carrier_up: where the carrier state will be stored
  *
  * Gets carrier status of the master network interface
  *
  * Returns: zero on success or negative number in case of an error.
  **/
 TEAM_EXPORT
-bool team_carrier_get(struct team_handle *th)
+int team_carrier_get(struct team_handle *th, bool *carrier_up)
 {
+#ifdef HAVE_RTNL_LINK_GET_CARRIER
 	struct rtnl_link *link;
 	int carrier;
 	int err;
@@ -1549,7 +1555,11 @@ bool team_carrier_get(struct team_handle *th)
 	carrier = rtnl_link_get_carrier(link);
 
 	rtnl_link_put(link);
-	return carrier ? true : false;
+	*carrier_up = carrier ? true : false;
+	return 0;
+#else
+	return -EOPNOTSUPP;
+#endif
 }
 
 /**
