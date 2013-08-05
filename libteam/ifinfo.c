@@ -198,8 +198,6 @@ static void obj_input(struct nl_object *obj, void *arg, bool getlink)
 	uint32_t ifindex;
 	int err;
 
-	if (nl_object_get_msgtype(obj) != RTM_NEWLINK)
-		return;
 	link = (struct rtnl_link *) obj;
 
 	ifindex = rtnl_link_get_ifindex(link);
@@ -232,6 +230,9 @@ int ifinfo_event_handler(struct nl_msg *msg, void *arg)
 {
 	struct team_handle *th = arg;
 
+	if (nlmsg_hdr(msg)->nlmsg_type != RTM_NEWLINK)
+		return NL_OK;
+
 	if (nl_msg_parse(msg, &event_handler_obj_input, th) < 0)
 		err(th, "Unknown message type.");
 	return NL_STOP;
@@ -251,6 +252,9 @@ static void valid_handler_obj_input(struct nl_object *obj, void *arg)
 static int valid_handler(struct nl_msg *msg, void *arg)
 {
 	struct team_handle *th = arg;
+
+	if (nlmsg_hdr(msg)->nlmsg_type != RTM_NEWLINK)
+		return NL_OK;
 
 	if (nl_msg_parse(msg, &valid_handler_obj_input, th) < 0)
 		err(th, "Unknown message type.");
