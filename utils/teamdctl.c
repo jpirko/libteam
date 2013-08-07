@@ -453,7 +453,7 @@ static int stateview_json_ports_process(char *runner_name, json_t *dump_json)
 	err = json_unpack(dump_json, "{s:o}", "ports", &ports_json);
 	if (err)
 		return 0;
-	pr_err("ports:\n");
+	pr_out("ports:\n");
 	for (iter = json_object_iter(ports_json); iter;
 	     iter = json_object_iter_next(ports_json, iter)) {
 		const char *port_name = json_object_iter_key(iter);
