@@ -1,7 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_INIT([libteam], [1.5], [jiri@resnulli.us])
+AC_INIT([libteam], [1.6], [jiri@resnulli.us])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS([config.h])
@@ -23,9 +23,9 @@ AM_PROG_AR
 # 6. If any interfaces have been removed or changed since the last public
 #    release, then set age to 0.
 
-AC_SUBST(LIBTEAM_CURRENT, 4)
+AC_SUBST(LIBTEAM_CURRENT, 5)
 AC_SUBST(LIBTEAM_REVISION, 0)
-AC_SUBST(LIBTEAM_AGE, 3)
+AC_SUBST(LIBTEAM_AGE, 0)
 
 AC_SUBST(LIBTEAMDCTL_CURRENT, 0)
 AC_SUBST(LIBTEAMDCTL_REVISION, 1)
