@@ -1,6 +1,6 @@
 /*
  *   ports.c - Wrapper for team generic netlink port-related communication
- *   Copyright (C) 2012 Jiri Pirko <jpirko@redhat.com>
+ *   Copyright (C) 2012-2013 Jiri Pirko <jiri@resnulli.us>
  *
  *   This library is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU Lesser General Public

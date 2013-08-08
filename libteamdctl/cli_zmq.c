@@ -1,5 +1,4 @@
 /*   cli_zmq.c - Teamd daemon control library teamd ZeroMQ library client
-
  *   Copyright (C) 2013 Jiri Zupka <jzupka@redhat.com>
  *
  *   This library is free software; you can redistribute it and/or

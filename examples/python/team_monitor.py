@@ -2,7 +2,7 @@
 """
 Team monitor
 
-   Copyright (C) 2011 Jiri Pirko <jpirko@redhat.com>
+   Copyright (C) 2011-2013 Jiri Pirko <jiri@resnulli.us>
 
    This library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
@@ -20,7 +20,7 @@ Team monitor
 """
 
 __author__ = """
-jpirko@redhat.com (Jiri Pirko)
+jiri@resnulli.us (Jiri Pirko)
 """
 
 import sys

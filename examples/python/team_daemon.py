@@ -4,7 +4,7 @@ Team daemon example. Implements very basic active backup functionality.
 Note that this application spawns its own team device instead of connecting
 to an existing one.
 
-   Copyright (C) 2011 Jiri Pirko <jpirko@redhat.com>
+   Copyright (C) 2011-2013 Jiri Pirko <jiri@resnulli.us>
 
    This library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
@@ -22,7 +22,7 @@ to an existing one.
 """
 
 __author__ = """
-jpirko@redhat.com (Jiri Pirko)
+jiri@resnulli.us (Jiri Pirko)
 """
 
 import sys
