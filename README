@@ -29,16 +29,3 @@ Copyright (C) 2011-2013 Jiri Pirko <jiri@resnulli.us>
 
 libteam is distributed under GNU Lesser General Public License version 2.1.
 See the file "COPYING" in the source distribution for information on terms & conditions for accessing and otherwise using libteam.
-
-Documentation:
-http://www.libteam.org
-https://fedorahosted.org/libteam/wiki/InfrastructureSpecification
-
-How to install:
-1) Install autotools, libtool, >=libnl 3.2.7
-2) In main dir start
-    $ ./autogen.sh
-    $ ./configure
-    $ make
-    $ sudo make install
-
