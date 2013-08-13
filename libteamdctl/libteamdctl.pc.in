@@ -5,7 +5,7 @@ includedir=@includedir@
 
 Name: libteamdctl
 Description: Teamd daemon control library.
-Requires: jansson-2.4
+Requires: jansson
 Version: @PACKAGE_VERSION@
 Libs: -L${libdir} -lteamdctl
 Cflags: -I${includedir}/teamdctl.h
