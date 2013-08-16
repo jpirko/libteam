@@ -872,8 +872,11 @@ static int check_team_devname(char *team_devname)
 	uint32_t ifindex = ifindex;
 
 	err = ifname2ifindex(&ifindex, team_devname);
-	if (err)
+	if (err) {
+		pr_err("Device \"%s\" - failed to get interface index (%s)\n",
+		       team_devname, strerror(-err));
 		return err;
+	}
 	if (!ifindex) {
 		pr_err("Device \"%s\" does not exist\n", team_devname);
 		return -ENODEV;
