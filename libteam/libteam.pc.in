@@ -8,4 +8,4 @@ Description: Libteam library.
 Requires: libnl-3.0
 Version: @PACKAGE_VERSION@
 Libs: -L${libdir} -lteam
-Cflags: -I${includedir}/team.h
+Cflags: -I${includedir}

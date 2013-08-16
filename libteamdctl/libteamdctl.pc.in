@@ -8,4 +8,4 @@ Description: Teamd daemon control library.
 Requires: jansson
 Version: @PACKAGE_VERSION@
 Libs: -L${libdir} -lteamdctl
-Cflags: -I${includedir}/teamdctl.h
+Cflags: -I${includedir}
