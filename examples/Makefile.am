@@ -6,7 +6,7 @@ AM_CFLAGS = -I${top_srcdir}/include
 
 LDADD = $(top_builddir)/libteam/libteam.la
 
-bin_PROGRAMS=team_manual_control team_monitor
+noinst_PROGRAMS=team_manual_control team_monitor
 team_manual_control_SOURCES=team_manual_control.c
 team_monitor_SOURCES=team_monitor.c
 
