@@ -72,12 +72,12 @@ To convert the current 'bond0' ifcfg configuration to team ifcfg renaming the in
 .PP
 To convert given bonding parameters with ports without any ifcfg:
 .PP
-.ni
-# bond2team --bonding_opts '\%mode=1 \%miimon=500 \%primary=eth1 \%primary_reselect=0' \%--port \%eth1 \%--port \%eth2 \%--port \%eth3 \%--port \%eth4
+.nf
+# bond2team \-\-bonding_opts '\%mode=1 \%miimon=500 \%primary=eth1 \%primary_reselect=0' \%--port \%eth1 \%--port \%eth2 \%--port \%eth3 \%--port \%eth4
 .fi
 .PP
 For more examples, see the option
-.B --examples.
+.B \-\-examples.
 .SH CAVEATS
 .PP
 The tool will not convert any other configuration which might be tied to the current setup. For instance, firewall rules, aliases interfaces, bridges, and etc.
