@@ -8,7 +8,7 @@ bond2team \(em Converts bonding configuration to team
 .PP
 bond2team is a tool to convert bonding options to team trying as much as possible to keep the original functionality.
 .PP
-The resulted files are saved in a temporary directory using ifcfg style by default. In the case of converting a ifcfg file, it translates the bonding options to team preserving all other options. In that case, it converts the respective slave ifcfg files to team port preserving all their other options too. In case of converting from given bonding options in the command line, the tool can use the specified ports as team ports.
+The resulting files are saved in a temporary directory using ifcfg style by default. In the case of converting an ifcfg file, it translates the bonding options to team, preserving all other options. In that case, it converts the respective slave ifcfg files to team port, preserving all their other options too. In case of converting from given bonding options in the command line, the tool can use the specified ports as team ports.
 .SH OPTIONS
 .TP
 .B "\-\-master <interface>"
@@ -64,7 +64,7 @@ To convert the current 'bond0' ifcfg configuration to team ifcfg:
 .PP
 To convert the current 'bond0' ifcfg configuration to team ifcfg renaming the interface name to 'team0'.
 .B Caution
-: firewall rules, aliases interfaces, etc., that might be tied to the original interface name can break after the renaming because the tool will only change the ifcfg file, nothing else.
+: firewall rules, alias interfaces, etc., that might be tied to the original interface name can break after the renaming because the tool will only change the ifcfg file, nothing else.
 .PP
 .nf
 # bond2team \%--master \%bond0 \%--rename \%team0
@@ -80,7 +80,7 @@ For more examples, see the option
 .B \-\-examples.
 .SH CAVEATS
 .PP
-The tool will not convert any other configuration which might be tied to the current setup. For instance, firewall rules, aliases interfaces, bridges, and etc.
+The tool will not convert any other configuration which might be tied to the current setup. For instance, firewall rules, alias interfaces, bridges, and so on.
 .SH AUTHOR
 .PP
 Flavio Leitner is the original author of the tool.
