@@ -59,6 +59,36 @@ static int teamd_ctl_method_port_config_update(struct teamd_context *ctx,
 	return ops->reply_succ(ops_priv, NULL);
 }
 
+static int teamd_ctl_method_port_config_dump(struct teamd_context *ctx,
+					     const struct teamd_ctl_method_ops *ops,
+					     void *ops_priv)
+{
+	const char *port_devname;
+	uint32_t ifindex;
+	char *cfg;
+	int err;
+
+	err = ops->get_args(ops_priv, "s", &port_devname);
+	if (err)
+		return ops->reply_err(ops_priv, "InvalidArgs", "Did not receive correct message arguments.");
+	teamd_log_dbgx(ctx, 2, "port_devname \"%s\"", port_devname);
+
+	ifindex = team_ifname2ifindex(ctx->th, port_devname);
+	if (!ifindex) {
+		teamd_log_err("Device \"%s\" does not exist.", port_devname);
+		return ops->reply_err(ops_priv, "NoSuchDev", "No such device.");
+	}
+	err = teamd_config_port_dump(ctx, port_devname, &cfg);
+	if (err) {
+		teamd_log_err("Failed to dump config for port \"%s\".",
+			      port_devname);
+		return ops->reply_err(ops_priv, "ConfigDumpFail", "Failed to dump config.");
+	}
+	err = ops->reply_succ(ops_priv, cfg);
+	free(cfg);
+	return err;
+}
+
 static int teamd_ctl_method_port_add(struct teamd_context *ctx,
 				     const struct teamd_ctl_method_ops *ops,
 				     void *ops_priv)
@@ -224,6 +254,11 @@ static const struct teamd_ctl_method teamd_ctl_method_list[] = {
 	{
 		.name = "PortConfigUpdate",
 		.func = teamd_ctl_method_port_config_update,
+
+	},
+	{
+		.name = "PortConfigDump",
+		.func = teamd_ctl_method_port_config_dump,
 
 	},
 	{

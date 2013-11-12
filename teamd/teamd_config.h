@@ -30,6 +30,8 @@ int teamd_config_dump(struct teamd_context *ctx, char **p_config_dump);
 int teamd_config_actual_dump(struct teamd_context *ctx, char **p_config_dump);
 int teamd_config_port_update(struct teamd_context *ctx, const char *port_name,
 			     const char *json_port_cfg_str);
+int teamd_config_port_dump(struct teamd_context *ctx, const char *port_name,
+			   char **p_config_port_dump);
 
 struct teamd_config_path_cookie;
 struct teamd_config_path_cookie *

@@ -189,6 +189,33 @@ new_port_decref:
 	return err;
 }
 
+int teamd_config_port_dump(struct teamd_context *ctx, const char *port_name,
+			   char **p_config_port_dump)
+{
+	json_t *port_json;
+	char *dump;
+	int err;
+
+	if (!teamd_get_port_by_ifname(ctx, port_name))
+		return -ENODEV;
+
+	err = json_unpack(ctx->config_json, "{s:{s:o}}", "ports", port_name,
+			  &port_json);
+	if (err)
+		port_json = json_object();
+	else
+		json_incref(port_json);
+	if (!port_json)
+		return -ENOMEM;
+
+	dump = json_dumps(port_json, TEAMD_JSON_DUMPS_FLAGS);
+
+	json_decref(port_json);
+	if (!dump)
+		return -ENOMEM;
+	*p_config_port_dump = dump;
+	return 0;
+}
 static int teamd_config_object_get(struct teamd_context *ctx,
 				   json_t **p_json_obj,
 				   const char *fmt, va_list ap)
