@@ -22,6 +22,7 @@
 
 #include <stdbool.h>
 #include <syslog.h>
+#include <private/list.h>
 #include <teamdctl.h>
 
 #include "config.h"
@@ -43,11 +44,13 @@ struct teamdctl {
 	char *addr;
 	const struct teamdctl_cli *cli;
 	void *cli_priv;
-	struct {
-		char *config;
-		char *config_actual;
-		char *state;
-	} cached_reply;
+	struct list_item reply_cache_list;
+};
+
+struct teamdctl_reply_cache_item {
+	struct list_item list;
+	char *reply;
+	char id[0];
 };
 
 /**

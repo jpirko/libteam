@@ -52,8 +52,11 @@ int teamdctl_port_config_update_raw(struct teamdctl *tdc,
 				    const char *port_devname,
 				    const char *port_config_raw);
 char *teamdctl_config_get_raw(struct teamdctl *tdc);
+int teamdctl_config_get_raw_direct(struct teamdctl *tdc, char **p_cfg);
 char *teamdctl_config_actual_get_raw(struct teamdctl *tdc);
+int teamdctl_config_actual_get_raw_direct(struct teamdctl *tdc, char **p_cfg);
 char *teamdctl_state_get_raw(struct teamdctl *tdc);
+int teamdctl_state_get_raw_direct(struct teamdctl *tdc, char **p_cfg);
 int teamdctl_state_item_value_get(struct teamdctl *tdc, const char *item_path,
 				  char **p_value);
 int teamdctl_state_item_value_set(struct teamdctl *tdc, const char *item_path,

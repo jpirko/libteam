@@ -25,6 +25,7 @@
 #include <syslog.h>
 #include <errno.h>
 #include <private/misc.h>
+#include <private/list.h>
 #include <teamdctl.h>
 
 #include "config.h"
@@ -72,6 +73,75 @@ static int log_priority(const char *priority)
 }
 
 /**
+ * SECTION: reply cache
+ * @short_description: libteamdctl reply cache facility
+ */
+
+static void reply_cache_clean(struct teamdctl *tdc)
+{
+	struct teamdctl_reply_cache_item *rcitem;
+	struct teamdctl_reply_cache_item *tmp;
+
+	list_for_each_node_entry_safe(rcitem, tmp,
+				      &tdc->reply_cache_list, list) {
+		list_del(&rcitem->list);
+		free(rcitem->reply);
+		free(rcitem);
+	}
+}
+
+static void replace_str(char **p_str, char *new)
+{
+	if (*p_str)
+		free(*p_str);
+	*p_str = new;
+}
+
+static struct teamdctl_reply_cache_item *find_rcitem(struct teamdctl *tdc,
+						     const char *id)
+{
+	struct teamdctl_reply_cache_item *rcitem;
+
+	list_for_each_node_entry(rcitem, &tdc->reply_cache_list, list) {
+		if (!strcmp(rcitem->id, id))
+			return rcitem;
+	}
+	return NULL;
+}
+
+static char *reply_cache_query(struct teamdctl *tdc, const char *id)
+{
+	struct teamdctl_reply_cache_item *rcitem;
+
+	rcitem = find_rcitem(tdc, id);
+	if (rcitem)
+		return rcitem->reply;
+	return NULL;
+}
+
+static char *reply_cache_update(struct teamdctl *tdc, const char *id,
+				char *reply)
+{
+	struct teamdctl_reply_cache_item *rcitem;
+
+	rcitem = find_rcitem(tdc, id);
+	if (rcitem)
+		goto skip_create;
+
+	rcitem = myzalloc(sizeof(*rcitem) + strlen(id) + 1);
+	if (!rcitem) {
+		free(reply);
+		return NULL;
+	}
+	strcpy(rcitem->id, id);
+	list_add_tail(&tdc->reply_cache_list, &rcitem->list);
+
+skip_create:
+	replace_str(&rcitem->reply, reply);
+	return reply;
+}
+
+/**
  * SECTION: Context functions
  * @short_description: Core context functions
  */
@@ -93,6 +163,7 @@ struct teamdctl *teamdctl_alloc(void)
 	if (!tdc)
 		return NULL;
 
+	list_init(&tdc->reply_cache_list);
 	tdc->log_fn = log_stderr;
 	tdc->log_priority = LOG_ERR;
 	/* environment overwrites config */
@@ -115,9 +186,7 @@ struct teamdctl *teamdctl_alloc(void)
 TEAMDCTL_EXPORT
 void teamdctl_free(struct teamdctl *tdc)
 {
-	free(tdc->cached_reply.config);
-	free(tdc->cached_reply.config_actual);
-	free(tdc->cached_reply.state);
+	reply_cache_clean(tdc);
 	free(tdc);
 }
 
@@ -311,31 +380,37 @@ void teamdctl_disconnect(struct teamdctl *tdc)
 	tdc->cli = NULL;
 }
 
-static void replace_str(char **p_str, char *new)
+
+static int cache_config(struct teamdctl *tdc, const char *id, char **p_reply)
 {
-	if (*p_str)
-		free(*p_str);
-	*p_str = new;
+	int err;
+	char *reply;
+
+	err = cli_method_call(tdc, id, &reply, "");
+	if (err)
+		return err;
+	reply = reply_cache_update(tdc, id, reply);
+	if (!reply)
+		return -ENOMEM;
+	if (p_reply)
+		*p_reply = reply;
+	return 0;
 }
 
 TEAMDCTL_EXPORT
 int teamdctl_refresh(struct teamdctl *tdc)
 {
-	char *reply;
 	int err;
 
-	err = cli_method_call(tdc, "ConfigDump", &reply, "");
+	err = cache_config(tdc, "ConfigDump", NULL);
 	if (err)
 		return err;
-	replace_str(&tdc->cached_reply.config, reply);
-	err = cli_method_call(tdc, "ConfigDumpActual", &reply, "");
+	err = cache_config(tdc, "ConfigDumpActual", NULL);
 	if (err)
 		return err;
-	replace_str(&tdc->cached_reply.config_actual, reply);
-	err = cli_method_call(tdc, "StateDump", &reply, "");
+	err = cache_config(tdc, "StateDump", NULL);
 	if (err)
 		return err;
-	replace_str(&tdc->cached_reply.state, reply);
 	return 0;
 }
 
@@ -393,13 +468,31 @@ int teamdctl_port_config_update_raw(struct teamdctl *tdc,
  * @tdc: libteamdctl library context
  *
  * Gets raw config string.
+ * Using reply cache. Return value is never NULL.
+ * To refresh the cache, use teamdctl_refresh function.
  *
  * Returns: pointer to cached config string.
  **/
 TEAMDCTL_EXPORT
 char *teamdctl_config_get_raw(struct teamdctl *tdc)
 {
-	return tdc->cached_reply.config;
+	return reply_cache_query(tdc, "ConfigDump");
+}
+
+/**
+ * teamdctl_config_get_raw_direct:
+ * @tdc: libteamdctl library context
+ * @p_cfg: pointer to string which will be set
+ *
+ * Gets raw config string.
+ * Does direct method call avoiding possible stale data in the cache.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAMDCTL_EXPORT
+int teamdctl_config_get_raw_direct(struct teamdctl *tdc, char **p_cfg)
+{
+	return cache_config(tdc, "ConfigActual", p_cfg);
 }
 
 /**
@@ -407,13 +500,31 @@ char *teamdctl_config_get_raw(struct teamdctl *tdc)
  * @tdc: libteamdctl library context
  *
  * Gets raw actual config string.
+ * Using reply cache. Return value is never NULL.
+ * To refresh the cache, use teamdctl_refresh function.
  *
  * Returns: pointer to cached actual config string.
  **/
 TEAMDCTL_EXPORT
 char *teamdctl_config_actual_get_raw(struct teamdctl *tdc)
 {
-	return tdc->cached_reply.config_actual;
+	return reply_cache_query(tdc, "ConfigDumpActual");
+}
+
+/**
+ * teamdctl_config_actual_get_raw_direct:
+ * @tdc: libteamdctl library context
+ * @p_cfg: pointer to string which will be set
+ *
+ * Gets raw actual config string.
+ * Does direct method call avoiding possible stale data in the cache.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAMDCTL_EXPORT
+int teamdctl_config_actual_get_raw_direct(struct teamdctl *tdc, char **p_cfg)
+{
+	return cache_config(tdc, "ConfigDumpActual", p_cfg);
 }
 
 /**
@@ -421,13 +532,31 @@ char *teamdctl_config_actual_get_raw(struct teamdctl *tdc)
  * @tdc: libteamdctl library context
  *
  * Gets raw state string.
+ * Using reply cache. Return value is never NULL.
+ * To refresh the cache, use teamdctl_refresh function.
  *
  * Returns: pointer to cached state string.
  **/
 TEAMDCTL_EXPORT
 char *teamdctl_state_get_raw(struct teamdctl *tdc)
 {
-	return tdc->cached_reply.state;
+	return reply_cache_query(tdc, "StateDump");
+}
+
+/**
+ * teamdctl_state_get_raw_direct:
+ * @tdc: libteamdctl library context
+ * @p_cfg: pointer to string which will be set
+ *
+ * Gets raw state string.
+ * Does direct method call avoiding possible stale data in the cache.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAMDCTL_EXPORT
+int teamdctl_state_get_raw_direct(struct teamdctl *tdc, char **p_cfg)
+{
+	return cache_config(tdc, "StateDump", p_cfg);
 }
 
 /**
