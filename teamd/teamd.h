@@ -287,7 +287,7 @@ int teamd_per_port_init(struct teamd_context *ctx);
 void teamd_per_port_fini(struct teamd_context *ctx);
 struct teamd_port *teamd_get_port(struct teamd_context *ctx, uint32_t ifindex);
 struct teamd_port *teamd_get_port_by_ifname(struct teamd_context *ctx,
-					    char *ifname);
+					    const char *ifname);
 struct teamd_port *teamd_get_next_tdport(struct teamd_context *ctx,
 					 struct teamd_port *tdport);
 #define teamd_for_each_tdport(tdport, ctx)				\

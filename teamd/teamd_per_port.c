@@ -231,7 +231,7 @@ static struct port_obj *get_port_obj(struct teamd_context *ctx,
 }
 
 static struct port_obj *get_port_obj_by_ifname(struct teamd_context *ctx,
-					       char *ifname)
+					       const char *ifname)
 {
 	struct port_obj *port_obj;
 
@@ -304,7 +304,7 @@ struct teamd_port *teamd_get_port(struct teamd_context *ctx, uint32_t ifindex)
 }
 
 struct teamd_port *teamd_get_port_by_ifname(struct teamd_context *ctx,
-					    char *ifname)
+					    const char *ifname)
 {
 	struct port_obj *port_obj;
 

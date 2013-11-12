@@ -138,7 +138,7 @@ int teamd_config_actual_dump(struct teamd_context *ctx, char **p_config_dump)
 			const char *port_name = json_object_iter_key(iter);
 
 			iter = json_object_iter_next(ports_obj, iter);
-			if (!teamd_get_port_by_ifname(ctx, (char *) port_name))
+			if (!teamd_get_port_by_ifname(ctx, port_name))
 				json_object_del(ports_obj, port_name);
 		}
 	}

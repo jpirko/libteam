@@ -562,7 +562,7 @@ static int ab_state_active_port_set(struct teamd_context *ctx,
 	struct ab *ab = priv;
 	struct teamd_port *tdport;
 
-	tdport = teamd_get_port_by_ifname(ctx, (char *) gsc->data.str_val.ptr);
+	tdport = teamd_get_port_by_ifname(ctx, (const char *) gsc->data.str_val.ptr);
 	if (!tdport)
 		return -ENODEV;
 	info = malloc(sizeof(*info));
