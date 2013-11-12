@@ -534,42 +534,6 @@ static int stateview_process_reply(char *reply)
 {
 	return stateview_json_process(reply);
 }
-/*
-static int portconfigupdate_msg_prepare(const struct msg_ops *msg_ops,
-					void *msg_ops_priv,
-					int argc, char **argv, void *priv)
-{
-	return msg_ops->set_args(msg_ops_priv, "ss", argv[0], argv[1]);
-}
-*/
-
-static int portconfigdump_json_process(char *dump, char *port_name)
-{
-	int err;
-	json_t *json;
-	json_t *port_json;
-	json_t *ports_json;
-
-	err = __jsonload(&json, dump);
-	if (err)
-		return err;
-	err = json_unpack(json, "{s:o}", "ports", &ports_json);
-	if (err) {
-		pr_err("Failed to parse JSON dump.\n");
-		err = -EINVAL;
-		goto free_json;
-	}
-	err = json_unpack(ports_json, "{s:o}", port_name, &port_json);
-	if (err) {
-		pr_err("Port named \"%s\" not found.\n", port_name);
-		err = -EINVAL;
-		goto free_json;
-	}
-	err = __jsondump(port_json);
-free_json:
-	json_decref(json);
-	return err;
-}
 
 static int call_method_config_jsonsimpledump(struct teamdctl *tdc,
 					     int argc, char **argv)
@@ -622,8 +586,13 @@ static int call_method_port_config_update(struct teamdctl *tdc,
 static int call_method_port_config_dump(struct teamdctl *tdc,
 					int argc, char **argv)
 {
-	return portconfigdump_json_process(teamdctl_config_actual_get_raw(tdc),
-					   argv[0]);
+	int err;
+	char *cfg;
+
+	err = teamdctl_port_config_get_raw_direct(tdc, argv[0], &cfg);
+	if (err)
+		return err;
+	return jsonsimpledump_process_reply(cfg);
 }
 
 static int call_method_state_item_get(struct teamdctl *tdc,
