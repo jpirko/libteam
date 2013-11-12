@@ -24,6 +24,8 @@
 #include <ctype.h>
 #include <syslog.h>
 #include <errno.h>
+#include <sys/socket.h>
+#include <linux/if.h>
 #include <private/misc.h>
 #include <private/list.h>
 #include <teamdctl.h>
@@ -461,6 +463,41 @@ int teamdctl_port_config_update_raw(struct teamdctl *tdc,
 {
 	return cli_method_call(tdc, "PortConfigUpdate", NULL,
 			       "ss", port_devname, port_config_raw);
+}
+
+/**
+ * teamdctl_port_config_get_raw_direct:
+ * @tdc: libteamdctl library context
+ * @port_devname: port device name
+ * @p_cfg: pointer to string which will be set
+ *
+ * Gets raw port config string.
+ * Does direct method call avoiding possible stale data in the cache.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAMDCTL_EXPORT
+int teamdctl_port_config_get_raw_direct(struct teamdctl *tdc,
+					const char *port_devname,
+					char **p_cfg)
+{
+	int err;
+	char *reply;
+#define PC_ID_PREFIX "_portcnf_"
+	char id[sizeof(PC_ID_PREFIX) + IFNAMSIZ + 1];
+
+	if (strlen(port_devname) > IFNAMSIZ)
+		return -EINVAL;
+	err = cli_method_call(tdc, "PortConfigDump", &reply, "s", port_devname);
+	if (err)
+		return err;
+	sprintf(id, "%s%s", PC_ID_PREFIX, port_devname);
+	reply = reply_cache_update(tdc, id, reply);
+	if (!reply)
+		return -ENOMEM;
+	if (p_cfg)
+		*p_cfg = reply;
+	return 0;
 }
 
 /**
