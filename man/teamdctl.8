@@ -52,14 +52,14 @@ Prints out state of teamd parsed from JSON state document.
 Finds state item in JSON state document and returns its value.
 .TP
 .BI "state item set " "state_item_path value"
-Finds state item in JSON state document and sets its value by value parameter. This is available only for limited number of paths:
+Finds state item in JSON state document and sets its value by value parameter. This is available only for a limited number of paths:
 .RS 7
 .PP
 .BR "ports.PORTIFNAME.runner.aggregator.selected "\(em
-This is available for lacp runner. User can manually select aggragator.
+This is available for lacp runner. User can manually select the aggregator.
 .PP
 .BR "runner.active_port "\(em
-This is available for activebackup runner. User can manually select active port.
+This is available for activebackup runner. User can manually select the active port.
 .RE
 .TP
 .BI "port add " portdev
