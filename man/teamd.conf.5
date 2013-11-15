@@ -33,7 +33,7 @@ Implements 802.3ad LACP protocol. Can use same Tx port selection possibilities a
 .RE
 .TP
 .BR "notify_peers.count " (int)
-Number of bursts of unsolicited NAs and gratuitous ARPs sent after port is enabled/disabled.
+Number of bursts of unsolicited NAs and gratuitous ARP packets sent after port is enabled or disabled.
 .RS 7
 .PP
 Default:
@@ -45,7 +45,7 @@ Default for activebackup runner:
 .RE
 .TP
 .BR "notify_peers.interval " (int)
-Value is positive number in milliseconds. Specifies an interval between notify peers bursts.
+Value is positive number in milliseconds. Specifies an interval between bursts of notify-peer packets.
 .RS 7
 .PP
 Default:
@@ -53,7 +53,7 @@ Default:
 .RE
 .TP
 .BR "mcast_rejoin.count " (int)
-Number of bursts of multicast group rejoins sent after port is enabled/disabled.
+Number of bursts of multicast group rejoin requests sent after port is enabled or disabled.
 .RS 7
 .PP
 Default:
@@ -65,7 +65,7 @@ Default for activebackup runner:
 .RE
 .TP
 .BR "mcast_rejoin.interval " (int)
-Value is positive number in milliseconds. Specifies an interval between multicast group rejoin bursts.
+Value is positive number in milliseconds. Specifies an interval between bursts of multicast group rejoin requests.
 .RS 7
 .PP
 Default:
@@ -73,7 +73,7 @@ Default:
 .RE
 .TP
 .BR "link_watch.name "| " ports.PORTIFNAME.link_watch.name " (string)
-Name of link watcher to be used. There are the following link watchers available:
+Name of link watcher to be used. The following link watchers are available:
 .RS 7
 .PP
 .BR "ethtool "\(em
@@ -87,7 +87,7 @@ Similar to the previous, except that it uses IPv6 Neighbor Solicitation / Neighb
 .PP
 .TP
 .BR "ports " (object)
-List of port NICs to be used in team device.
+List of ports, network devices, to be used in a team device.
 .PP
 See examples for more information.
 .RE
@@ -109,7 +109,7 @@ This defines the policy of how hardware addresses of team device and port device
 All ports will always have the same hardware address as the associated team device.
 .PP
 .BR "by_active "\(em
-Team device adopts the hardware address of currently active port. This is useful in case the port device is not able to change its hardware address.
+Team device adopts the hardware address of the currently active port. This is useful when the port device is not able to change its hardware address.
 .PP
 .BR "only_active "\(em
 Only the active port adopts the hardware address of the team device. The others have their own.
@@ -231,7 +231,7 @@ Default:
 .RE
 .TP
 .BR "runner.agg_select_policy " (string)
-This selects policy on how the aggregators will be selected. Following are available:
+This selects the policy of how the aggregators will be selected. The following are available:
 .RS 7
 .PP
 .BR "lacp_prio "\(em
@@ -239,7 +239,7 @@ Aggregator with highest priority according to LACP standard will be selected. Ag
 .BR "lacp_prio".
 .PP
 .BR "lacp_prio_stable "\(em
-Same as previous one, except do not replace selected aggregator if is still usable.
+Same as previous one, except do not replace selected aggregator if it is still usable.
 .PP
 .BR "bandwidth "\(em
 Select aggregator with highest total bandwidth.
@@ -271,7 +271,7 @@ Default:
 .SH ETHTOOL LINK WATCH SPECIFIC OPTIONS
 .TP
 .BR "link_watch.delay_up "| " ports.PORTIFNAME.link_watch.delay_up " (int)
-Value is positive number in milliseconds. It is the delay between the link coming up and the runner being notified about it.
+Value is a positive number in milliseconds. It is the delay between the link coming up and the runner being notified about it.
 .RS 7
 .PP
 Default:
@@ -279,7 +279,7 @@ Default:
 .RE
 .TP
 .BR "link_watch.delay_down "| " ports.PORTIFNAME.link_watch.delay_down " (int)
-Value is positive number in milliseconds. It is the delay between the link going down and the runner being notified about it.
+Value is a positive number in milliseconds. It is the delay between the link going down and the runner being notified about it.
 .RS 7
 .PP
 Default:
@@ -289,10 +289,10 @@ Default:
 .SH ARP PING LINK WATCH SPECIFIC OPTIONS
 .TP
 .BR "link_watch.interval "| " ports.PORTIFNAME.link_watch.interval " (int)
-Value is positive number in milliseconds. It's the interval between ARP requests being sent.
+Value is a positive number in milliseconds. It is the interval between ARP requests being sent.
 .TP
 .BR "link_watch.init_wait "| " ports.PORTIFNAME.link_watch.init_wait " (int)
-Value is positive number in milliseconds. It's the delay between link watch initialization and first ARP request being sent.
+Value is a positive number in milliseconds. It is the delay between link watch initialization and the first ARP request being sent.
 .RS 7
 .PP
 Default:
@@ -333,10 +333,10 @@ Default:
 .SH NS/NA PING LINK WATCH SPECIFIC OPTIONS
 .TP
 .BR "link_watch.interval "| " ports.PORTIFNAME.link_watch.interval " (int)
-Value is positive number in milliseconds. It's the interval between sending NS packets.
+Value is a positive number in milliseconds. It is the interval between sending NS packets.
 .TP
 .BR "link_watch.init_wait "| " ports.PORTIFNAME.link_watch.init_wait " (int)
-Value is positive number in milliseconds. It's the delay between link watch initialization and first NS packet send.
+Value is a positive number in milliseconds. It is the delay between link watch initialization and the first NS packet being sent.
 .TP
 .BR "link_watch.missed_max "| " ports.PORTIFNAME.link_watch.missed_max " (int)
 Maximum number of missed NA reply packets. If this number is exceeded, link is reported as down.
@@ -372,7 +372,7 @@ Very basic configuration.
 }
 .fi
 .PP
-This configuration uses active-backup runner with ethtool link watcher. Port eth2 has higher priority. But sticky flag ensures that if eth1 becomes active, it stays active while the link remains up.
+This configuration uses active-backup runner with ethtool link watcher. Port eth2 has higher priority, but the sticky flag ensures that if eth1 becomes active, it stays active while the link remains up.
 .PP
 .nf
 {
