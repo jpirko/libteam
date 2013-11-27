@@ -36,7 +36,7 @@ if [ "${DEVICETYPE}" = "Team" ]; then
 		net_log $"Team support not available: teamd not found"
 		exit 1
 	fi
-	# Bring up all existing port devices now
+	# Bring down all existing port devices now
 	for device in $(LANG=C egrep -l "^[[:space:]]*TEAM_MASTER=\"?${DEVICE}\"?" /etc/sysconfig/network-scripts/ifcfg-*) ; do
 		is_ignored_file "$device" && continue
 		/sbin/ifdown ${device##*/}
