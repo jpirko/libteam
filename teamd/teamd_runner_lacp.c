@@ -337,36 +337,9 @@ static int lacp_port_should_be_disabled(struct lacp_port *lacp_port)
 
 static int lacp_port_update_enabled(struct lacp_port *lacp_port)
 {
-	struct teamd_port *tdport = lacp_port->tdport;
-	struct teamd_context *ctx = lacp_port->ctx;
-	bool new_enabled_state;
-	bool curr_enabled_state;
-	int err;
-
-	if (!teamd_port_present(ctx, tdport))
-		return 0;
-	err = teamd_port_enabled(ctx, tdport, &curr_enabled_state);
-	if (err)
-		return err;
-
-	if (!curr_enabled_state && lacp_port_should_be_enabled(lacp_port))
-		new_enabled_state = true;
-	else if (curr_enabled_state && lacp_port_should_be_disabled(lacp_port))
-		new_enabled_state = false;
-	else
-		return 0;
-
-	teamd_log_dbg("%s: %s port", tdport->ifname,
-		      new_enabled_state ? "Enabling": "Disabling");
-	err = team_set_port_enabled(ctx->th, tdport->ifindex,
-				    new_enabled_state);
-	if (err) {
-		teamd_log_err("%s: Failed to %s port.", tdport->ifname,
-			      new_enabled_state ? "enable": "disable");
-		if (!TEAMD_ENOENT(err))
-			return err;
-	}
-	return 0;
+	return teamd_port_check_enable(lacp_port->ctx, lacp_port->tdport,
+				       lacp_port_should_be_enabled(lacp_port),
+				       lacp_port_should_be_disabled(lacp_port));
 }
 
 static bool lacp_ports_aggregable(struct lacp_port *lacp_port1,

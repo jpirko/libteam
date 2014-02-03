@@ -364,3 +364,37 @@ int teamd_port_prio(struct teamd_context *ctx, struct teamd_port *tdport)
 	}
 	return prio;
 }
+
+int teamd_port_check_enable(struct teamd_context *ctx,
+			    struct teamd_port *tdport,
+			    bool should_enable, bool should_disable)
+{
+	bool new_enabled_state;
+	bool curr_enabled_state;
+	int err;
+
+	if (!teamd_port_present(ctx, tdport))
+		return 0;
+	err = teamd_port_enabled(ctx, tdport, &curr_enabled_state);
+	if (err)
+		return err;
+
+	if (!curr_enabled_state && should_enable)
+		new_enabled_state = true;
+	else if (curr_enabled_state && should_disable)
+		new_enabled_state = false;
+	else
+		return 0;
+
+	teamd_log_dbg("%s: %s port", tdport->ifname,
+		      new_enabled_state ? "Enabling": "Disabling");
+	err = team_set_port_enabled(ctx->th, tdport->ifindex,
+				    new_enabled_state);
+	if (err) {
+		teamd_log_err("%s: Failed to %s port.", tdport->ifname,
+			      new_enabled_state ? "enable": "disable");
+		if (!TEAMD_ENOENT(err))
+			return err;
+	}
+	return 0;
+}

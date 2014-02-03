@@ -51,9 +51,19 @@ static void lb_event_watch_port_removed(struct teamd_context *ctx,
 	teamd_balancer_port_removed(lb->tb, tdport);
 }
 
+static int lb_event_watch_port_link_changed(struct teamd_context *ctx,
+					    struct teamd_port *tdport,
+					    void *priv)
+{
+	bool port_up = teamd_link_watch_port_up(ctx, tdport);
+
+	return teamd_port_check_enable(ctx, tdport, port_up, !port_up);
+}
+
 static const struct teamd_event_watch_ops lb_port_watch_ops = {
 	.port_added = lb_event_watch_port_added,
 	.port_removed = lb_event_watch_port_removed,
+	.port_link_changed = lb_event_watch_port_link_changed,
 };
 
 static int lb_init(struct teamd_context *ctx, void *priv)
