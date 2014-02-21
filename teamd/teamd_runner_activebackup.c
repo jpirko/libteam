@@ -440,7 +440,7 @@ static int ab_port_added(struct teamd_context *ctx,
 		teamd_log_err("Failed to load port config.");
 		return err;
 	}
-	/* Newly added ports are enabled */
+	/* Newly added ports are disabled */
 	err = team_set_port_enabled(ctx->th, tdport->ifindex, false);
 	if (err) {
 		teamd_log_err("%s: Failed to disable port.", tdport->ifname);
