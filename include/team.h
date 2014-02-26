@@ -42,6 +42,7 @@ int team_recreate(struct team_handle *th, const char *team_name);
 int team_destroy(struct team_handle *th);
 int team_init(struct team_handle *th, uint32_t ifindex);
 void team_free(struct team_handle *th);
+int team_refresh(struct team_handle *th);
 void team_set_log_fn(struct team_handle *th,
 		     void (*log_fn)(struct team_handle *th, int priority,
 				    const char *file, int line, const char *fn,

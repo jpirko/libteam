@@ -643,6 +643,39 @@ void team_free(struct team_handle *th)
 }
 
 /**
+ * team_refresh:
+ * @th: libteam library context
+ *
+ * This is used for user to refresh internal lists and call event handlers.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_refresh(struct team_handle *th)
+{
+	int err;
+
+	err = ifinfo_list_init(th);
+	if (err) {
+		err(th, "Failed to refresh interface information list.");
+		return err;
+	}
+
+	err = port_list_init(th);
+	if (err) {
+		err(th, "Failed to refresh port list.");
+		return err;
+	}
+
+	err = option_list_init(th);
+	if (err) {
+		err(th, "Failed to refresh option list.");
+		return err;
+	}
+	return 0;
+}
+
+/**
  * team_set_log_fn:
  * @th: libteam library context
  * @log_fn: function to be called for logging messages

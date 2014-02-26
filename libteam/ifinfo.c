@@ -190,7 +190,7 @@ static struct team_ifinfo *ifinfo_find_create(struct team_handle *th,
 	return ifinfo;
 }
 
-static void obj_input(struct nl_object *obj, void *arg, bool getlink)
+static void obj_input(struct nl_object *obj, void *arg, bool event)
 {
 	struct team_handle *th = arg;
 	struct rtnl_link *link;
@@ -205,7 +205,7 @@ static void obj_input(struct nl_object *obj, void *arg, bool getlink)
 	if (!ifinfo)
 		return;
 
-	if (getlink) {
+	if (event) {
 		err = rtnl_link_get_kernel(th->nl_cli.sock, ifindex, NULL, &link);
 		if (err)
 			return;
@@ -214,10 +214,10 @@ static void obj_input(struct nl_object *obj, void *arg, bool getlink)
 	clear_last_changed(th);
 	ifinfo_update(ifinfo, link);
 
-	if (getlink)
+	if (event)
 		rtnl_link_put(link);
 
-	if (ifinfo->changed)
+	if (ifinfo->changed || !event)
 		set_call_change_handlers(th, TEAM_IFINFO_CHANGE);
 }
 
@@ -286,7 +286,7 @@ int get_ifinfo_list(struct team_handle *th)
 	nl_cb_put(cb);
 	if (ret < 0)
 		return -nl2syserr(ret);
-	return 0;
+	return check_call_change_handlers(th, TEAM_IFINFO_CHANGE);
 }
 
 int ifinfo_list_init(struct team_handle *th)
