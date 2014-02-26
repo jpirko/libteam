@@ -861,6 +861,7 @@ static int teamd_add_ports(struct teamd_context *ctx)
 	int err;
 	const char *key;
 
+	ctx->pre_add_ports = false;
 	if (ctx->init_no_ports)
 		return 0;
 
@@ -903,9 +904,11 @@ static int teamd_event_watch_port_added(struct teamd_context *ctx,
 	int err;
 	int tmp;
 
-	err = teamd_hwaddr_check_change(ctx, tdport);
-	if (err)
-		return err;
+	if (!ctx->pre_add_ports) {
+		err = teamd_hwaddr_check_change(ctx, tdport);
+		if (err)
+			return err;
+	}
 
 	err = teamd_config_int_get(ctx, &tmp, "$.ports.%s.queue_id",
 				   tdport->ifname);
@@ -1339,6 +1342,13 @@ skip_create:
 	if (err) {
 		teamd_log_err("Failed to init zmq.");
 		goto dbus_fini;
+	}
+
+	ctx->pre_add_ports = true;
+	err = team_refresh(ctx->th);
+	if (err) {
+		teamd_log_err("Team refresh failed.");
+		goto zmq_fini;
 	}
 
 	err = teamd_add_ports(ctx);

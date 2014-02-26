@@ -100,6 +100,7 @@ struct teamd_context {
 	bool				force_recreate;
 	bool				take_over;
 	bool				init_no_ports;
+	bool				pre_add_ports;
 	char *				config_file;
 	char *				config_text;
 	json_t *			config_json;
