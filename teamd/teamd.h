@@ -304,8 +304,9 @@ static inline unsigned int teamd_port_count(struct teamd_context *ctx)
 	return ctx->port_obj_list_count;
 }
 
-int teamd_port_add(struct teamd_context *ctx, const char *port_name);
-int teamd_port_remove(struct teamd_context *ctx, const char *port_name);
+int teamd_port_add_ifname(struct teamd_context *ctx, const char *port_name);
+int teamd_port_remove_ifname(struct teamd_context *ctx, const char *port_name);
+int teamd_port_remove(struct teamd_context *ctx, struct teamd_port *tdport);
 int teamd_port_enabled(struct teamd_context *ctx, struct teamd_port *tdport,
 		       bool *enabled);
 int teamd_port_prio(struct teamd_context *ctx, struct teamd_port *tdport);

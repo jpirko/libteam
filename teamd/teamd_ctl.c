@@ -101,7 +101,7 @@ static int teamd_ctl_method_port_add(struct teamd_context *ctx,
 		return ops->reply_err(ops_priv, "InvalidArgs", "Did not receive correct message arguments.");
 	teamd_log_dbgx(ctx, 2, "port_devname \"%s\"", port_devname);
 
-	err = teamd_port_add(ctx, port_devname);
+	err = teamd_port_add_ifname(ctx, port_devname);
 	switch (err) {
 	case -ENODEV:
 		return ops->reply_err(ops_priv, "NoSuchDev", "No such device.");
@@ -125,7 +125,7 @@ static int teamd_ctl_method_port_remove(struct teamd_context *ctx,
 		return ops->reply_err(ops_priv, "InvalidArgs", "Did not receive correct message arguments.");
 	teamd_log_dbgx(ctx, 2, "port_devname \"%s\"", port_devname);
 
-	err = teamd_port_remove(ctx, port_devname);
+	err = teamd_port_remove_ifname(ctx, port_devname);
 	switch (err) {
 	case -ENODEV:
 		return ops->reply_err(ops_priv, "NoSuchDev", "No such device.");

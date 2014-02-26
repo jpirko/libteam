@@ -329,7 +329,7 @@ static int teamd_flush_ports(struct teamd_context *ctx)
 	int err;
 
 	teamd_for_each_tdport(tdport, ctx) {
-		err = teamd_port_remove(ctx, tdport->ifname);
+		err = teamd_port_remove(ctx, tdport);
 		if (err)
 			return err;
 	}
@@ -828,34 +828,6 @@ free_hwaddr:
 	return err;
 }
 
-int teamd_port_add(struct teamd_context *ctx, const char *port_name)
-{
-	int err;
-	uint32_t ifindex;
-
-	ifindex = team_ifname2ifindex(ctx->th, port_name);
-	teamd_log_dbg("%s: Adding port (found ifindex \"%d\").",
-		      port_name, ifindex);
-	err = team_port_add(ctx->th, ifindex);
-	if (err)
-		teamd_log_err("%s: Failed to add port.", port_name);
-	return err;
-}
-
-int teamd_port_remove(struct teamd_context *ctx, const char *port_name)
-{
-	int err;
-	uint32_t ifindex;
-
-	ifindex = team_ifname2ifindex(ctx->th, port_name);
-	teamd_log_dbg("%s: Removing port (found ifindex \"%d\").",
-		      port_name, ifindex);
-	err = team_port_remove(ctx->th, ifindex);
-	if (err)
-		teamd_log_err("%s: Failed to remove port.", port_name);
-	return err;
-}
-
 static int teamd_add_ports(struct teamd_context *ctx)
 {
 	int err;
@@ -866,7 +838,7 @@ static int teamd_add_ports(struct teamd_context *ctx)
 		return 0;
 
 	teamd_config_for_each_key(key, ctx, "$.ports") {
-		err = teamd_port_add(ctx, key);
+		err = teamd_port_add_ifname(ctx, key);
 		if (err)
 			return err;
 	}

@@ -331,6 +331,47 @@ next_one:
 	return tdport;
 }
 
+int teamd_port_add_ifname(struct teamd_context *ctx, const char *port_name)
+{
+	int err;
+	uint32_t ifindex;
+
+	ifindex = team_ifname2ifindex(ctx->th, port_name);
+	teamd_log_dbg("%s: Adding port (found ifindex \"%d\").",
+		      port_name, ifindex);
+	err = team_port_add(ctx->th, ifindex);
+	if (err)
+		teamd_log_err("%s: Failed to add port.", port_name);
+	return err;
+}
+
+int teamd_port_remove(struct teamd_context *ctx, struct teamd_port *tdport)
+{
+	struct port_obj *port_obj;
+	int err;
+
+	teamd_log_dbg("%s: Removing port (found ifindex \"%d\").",
+		      tdport->ifname, tdport->ifindex);
+	if (ctx->take_over) {
+		port_obj = get_container(tdport, struct port_obj, port);
+		port_obj_remove(ctx, port_obj);
+		return 0;
+	}
+	err = team_port_remove(ctx->th, tdport->ifindex);
+	if (err)
+		teamd_log_err("%s: Failed to remove port.", tdport->ifname);
+	return err;
+}
+
+int teamd_port_remove_ifname(struct teamd_context *ctx, const char *port_name)
+{
+	struct teamd_port *tdport = teamd_get_port_by_ifname(ctx, port_name);
+
+	if (!tdport)
+		return -ENODEV;
+	return teamd_port_remove(ctx, tdport);
+}
+
 int teamd_port_enabled(struct teamd_context *ctx, struct teamd_port *tdport,
 		       bool *enabled)
 {
