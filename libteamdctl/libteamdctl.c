@@ -474,6 +474,8 @@ int teamdctl_port_config_update_raw(struct teamdctl *tdc,
  * Gets raw port config string.
  * Does direct method call avoiding possible stale data in the cache.
  *
+ * Note: the obtained string should not be modified or freed by caller.
+ *
  * Returns: zero on success or negative number in case of an error.
  **/
 TEAMDCTL_EXPORT
@@ -508,6 +510,8 @@ int teamdctl_port_config_get_raw_direct(struct teamdctl *tdc,
  * Using reply cache. Return value is never NULL.
  * To refresh the cache, use teamdctl_refresh function.
  *
+ * Note: the obtained string should not be modified or freed by caller.
+ *
  * Returns: pointer to cached config string.
  **/
 TEAMDCTL_EXPORT
@@ -523,6 +527,8 @@ char *teamdctl_config_get_raw(struct teamdctl *tdc)
  *
  * Gets raw config string.
  * Does direct method call avoiding possible stale data in the cache.
+ *
+ * Note: the obtained string should not be modified or freed by caller.
  *
  * Returns: zero on success or negative number in case of an error.
  **/
@@ -540,6 +546,8 @@ int teamdctl_config_get_raw_direct(struct teamdctl *tdc, char **p_cfg)
  * Using reply cache. Return value is never NULL.
  * To refresh the cache, use teamdctl_refresh function.
  *
+ * Note: the obtained string should not be modified or freed by caller.
+ *
  * Returns: pointer to cached actual config string.
  **/
 TEAMDCTL_EXPORT
@@ -555,6 +563,8 @@ char *teamdctl_config_actual_get_raw(struct teamdctl *tdc)
  *
  * Gets raw actual config string.
  * Does direct method call avoiding possible stale data in the cache.
+ *
+ * Note: the obtained string should not be modified or freed by caller.
  *
  * Returns: zero on success or negative number in case of an error.
  **/
@@ -572,6 +582,8 @@ int teamdctl_config_actual_get_raw_direct(struct teamdctl *tdc, char **p_cfg)
  * Using reply cache. Return value is never NULL.
  * To refresh the cache, use teamdctl_refresh function.
  *
+ * Note: the obtained string should not be modified or freed by caller.
+ *
  * Returns: pointer to cached state string.
  **/
 TEAMDCTL_EXPORT
@@ -587,6 +599,8 @@ char *teamdctl_state_get_raw(struct teamdctl *tdc)
  *
  * Gets raw state string.
  * Does direct method call avoiding possible stale data in the cache.
+ *
+ * Note: the obtained string should not be modified or freed by caller.
  *
  * Returns: zero on success or negative number in case of an error.
  **/
