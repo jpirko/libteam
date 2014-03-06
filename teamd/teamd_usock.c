@@ -45,6 +45,39 @@ struct usock_acc_conn {
 	int sock;
 };
 
+int __strdecode(char *str)
+{
+	char *cur;
+	char *cur2;
+	bool escaped = false;
+
+	cur = str;
+	while (*cur != '\0') {
+		if (!escaped && *cur == '\\') {
+			escaped = true;
+		} else if (escaped) {
+			escaped = false;
+			switch (*cur) {
+			case 'n':
+				*(cur - 1) = '\n';
+				break;
+			case '\\':
+				*(cur - 1) = '\\';
+				break;
+			default:
+				return -EINVAL;
+			}
+			cur2 = cur;
+			while (*cur2 != '\0') {
+				*cur2 = *(cur2 + 1);
+				cur2++;
+			}
+		}
+		cur++;
+	}
+	return 0;
+}
+
 static int usock_op_get_args(void *ops_priv, const char *fmt, ...)
 {
 	va_list ap;
@@ -63,6 +96,11 @@ static int usock_op_get_args(void *ops_priv, const char *fmt, ...)
 			if (!str) {
 				teamd_log_err("Insufficient number of arguments in message.");
 				err = -EINVAL;
+				goto out;
+			}
+			err = __strdecode(str);
+			if (err) {
+				teamd_log_err("Corrupted argument in message.");
 				goto out;
 			}
 			*pstr = str;

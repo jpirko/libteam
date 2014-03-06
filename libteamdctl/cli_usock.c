@@ -115,6 +115,40 @@ static int myasprintf(char **p_str, const char *fmt, ...)
 	return 0;
 }
 
+char *__strencode(char *str)
+{
+	char *newstr;
+	int i, j;
+	size_t len = strlen(str);
+
+	for (i = 0; i < strlen(str); i++) {
+		switch (str[i]) {
+		case '\n':
+		case '\\':
+			len++;
+		}
+	}
+	newstr = malloc(sizeof(char) * (len + 1));
+	if (!newstr)
+		return NULL;
+	j = 0;
+	for (i = 0; i <= strlen(str); i++) {
+		switch (str[i]) {
+		case '\n':
+			newstr[j++] = '\\';
+			newstr[j++] = 'n';
+			break;
+		case '\\':
+			newstr[j++] = '\\';
+			newstr[j++] = '\\';
+			break;
+		default:
+			newstr[j++] = str[i];
+		}
+	}
+	return newstr;
+}
+
 static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 				 char **p_reply, void *priv,
 				 const char *fmt, va_list ap)
@@ -134,8 +168,13 @@ static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 	while (*fmt) {
 		switch (*fmt++) {
 		case 's': /* string */
-			str = va_arg(ap, char *);
+			str = __strencode(va_arg(ap, char *));
+			if (!str) {
+				err = -ENOMEM;
+				goto free_msg;
+			}
 			err = myasprintf(&msg, "%s%s\n", msg, str);
+			free(str);
 			if (err)
 				goto free_msg;
 			break;
