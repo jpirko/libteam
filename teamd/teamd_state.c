@@ -98,8 +98,10 @@ int __reg_val(struct teamd_context *ctx, const struct teamd_state_val *val,
 	}
 	if (val->per_port)
 		per_port = true;
-	if (per_port && tdport)
-		return -EINVAL;
+	if (per_port && tdport) {
+		err = -EINVAL;
+		goto errout;
+	}
 
 	if (val->type == TEAMD_STATE_ITEM_TYPE_NODE) {
 		int i;
