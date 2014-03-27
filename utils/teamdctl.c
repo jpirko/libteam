@@ -535,6 +535,22 @@ static int stateview_process_reply(char *reply)
 	return stateview_json_process(reply);
 }
 
+static int state_json_port_present(char *dump, const char *port_devname)
+{
+	json_t *dump_json;
+	json_t *port_json;
+	int err;
+
+	err = __jsonload(&dump_json, dump);
+	if (err)
+		return err;
+	err = json_unpack(dump_json, "{s:{s:o}}", "ports", port_devname, &port_json);
+	if (err)
+		err = -ENODEV;
+	json_decref(dump_json);
+	return err;
+}
+
 static int call_method_config_jsonsimpledump(struct teamdctl *tdc,
 					     int argc, char **argv)
 {
@@ -575,6 +591,12 @@ static int call_method_port_remove(struct teamdctl *tdc,
 				   int argc, char **argv)
 {
 	return teamdctl_port_remove(tdc, argv[0]);
+}
+
+static int call_method_port_present(struct teamdctl *tdc,
+				  int argc, char **argv)
+{
+	return state_json_port_present(teamdctl_state_get_raw(tdc), argv[0]);
 }
 
 static int call_method_port_config_update(struct teamdctl *tdc,
@@ -631,6 +653,7 @@ enum id_command_type {
 	ID_CMDTYPE_P,
 	ID_CMDTYPE_P_A,
 	ID_CMDTYPE_P_R,
+	ID_CMDTYPE_P_P,
 	ID_CMDTYPE_P_C,
 	ID_CMDTYPE_P_C_U,
 	ID_CMDTYPE_P_C_D,
@@ -726,6 +749,13 @@ static struct command_type command_types[] = {
 		.parent_id = ID_CMDTYPE_P,
 		.name = "remove",
 		.call_method = call_method_port_remove,
+		.params = {"PORTDEV"},
+	},
+	{
+		.id = ID_CMDTYPE_P_P,
+		.parent_id = ID_CMDTYPE_P,
+		.name = "present",
+		.call_method = call_method_port_present,
 		.params = {"PORTDEV"},
 	},
 	{
