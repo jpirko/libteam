@@ -994,15 +994,6 @@ lwatch_parse_arpiptarget()
 	for addr in ${ip_list}
 	do
 		lwatch_add_opt "\"target_host\" : \"$addr\""
-		source_host=$(vfile_get_ipaddr)
-		if [ -z ${source_host} ]; then
-			pr_warn "could not find the source IP address required"
-			pr_warn "to convert arp_ip_target= parameter"
-			pr_warn "please fix the source_host parameter in the master ifcfg file"
-			lwatch_add_opt "\"source_host\" : \"$addr\""
-		else
-			lwatch_add_opt "\"source_host\" : \"$source_host\""
-		fi
 	done
 }
 
