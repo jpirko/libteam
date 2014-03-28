@@ -301,6 +301,11 @@ Default:
 .TP
 .BR "link_watch.missed_max "| " ports.PORTIFNAME.link_watch.missed_max " (int)
 Maximum number of missed ARP replies. If this number is exceeded, link is reported as down.
+.RS 7
+.PP
+Default:
+.BR "3"
+.RE
 .TP
 .BR "link_watch.source_host "| " ports.PORTIFNAME.link_watch.source_host " (int)
 Hostname to be converted to IP address which will be filled into ARP request as source address.
@@ -345,6 +350,11 @@ Value is a positive number in milliseconds. It is the delay between link watch i
 .TP
 .BR "link_watch.missed_max "| " ports.PORTIFNAME.link_watch.missed_max " (int)
 Maximum number of missed NA reply packets. If this number is exceeded, link is reported as down.
+.RS 7
+.PP
+Default:
+.BR "3"
+.RE
 .TP
 .BR "link_watch.target_host "| " ports.PORTIFNAME.link_watch.target_host " (int)
 Hostname to be converted to IPv6 address which will be filled into NS packet as target address.

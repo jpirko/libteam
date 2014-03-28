@@ -429,6 +429,7 @@ static int lw_psr_callback_socket(struct teamd_context *ctx, int events,
 }
 
 static const struct timespec lw_psr_default_init_wait = { 0, 1 };
+#define LW_PSR_DEFAULT_MISSED_MAX 3
 
 static int lw_psr_load_options(struct teamd_context *ctx,
 			       struct teamd_port *tdport,
@@ -455,13 +456,13 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 	teamd_log_dbg("init_wait \"%d\".", timespec_to_ms(&psr_ppriv->init_wait));
 
 	err = teamd_config_int_get(ctx, &tmp, "@.missed_max", cpcookie);
-	if (err) {
-		teamd_log_err("Failed to get \"missed_max\" link-watch option.");
-		return -EINVAL;
-	}
-	if (tmp < 0) {
-		teamd_log_err("\"missed_max\" must not be negative number.");
-		return -EINVAL;
+	if (!err) {
+		if (tmp < 0) {
+			teamd_log_err("\"missed_max\" must not be negative number.");
+			return -EINVAL;
+		}
+	} else {
+		tmp = LW_PSR_DEFAULT_MISSED_MAX;
 	}
 	teamd_log_dbg("missed_max \"%d\".", tmp);
 	psr_ppriv->missed_max = tmp;
