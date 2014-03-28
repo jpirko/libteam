@@ -886,26 +886,30 @@ static int check_team_devname(char *team_devname)
 static int check_teamd_team_devname(struct teamdctl *tdc,
 				    const char *team_devname)
 {
-	int ret = 0;
-	json_t* root;
-	json_error_t error;
-	json_t* j_device_name;
-	const char* teamd_device_name;
+	json_t *dump_json;
+	char *devname;
+	int err;
 
-	root = json_loads(teamdctl_config_get_raw(tdc), 0, &error);
-	j_device_name = json_object_get(root, "device");
-
-	teamd_device_name = json_string_value(j_device_name);
-
-	if (strcmp(team_devname, teamd_device_name) != 0) {
-		pr_err("Unable to access to %s through connected teamd daemon because daemon controls %s.\n",
-		       team_devname, teamd_device_name);
-		ret = -1;
+	err = __jsonload(&dump_json, teamdctl_config_get_raw(tdc));
+	if (err)
+		return err;
+	err = json_unpack(dump_json, "{s:s}", "device", &devname);
+	if (err) {
+		pr_err("Failed to parse device name from config.\n");
+		err = -EINVAL;
+		goto free_json;
 	}
 
-	json_decref(j_device_name);
-	json_decref(root);
-	return ret;
+	if (strcmp(team_devname, devname)) {
+		pr_err("Unable to access to %s through connected teamd daemon because it controls %s.\n",
+		       team_devname, devname);
+		err = -EINVAL;
+		goto free_json;
+	}
+
+free_json:
+	json_decref(dump_json);
+	return err;
 }
 
 static int call_command(struct teamdctl *tdc, int argc, char **argv,
@@ -1062,7 +1066,8 @@ int main(int argc, char **argv)
 		goto teamdctl_free;
 	}
 
-	if (check_teamd_team_devname(tdc, team_devname)) {
+	err = check_teamd_team_devname(tdc, team_devname);
+	if (err) {
 		ret = EXIT_FAILURE;
 		goto teamdctl_disconnect;
 	}
