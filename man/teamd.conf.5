@@ -304,6 +304,11 @@ Maximum number of missed ARP replies. If this number is exceeded, link is report
 .TP
 .BR "link_watch.source_host "| " ports.PORTIFNAME.link_watch.source_host " (int)
 Hostname to be converted to IP address which will be filled into ARP request as source address.
+.RS 7
+.PP
+Default:
+.BR "0.0.0.0"
+.RE
 .TP
 .BR "link_watch.target_host "| " ports.PORTIFNAME.link_watch.target_host " (int)
 Hostname to be converted to IP address which will be filled into ARP request as destination address.
@@ -405,7 +410,6 @@ Similar to the previous one. Only difference is that link changes are not propag
     "name": "arp_ping",
     "interval": 100,
     "missed_max": 30,
-    "source_host": "192.168.23.2",
     "target_host": "192.168.23.1"
   },
   "ports": {
@@ -431,14 +435,12 @@ This configuration uses ARP ping link watch.
     "name": "arp_ping",
     "interval": 100,
     "missed_max": 30,
-    "source_host": "192.168.23.2",
     "target_host": "192.168.23.1"
   },
   {
     "name": "arp_ping",
     "interval": 50,
     "missed_max": 20,
-    "source_host": "192.168.24.2",
     "target_host": "192.168.24.1"
   }
 ],

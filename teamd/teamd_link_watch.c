@@ -703,13 +703,15 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 	int err;
 
 	err = teamd_config_string_get(ctx, &host, "@.source_host", cpcookie);
-	if (err) {
-		teamd_log_err("Failed to get \"source_host\" link-watch option.");
-		return -EINVAL;
+	if (!err) {
+		err = set_in_addr(&ap_ppriv->src, host);
+		if (err)
+			return err;
 	}
-	err = set_in_addr(&ap_ppriv->src, host);
-	if (err)
-		return err;
+	/*
+	 * If source_host is not provided, just use address 0.0.0.0 according
+	 * to RFC 5227 (IPv4 Address Conflict Detection).
+	 */
 	teamd_log_dbg("source address \"%s\".",
 		      str_in_addr(&ap_ppriv->src));
 
