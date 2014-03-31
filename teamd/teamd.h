@@ -250,6 +250,7 @@ int teamd_loop_callback_enable(struct teamd_context *ctx, const char *cb_name,
 			       void *priv);
 int teamd_loop_callback_disable(struct teamd_context *ctx, const char *cb_name,
 				void *priv);
+void teamd_run_loop_quit(struct teamd_context *ctx, int err);
 void teamd_run_loop_restart(struct teamd_context *ctx);
 
 /* Runner structures */
