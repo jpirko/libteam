@@ -136,6 +136,7 @@ struct team_ifinfo *team_get_next_ifinfo(struct team_handle *th,
 	for (ifinfo = team_get_next_ifinfo(th, NULL); ifinfo;	\
 	     ifinfo = team_get_next_ifinfo(th, ifinfo))
 /* ifinfo getters */
+bool team_is_ifinfo_removed(struct team_ifinfo *ifinfo);
 uint32_t team_get_ifinfo_ifindex(struct team_ifinfo *ifinfo);
 struct team_port *team_get_ifinfo_port(struct team_ifinfo *ifinfo);
 char *team_get_ifinfo_hwaddr(struct team_ifinfo *ifinfo);

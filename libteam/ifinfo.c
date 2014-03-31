@@ -47,15 +47,17 @@ struct team_ifinfo {
 	int			changed;
 };
 
-#define CHANGED_HWADDR			(1 << 0)
-#define CHANGED_HWADDR_LEN		(1 << 1)
-#define CHANGED_IFNAME			(1 << 2)
-#define CHANGED_MASTER_IFINDEX		(1 << 3)
-#define CHANGED_PHYS_PORT_ID		(1 << 4)
-#define CHANGED_PHYS_PORT_ID_LEN	(1 << 5)
-#define CHANGED_ANY	(CHANGED_HWADDR | CHANGED_HWADDR_LEN |		\
-			 CHANGED_IFNAME | CHANGED_MASTER_IFINDEX |	\
-			 CHANGED_PHYS_PORT_ID |	CHANGED_PHYS_PORT_ID_LEN)
+#define CHANGED_REMOVED			(1 << 0)
+#define CHANGED_HWADDR			(1 << 1)
+#define CHANGED_HWADDR_LEN		(1 << 2)
+#define CHANGED_IFNAME			(1 << 3)
+#define CHANGED_MASTER_IFINDEX		(1 << 4)
+#define CHANGED_PHYS_PORT_ID		(1 << 5)
+#define CHANGED_PHYS_PORT_ID_LEN	(1 << 6)
+#define CHANGED_ANY	(CHANGED_REMOVED | CHANGED_HWADDR | \
+			 CHANGED_HWADDR_LEN | CHANGED_IFNAME | \
+			 CHANGED_MASTER_IFINDEX | CHANGED_PHYS_PORT_ID | \
+			 CHANGED_PHYS_PORT_ID_LEN)
 
 static void set_changed(struct team_ifinfo *ifinfo, int bit)
 {
@@ -190,13 +192,31 @@ static struct team_ifinfo *ifinfo_find_create(struct team_handle *th,
 	return ifinfo;
 }
 
-static void obj_input(struct nl_object *obj, void *arg, bool event)
+static void ifinfo_destroy(struct team_ifinfo *ifinfo)
+{
+	list_del(&ifinfo->list);
+	free(ifinfo);
+}
+
+static void ifinfo_destroy_removed(struct team_handle *th)
+{
+	struct team_ifinfo *ifinfo, *tmp;
+
+	list_for_each_node_entry_safe(ifinfo, tmp, &th->ifinfo_list, list) {
+		if (is_changed(ifinfo, CHANGED_REMOVED))
+			ifinfo_destroy(ifinfo);
+	}
+}
+
+static void obj_input_newlink(struct nl_object *obj, void *arg, bool event)
 {
 	struct team_handle *th = arg;
 	struct rtnl_link *link;
 	struct team_ifinfo *ifinfo;
 	uint32_t ifindex;
 	int err;
+
+	ifinfo_destroy_removed(th);
 
 	link = (struct rtnl_link *) obj;
 
@@ -221,20 +241,47 @@ static void obj_input(struct nl_object *obj, void *arg, bool event)
 		set_call_change_handlers(th, TEAM_IFINFO_CHANGE);
 }
 
-static void event_handler_obj_input(struct nl_object *obj, void *arg)
+static void event_handler_obj_input_newlink(struct nl_object *obj, void *arg)
 {
-	return obj_input(obj, arg, true);
+	return obj_input_newlink(obj, arg, true);
+}
+
+static void event_handler_obj_input_dellink(struct nl_object *obj, void *arg)
+{
+	struct team_handle *th = arg;
+	struct rtnl_link *link;
+	struct team_ifinfo *ifinfo;
+	uint32_t ifindex;
+
+	ifinfo_destroy_removed(th);
+
+	link = (struct rtnl_link *) obj;
+
+	ifindex = rtnl_link_get_ifindex(link);
+	ifinfo = ifinfo_find_create(th, ifindex);
+	if (!ifinfo)
+		return;
+	clear_last_changed(th);
+	set_changed(ifinfo, CHANGED_REMOVED);
+	set_call_change_handlers(th, TEAM_IFINFO_CHANGE);
 }
 
 int ifinfo_event_handler(struct nl_msg *msg, void *arg)
 {
 	struct team_handle *th = arg;
 
-	if (nlmsg_hdr(msg)->nlmsg_type != RTM_NEWLINK)
+	switch (nlmsg_hdr(msg)->nlmsg_type) {
+	case RTM_NEWLINK:
+		if (nl_msg_parse(msg, &event_handler_obj_input_newlink, th) < 0)
+			err(th, "Unknown message type.");
+		break;
+	case RTM_DELLINK:
+		if (nl_msg_parse(msg, &event_handler_obj_input_dellink, th) < 0)
+			err(th, "Unknown message type.");
+		break;
+	default:
 		return NL_OK;
-
-	if (nl_msg_parse(msg, &event_handler_obj_input, th) < 0)
-		err(th, "Unknown message type.");
+	}
 	return NL_STOP;
 }
 
@@ -244,9 +291,9 @@ int ifinfo_list_alloc(struct team_handle *th)
 	return 0;
 }
 
-static void valid_handler_obj_input(struct nl_object *obj, void *arg)
+static void valid_handler_obj_input_newlink(struct nl_object *obj, void *arg)
 {
-	return obj_input(obj, arg, false);
+	return obj_input_newlink(obj, arg, false);
 }
 
 static int valid_handler(struct nl_msg *msg, void *arg)
@@ -256,7 +303,7 @@ static int valid_handler(struct nl_msg *msg, void *arg)
 	if (nlmsg_hdr(msg)->nlmsg_type != RTM_NEWLINK)
 		return NL_OK;
 
-	if (nl_msg_parse(msg, &valid_handler_obj_input, th) < 0)
+	if (nl_msg_parse(msg, &valid_handler_obj_input_newlink, th) < 0)
 		err(th, "Unknown message type.");
 	return NL_OK;
 }
@@ -299,12 +346,6 @@ int ifinfo_list_init(struct team_handle *th)
 		return err;
 	}
 	return 0;
-}
-
-static void ifinfo_destroy(struct team_ifinfo *ifinfo)
-{
-	list_del(&ifinfo->list);
-	free(ifinfo);
 }
 
 static void flush_port_list(struct team_handle *th)
@@ -368,6 +409,20 @@ struct team_ifinfo *team_get_next_ifinfo(struct team_handle *th,
 			return ifinfo;
 	} while (ifinfo);
 	return NULL;
+}
+
+/**
+ * team_is_ifinfo_removed:
+ * @ifinfo: ifinfo structure
+ *
+ * See if ifinfo got removed. This means that the interface got removed.
+ *
+ * Returns: true if ifinfo got changed.
+ **/
+TEAM_EXPORT
+bool team_is_ifinfo_removed(struct team_ifinfo *ifinfo)
+{
+	return is_changed(ifinfo, CHANGED_REMOVED);
 }
 
 /**
