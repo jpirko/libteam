@@ -29,15 +29,15 @@ need_config "${CONFIG}"
 
 source_config
 
-/etc/sysconfig/network-scripts/ifup-eth ${CONFIG} $2
-
 if [ "${DEVICETYPE}" = "TeamPort" ]; then
+	# This means that this was called directly, not via ifup-eth
+	# so execute ifup-eth now.
+	/etc/sysconfig/network-scripts/ifup-eth ${CONFIG} $2
+fi
+
+if [ -n "${TEAM_MASTER}" ]; then
 	if [ ! -x /usr/bin/teamdctl ]; then
 		net_log $"Team support not available: teamdctl not found"
-		exit 1
-	fi
-	if [ ! -n "${TEAM_MASTER}" ]; then
-		net_log $"Team master is not specified for port device"
 		exit 1
 	fi
 	/sbin/ip link show ${TEAM_MASTER} > /dev/null 2>&1

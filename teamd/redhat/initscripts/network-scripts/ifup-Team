@@ -32,7 +32,7 @@ source_config
 . /etc/sysconfig/teamd
 
 # If the device is a team, create it with teamd, if available.
-if [ "${DEVICETYPE}" = "Team" ]; then
+if [ -n "${TEAM_CONFIG}" ]; then
 	if [ ! -x /usr/bin/teamd ]; then
 		net_log $"Team support not available: teamd not found"
 		exit 1
@@ -45,4 +45,8 @@ if [ "${DEVICETYPE}" = "Team" ]; then
 	done
 fi
 
-exec /etc/sysconfig/network-scripts/ifup-eth ${CONFIG} $2
+if [ "${DEVICETYPE}" = "Team" ]; then
+	# This means that this was called directly, not via ifup-eth
+	# so execute ifup-eth now.
+	exec /etc/sysconfig/network-scripts/ifup-eth ${CONFIG} $2
+fi

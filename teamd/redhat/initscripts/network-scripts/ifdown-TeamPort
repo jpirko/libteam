@@ -29,13 +29,9 @@ need_config "${CONFIG}"
 
 source_config
 
-if [ "${DEVICETYPE}" = "TeamPort" ]; then
+if [ -n "${TEAM_MASTER}" ]; then
 	if [ ! -x /usr/bin/teamdctl ]; then
 		net_log $"Team support not available: teamdctl not found"
-		exit 1
-	fi
-	if [ ! -n "${TEAM_MASTER}" ]; then
-		net_log $"Team master is not specified for port device"
 		exit 1
 	fi
 	/sbin/ip link show ${TEAM_MASTER} > /dev/null 2>&1
@@ -46,4 +42,8 @@ if [ "${DEVICETYPE}" = "TeamPort" ]; then
 	/usr/bin/teamdctl ${TEAM_MASTER} port remove ${DEVICE} || exit 1
 fi
 
-exec /etc/sysconfig/network-scripts/ifdown-eth ${CONFIG} $2
+if [ "${DEVICETYPE}" = "TeamPort" ]; then
+	# This means that this was called directly, not via ifdown-eth
+	# so execute ifdown-eth now.
+	exec /etc/sysconfig/network-scripts/ifdown-eth ${CONFIG} $2
+fi

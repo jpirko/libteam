@@ -29,9 +29,13 @@ need_config "${CONFIG}"
 
 source_config
 
-/etc/sysconfig/network-scripts/ifdown-eth ${CONFIG} $2
-
 if [ "${DEVICETYPE}" = "Team" ]; then
+	# This means that this was called directly, not via ifdown-eth
+	# so execute ifdown-eth now.
+	/etc/sysconfig/network-scripts/ifdown-eth ${CONFIG} $2
+fi
+
+if [ -n "${TEAM_CONFIG}" ]; then
 	if [ ! -x /usr/bin/teamd ]; then
 		net_log $"Team support not available: teamd not found"
 		exit 1
