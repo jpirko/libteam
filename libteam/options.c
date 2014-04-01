@@ -258,7 +258,7 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 		    !option_attrs[TEAM_ATTR_OPTION_TYPE]) {
 			return NL_SKIP;
 		}
-		nla_type = nla_get_u32(option_attrs[TEAM_ATTR_OPTION_TYPE]);
+		nla_type = nla_get_u8(option_attrs[TEAM_ATTR_OPTION_TYPE]);
 		data_attr = option_attrs[TEAM_ATTR_OPTION_DATA];
 		if (nla_type != NLA_FLAG && !data_attr)
 			return NL_SKIP;
@@ -743,7 +743,7 @@ static int set_option_value(struct team_handle *th, struct team_option *option,
 	if (option->id.array_index_used)
 		NLA_PUT_U32(msg, TEAM_ATTR_OPTION_ARRAY_INDEX,
 			    option->id.array_index);
-	NLA_PUT_U32(msg, TEAM_ATTR_OPTION_TYPE, nla_type);
+	NLA_PUT_U8(msg, TEAM_ATTR_OPTION_TYPE, nla_type);
 	switch (nla_type) {
 		case NLA_U32:
 			NLA_PUT_U32(msg, TEAM_ATTR_OPTION_DATA, *((__u32 *) data));
