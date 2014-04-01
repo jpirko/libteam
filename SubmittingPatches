@@ -1,0 +1,45 @@
+#  How to Submit Patches for libteam  #
+=======================================
+
+Send changes to libteam as patches to libteam@lists.fedorahosted.org
+with copy to jiri@resnulli.us.
+
+Avoid using attachments because usually it doesn't work.
+In another words, inline the patch inside the e-mail's body.
+
+The simplest workflow to send changes is using git. The following
+steps will guide you to do the task.
+
+1) Clone the source code on your local machine.
+$ git clone https://github.com/jpirko/libteam.git
+
+2) Create a local branch for you
+$ cd libteam
+$ git checkout -b testbranch
+
+3) Do your changes
+<<do some changes>>
+
+4) Commit them to the repository
+$ git commit -a -s
+
+5) Optionally, you can verify how it looks like in the repo
+$ git show
+
+6) Extract the patch in a standard format into /tmp directory
+$ git format-patch origin -o /tmp --subject-prefix "patch libteam"
+
+7) Use git send-email to send the patch*.
+$ git send-email /tmp/0001-somepatch.patch \
+  --to=libteam@lists.fedorahosted.org --cc=jiri@resnulli.us
+
+And you are done :)
+
+* You may need to configure smtp in order to send emails, so please
+  check the "Example" section in the reference [3] below as a start.
+
+Additional references about git:
+[1] http://git-scm.com/docs/gittutorial
+[2] http://git-scm.com/docs/gitworkflows.html
+[3] http://git-scm.com/docs/git-send-email
+[4] http://git-scm.com/book
