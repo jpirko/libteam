@@ -104,6 +104,7 @@ static void print_help(const struct teamd_context *ctx) {
             "    -r --force-recreate      Force team device recreation in case it\n"
             "                             already exists\n"
             "    -o --take-over           Take over the device if it already exists\n"
+            "    -N --no-quit-destroy     Do not destroy the device on quit\n"
             "    -t --team-dev=DEVNAME    Use the specified team device\n"
             "    -n --no-ports            Start without ports\n"
             "    -D --dbus-enable         Enable D-Bus interface\n"
@@ -135,6 +136,7 @@ static int parse_command_line(struct teamd_context *ctx,
 		{ "debug",		no_argument,		NULL, 'g' },
 		{ "force-recreate",	no_argument,		NULL, 'r' },
 		{ "take-over",		no_argument,		NULL, 'o' },
+		{ "no-quit-destroy",	no_argument,		NULL, 'N' },
 		{ "team-dev",		required_argument,	NULL, 't' },
 		{ "no-ports",		no_argument,		NULL, 'n' },
 		{ "dbus-enable",	no_argument,		NULL, 'D' },
@@ -144,7 +146,7 @@ static int parse_command_line(struct teamd_context *ctx,
 		{ NULL, 0, NULL, 0 }
 	};
 
-	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:grot:nDZ:Uu",
+	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:groNt:nDZ:Uu",
 				  long_options, NULL)) >= 0) {
 
 		switch(opt) {
@@ -188,6 +190,9 @@ static int parse_command_line(struct teamd_context *ctx,
 			break;
 		case 'o':
 			ctx->take_over = true;
+			break;
+		case 'N':
+			ctx->no_quit_destroy = true;
 			break;
 		case 't':
 			free(ctx->team_devname);
@@ -325,7 +330,7 @@ static int teamd_run_loop_do_callbacks(struct list_item *lcb_list, fd_set *fds,
 
 static int teamd_flush_ports(struct teamd_context *ctx)
 {
-	if (!ctx->take_over)
+	if (!ctx->no_quit_destroy)
 		return teamd_port_remove_all(ctx);
 	else
 		teamd_port_obj_remove_all(ctx);
@@ -1393,7 +1398,7 @@ static void teamd_fini(struct teamd_context *ctx)
 	teamd_unregister_default_handlers(ctx);
 	teamd_workq_fini(ctx);
 	teamd_run_loop_fini(ctx);
-	if (!ctx->take_over)
+	if (!ctx->no_quit_destroy)
 		team_destroy(ctx->th);
 	team_free(ctx->th);
 }

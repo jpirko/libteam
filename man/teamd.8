@@ -73,7 +73,10 @@ Turns on debugging messages. Repeating the option increases verbosity.
 Force team device recreation in case it already exists.
 .TP
 .B "\-o, \-\-take-over"
-Take over the device if it already exists. This option also ensures that the team device is not removed after teamd finishes.
+Take over the device if it already exists.
+.TP
+.B "\-N, \-\-no-quit-destroy"
+This option also ensures that the team device is not removed after teamd finishes.
 .TP
 .BI "\-t " devicename ", \-\-team-dev " devicename
 Use the specified team device name (overrides "device" key in the configuration).
