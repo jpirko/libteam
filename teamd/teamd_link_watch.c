@@ -1480,6 +1480,13 @@ static int link_watch_load_config_one(struct teamd_context *ctx,
 	const struct teamd_link_watch *link_watch;
 	unsigned int id;
 	struct lw_common_port_priv *common_ppriv;
+	bool linkup = false;
+
+	err = team_get_port_user_linkup(ctx->th, tdport->ifindex, &linkup);
+	if (!err) {
+		teamd_log_dbg("%s: Current user link state is \"%s\".",
+			      tdport->ifname, linkup ? "up" : "down");
+	}
 
 	err = teamd_config_string_get(ctx, &link_watch_name,
 				      "@.name", cpcookie);
@@ -1505,6 +1512,7 @@ static int link_watch_load_config_one(struct teamd_context *ctx,
 	common_ppriv->ctx = ctx;
 	common_ppriv->tdport = tdport;
 	common_ppriv->cpcookie = cpcookie;
+	common_ppriv->link_up = linkup;
 
 	err = link_watch_state_register(ctx, common_ppriv);
 	if (err)
