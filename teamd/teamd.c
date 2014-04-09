@@ -325,14 +325,10 @@ static int teamd_run_loop_do_callbacks(struct list_item *lcb_list, fd_set *fds,
 
 static int teamd_flush_ports(struct teamd_context *ctx)
 {
-	struct teamd_port *tdport;
-	int err;
-
-	teamd_for_each_tdport(tdport, ctx) {
-		err = teamd_port_remove(ctx, tdport);
-		if (err)
-			return err;
-	}
+	if (!ctx->take_over)
+		return teamd_port_remove_all(ctx);
+	else
+		teamd_port_obj_remove_all(ctx);
 	return 0;
 }
 

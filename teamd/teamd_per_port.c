@@ -345,22 +345,39 @@ int teamd_port_add_ifname(struct teamd_context *ctx, const char *port_name)
 	return err;
 }
 
-int teamd_port_remove(struct teamd_context *ctx, struct teamd_port *tdport)
+static int teamd_port_remove(struct teamd_context *ctx,
+			     struct teamd_port *tdport)
 {
-	struct port_obj *port_obj;
 	int err;
 
 	teamd_log_dbg("%s: Removing port (found ifindex \"%d\").",
 		      tdport->ifname, tdport->ifindex);
-	if (ctx->take_over) {
-		port_obj = get_container(tdport, struct port_obj, port);
-		port_obj_remove(ctx, port_obj);
-		return 0;
-	}
 	err = team_port_remove(ctx->th, tdport->ifindex);
 	if (err)
 		teamd_log_err("%s: Failed to remove port.", tdport->ifname);
 	return err;
+}
+
+int teamd_port_remove_all(struct teamd_context *ctx)
+{
+	struct port_obj *port_obj;
+	int err;
+
+	list_for_each_node_entry(port_obj, &ctx->port_obj_list, list) {
+		err = teamd_port_remove(ctx, _port(port_obj));
+		if (err)
+			return err;
+	}
+	return 0;
+}
+
+void teamd_port_obj_remove_all(struct teamd_context *ctx)
+{
+	struct port_obj *port_obj;
+	struct port_obj *tmp;
+
+	list_for_each_node_entry_safe(port_obj, tmp, &ctx->port_obj_list, list)
+		port_obj_remove(ctx, port_obj);
 }
 
 int teamd_port_remove_ifname(struct teamd_context *ctx, const char *port_name)
