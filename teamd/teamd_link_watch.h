@@ -42,6 +42,10 @@ struct lw_psr_port_priv {
 	bool reply_received;
 };
 
+int __set_sockaddr(struct sockaddr *sa, socklen_t sa_len, sa_family_t family,
+		   const char *hostname);
+char *__str_sockaddr(struct sockaddr *sa, socklen_t sa_len, sa_family_t family,
+		     char buf[]);
 
 static inline bool teamd_link_watch_link_up_differs(struct lw_common_port_priv *common_ppriv,
 					     bool new_link_up)
@@ -53,7 +57,6 @@ int teamd_link_watch_check_link_up(struct teamd_context *ctx,
 				   struct teamd_port *tdport,
 				   struct lw_common_port_priv *common_ppriv,
 				   bool new_link_up);
-
 struct lw_psr_port_priv *
 lw_psr_ppriv_get(struct lw_common_port_priv *common_ppriv);
 int lw_psr_port_added(struct teamd_context *ctx, struct teamd_port *tdport,
