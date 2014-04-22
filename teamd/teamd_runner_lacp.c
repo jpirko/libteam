@@ -1014,6 +1014,8 @@ static int lacpdu_send(struct lacp_port *lacp_port)
 	ll_slow = ll_my;
 	memcpy(ll_slow.sll_addr, slow_addr, ll_slow.sll_halen);
 
+	memcpy(lacp_port->actor.system, lacp_port->ctx->hwaddr, ETH_ALEN);
+
 	lacpdu_init(&lacpdu);
 	lacpdu.actor = lacp_port->actor;
 	lacpdu.partner = lacp_port->partner;
