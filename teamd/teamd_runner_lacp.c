@@ -303,8 +303,7 @@ static bool lacp_port_selectable(struct lacp_port *lacp_port)
 			       "team device.", lacp_port->tdport->ifname);
 		return false;
 	}
-	if (lacp_port->state == PORT_STATE_CURRENT ||
-	    lacp_port->state == PORT_STATE_EXPIRED)
+	if (lacp_port->state == PORT_STATE_CURRENT)
 		return true;
 	return false;
 }
