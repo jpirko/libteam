@@ -318,7 +318,6 @@ static int lacp_port_should_be_enabled(struct lacp_port *lacp_port)
 	struct lacp *lacp = lacp_port->lacp;
 
 	if (lacp_port_selected(lacp_port) &&
-	    lacp_port->partner.state & INFO_STATE_SYNCHRONIZATION &&
 	    lacp_port->agg_lead == lacp->selected_agg_lead)
 		return true;
 	return false;
