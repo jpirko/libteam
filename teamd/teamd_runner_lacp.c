@@ -1039,10 +1039,6 @@ static int lacpdu_recv(struct lacp_port *lacp_port)
 		return 0;
 	}
 
-	err = lacp_port_set_state(lacp_port, PORT_STATE_CURRENT);
-	if (err)
-		return err;
-
 	/* Check if we have correct info about the other side */
 	if (memcmp(&lacpdu.actor, &lacp_port->partner,
 		   sizeof(struct lacpdu_info))) {
@@ -1054,6 +1050,10 @@ static int lacpdu_recv(struct lacp_port *lacp_port)
 		if (err)
 			return err;
 	}
+
+	err = lacp_port_set_state(lacp_port, PORT_STATE_CURRENT);
+	if (err)
+		return err;
 
 	/* Check if the other side has correct info about us */
 	if (memcmp(&lacpdu.partner, &lacp_port->actor,
