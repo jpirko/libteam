@@ -1153,8 +1153,8 @@ static int teamd_register_default_handlers(struct teamd_context *ctx)
 {
 	if (!ctx->debug)
 		return 0;
-	return team_change_handler_register(ctx->th,
-					    &debug_change_handler, ctx);
+	return team_change_handler_register_head(ctx->th,
+						 &debug_change_handler, ctx);
 }
 
 static void teamd_unregister_default_handlers(struct teamd_context *ctx)
