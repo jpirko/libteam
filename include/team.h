@@ -239,6 +239,9 @@ struct team_change_handler {
 int team_change_handler_register(struct team_handle *th,
 				 const struct team_change_handler *handler,
 				 void *priv);
+int team_change_handler_register_head(struct team_handle *th,
+				      const struct team_change_handler *handler,
+				      void *priv);
 void team_change_handler_unregister(struct team_handle *th,
 				    const struct team_change_handler *handler,
 				    void *priv);

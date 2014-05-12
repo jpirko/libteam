@@ -240,21 +240,10 @@ find_change_handler(struct team_handle *th,
 	return NULL;
 }
 
-/**
- * team_change_handler_register:
- * @th: libteam library context
- * @handler: event handler structure
- * @priv: event handler func private data
- *
- * Registers custom @handler structure which defines a function which
- * going to be called on defined events.
- *
- * Returns: zero on success or negative number in case of an error.
- **/
-TEAM_EXPORT
-int team_change_handler_register(struct team_handle *th,
-				 const struct team_change_handler *handler,
-				 void *priv)
+static int
+__team_change_handler_register(struct team_handle *th,
+			       const struct team_change_handler *handler,
+			       void *priv, bool head)
 {
 	struct change_handler_item *handler_item;
 
@@ -265,9 +254,53 @@ int team_change_handler_register(struct team_handle *th,
 		return -ENOMEM;
 	handler_item->handler = handler;
 	handler_item->priv = priv;
-	list_add_tail(&th->change_handler.list, &handler_item->list);
+	if (head)
+		list_add(&th->change_handler.list, &handler_item->list);
+	else
+		list_add_tail(&th->change_handler.list, &handler_item->list);
 	return 0;
 }
+
+/**
+ * team_change_handler_register:
+ * @th: libteam library context
+ * @handler: event handler structure
+ * @priv: event handler func private data
+ *
+ * Registers custom @handler structure which defines a function which
+ * going to be called on defined events. The handler will be added
+ * at the end of the list.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_change_handler_register(struct team_handle *th,
+				 const struct team_change_handler *handler,
+				 void *priv)
+{
+	return __team_change_handler_register(th, handler, priv, false);
+}
+
+/**
+ * team_change_handler_register_head:
+ * @th: libteam library context
+ * @handler: event handler structure
+ * @priv: event handler func private data
+ *
+ * Registers custom @handler structure which defines a function which
+ * going to be called on defined events. The handler will be added
+ * at the start of the list.
+ *
+ * Returns: zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_change_handler_register_head(struct team_handle *th,
+				      const struct team_change_handler *handler,
+				      void *priv)
+{
+	return __team_change_handler_register(th, handler, priv, true);
+}
+
 
 /**
  * team_change_handler_unregister:
