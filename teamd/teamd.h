@@ -254,6 +254,8 @@ int teamd_loop_callback_disable(struct teamd_context *ctx, const char *cb_name,
 void teamd_run_loop_quit(struct teamd_context *ctx, int err);
 void teamd_run_loop_restart(struct teamd_context *ctx);
 
+int teamd_change_debug_level(struct teamd_context *ctx, unsigned int new_debug);
+
 /* Runner structures */
 extern const struct teamd_runner teamd_runner_broadcast;
 extern const struct teamd_runner teamd_runner_roundrobin;

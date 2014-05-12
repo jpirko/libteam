@@ -639,6 +639,15 @@ static int setup_state_debug_level_get(struct teamd_context *ctx,
 	return 0;
 }
 
+static int setup_state_debug_level_set(struct teamd_context *ctx,
+				       struct team_state_gsc *gsc,
+				       void *priv)
+{
+	if (gsc->data.int_val < 0)
+		return -EINVAL;
+	return teamd_change_debug_level(ctx, gsc->data.int_val);
+}
+
 static int setup_state_daemonized_get(struct teamd_context *ctx,
 				      struct team_state_gsc *gsc,
 				      void *priv)
@@ -688,6 +697,7 @@ static const struct teamd_state_val setup_state_vals[] = {
 		.subpath = "debug_level",
 		.type = TEAMD_STATE_ITEM_TYPE_INT,
 		.getter = setup_state_debug_level_get,
+		.setter = setup_state_debug_level_set,
 	},
 	{
 		.subpath = "daemonized",

@@ -1149,19 +1149,47 @@ static const struct team_change_handler debug_change_handler = {
 	.type_mask = TEAM_PORT_CHANGE | TEAM_OPTION_CHANGE | TEAM_IFINFO_CHANGE,
 };
 
+static int teamd_register_debug_handler(struct teamd_context *ctx)
+{
+	return team_change_handler_register_head(ctx->th,
+						 &debug_change_handler, ctx);
+}
+
 static int teamd_register_default_handlers(struct teamd_context *ctx)
 {
 	if (!ctx->debug)
 		return 0;
-	return team_change_handler_register_head(ctx->th,
-						 &debug_change_handler, ctx);
+	return teamd_register_debug_handler(ctx);
+}
+
+static void teamd_unregister_debug_handler(struct teamd_context *ctx)
+{
+	team_change_handler_unregister(ctx->th, &debug_change_handler, ctx);
 }
 
 static void teamd_unregister_default_handlers(struct teamd_context *ctx)
 {
 	if (!ctx->debug)
 		return;
-	team_change_handler_unregister(ctx->th, &debug_change_handler, ctx);
+	teamd_unregister_debug_handler(ctx);
+}
+
+int teamd_change_debug_level(struct teamd_context *ctx, unsigned int new_debug)
+{
+	int err = 0;
+
+	if (!ctx->debug && new_debug) {
+		daemon_set_verbosity(LOG_DEBUG);
+		err = teamd_register_debug_handler(ctx);
+	}
+	if (ctx->debug && !new_debug) {
+		daemon_set_verbosity(LOG_WARNING);
+		teamd_unregister_debug_handler(ctx);
+	}
+	if (err)
+		return err;
+	ctx->debug = new_debug;
+	return 0;
 }
 
 static int teamd_init(struct teamd_context *ctx)
