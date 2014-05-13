@@ -9,6 +9,15 @@ teamd uses JSON format configuration.
 .BR "device " (string, " " mandatory)
 Desired name of new team device.
 .TP
+.BR "debug_level " (int)
+Level of debug messages. The higher it is the more debug messages will be printed. It is the same as adding "-g" command line options.
+.RS 7
+.PP
+Default:
+.BR "0"
+(disabled)
+.RE
+.TP
 .BR "hwaddr " (string)
 Desired hardware address of new team device. Usual MAC address format is accepted.
 .TP

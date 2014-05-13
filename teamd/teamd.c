@@ -1619,6 +1619,18 @@ static int teamd_set_default_pid_file(struct teamd_context *ctx)
 	return 0;
 }
 
+static void teamd_init_debug_level(struct teamd_context *ctx)
+{
+	int err;
+	int tmp;
+
+	err = teamd_config_int_get(ctx, &tmp, "$.debug_level");
+	if (err || tmp <= ctx->debug)
+		return;
+	ctx->debug = tmp;
+	daemon_set_verbosity(LOG_DEBUG);
+}
+
 static int teamd_context_init(struct teamd_context **pctx)
 {
 	struct teamd_context *ctx;
@@ -1687,6 +1699,9 @@ int main(int argc, char **argv)
 		teamd_log_err("Failed to load config.");
 		goto context_fini;
 	}
+
+	teamd_init_debug_level(ctx);
+
 	err = teamd_get_devname(ctx, ctx->cmd == DAEMON_CMD_RUN);
 	if (err)
 		goto config_free;
