@@ -52,6 +52,12 @@
 #include "teamd_zmq.h"
 #include "teamd_phys_port_check.h"
 
+enum teamd_exit_code {
+	TEAMD_EXIT_SUCCESS,
+	TEAMD_EXIT_FAILURE,
+	TEAMD_EXIT_RUNTIME_FAILURE,
+};
+
 static const struct teamd_runner *teamd_runner_list[] = {
 	&teamd_runner_broadcast,
 	&teamd_runner_roundrobin,
@@ -1431,7 +1437,7 @@ static void teamd_fini(struct teamd_context *ctx)
 	team_free(ctx->th);
 }
 
-static int teamd_start(struct teamd_context *ctx)
+static int teamd_start(struct teamd_context *ctx, enum teamd_exit_code *p_ret)
 {
 	pid_t pid;
 	int err = 0;
@@ -1508,6 +1514,7 @@ static int teamd_start(struct teamd_context *ctx)
 		daemon_retval_send(-err);
 		goto signal_done;
 	}
+	*p_ret = TEAMD_EXIT_RUNTIME_FAILURE;
 
 	daemon_retval_send(0);
 
@@ -1658,7 +1665,7 @@ static void teamd_context_fini(struct teamd_context *ctx)
 
 int main(int argc, char **argv)
 {
-	int ret = EXIT_FAILURE;
+	enum teamd_exit_code ret = TEAMD_EXIT_FAILURE;
 	int err;
 	struct teamd_context *ctx;
 
@@ -1677,11 +1684,11 @@ int main(int argc, char **argv)
 	switch (ctx->cmd) {
 	case DAEMON_CMD_HELP:
 		print_help(ctx);
-		ret = EXIT_SUCCESS;
+		ret = TEAMD_EXIT_SUCCESS;
 		goto context_fini;
 	case DAEMON_CMD_VERSION:
 		printf("%s "PACKAGE_VERSION"\n", ctx->argv0);
-		ret = 0;
+		ret = TEAMD_EXIT_SUCCESS;
 		goto context_fini;
 	case DAEMON_CMD_KILL:
 	case DAEMON_CMD_CHECK:
@@ -1726,17 +1733,18 @@ int main(int argc, char **argv)
 		if (err)
 			teamd_log_warn("Failed to kill daemon: %s", strerror(errno));
 		else
-			ret = EXIT_SUCCESS;
+			ret = TEAMD_EXIT_SUCCESS;
 		break;
 	case DAEMON_CMD_CHECK:
-		ret = (daemon_pid_file_is_running() >= 0) ? 0 : 1;
+		ret = (daemon_pid_file_is_running() >= 0) ? TEAMD_EXIT_SUCCESS :
+							    TEAMD_EXIT_FAILURE;
 		break;
 	case DAEMON_CMD_RUN:
-		err = teamd_start(ctx);
+		err = teamd_start(ctx, &ret);
 		if (err)
 			teamd_log_err("Failed: %s", strerror(-err));
 		else
-			ret = EXIT_SUCCESS;
+			ret = TEAMD_EXIT_SUCCESS;
 		break;
 	}
 
