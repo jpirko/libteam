@@ -21,6 +21,10 @@ teamd_SOURCES=teamd.c teamd_common.c teamd_json.c teamd_config.c teamd_state.c \
 	      teamd_runner_activebackup.c teamd_runner_loadbalance.c \
 	      teamd_runner_lacp.c
 
+if TEAMD_ENABLE_TIPC
+teamd_SOURCES+=teamd_lw_tipc.c
+endif
+
 EXTRA_DIST = example_configs dbus redhat
 
 noinst_HEADERS = teamd.h teamd_workq.h teamd_bpf_chef.h teamd_ctl.h \

@@ -36,6 +36,9 @@
 extern const struct teamd_link_watch teamd_link_watch_ethtool;
 extern const struct teamd_link_watch teamd_link_watch_arp_ping;
 extern const struct teamd_link_watch teamd_link_watch_nsnap;
+#ifdef TEAMD_ENABLE_TIPC
+extern const struct teamd_link_watch teamd_link_watch_tipc;
+#endif
 
 int __set_sockaddr(struct sockaddr *sa, socklen_t sa_len, sa_family_t family,
 		   const char *hostname)
@@ -99,6 +102,9 @@ static const struct teamd_link_watch *teamd_link_watch_list[] = {
 	&teamd_link_watch_ethtool,
 	&teamd_link_watch_arp_ping,
 	&teamd_link_watch_nsnap,
+#ifdef TEAMD_ENABLE_TIPC
+	&teamd_link_watch_tipc,
+#endif
 };
 
 #define TEAMD_LINK_WATCH_LIST_SIZE ARRAY_SIZE(teamd_link_watch_list)

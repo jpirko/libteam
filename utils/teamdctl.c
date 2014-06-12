@@ -256,7 +256,16 @@ static int stateview_json_link_watch_info_process(char *lw_name,
 		pr_out2("interval: %d\n", interval);
 		pr_out2("missed packets: %d/%d\n", missed, missed_max);
 		pr_out2("initial wait: %d\n", init_wait);
-	} else {
+	} else if (!strcmp(lw_name, "tipc")) {
+		char *tipc_bearer;
+
+		err = json_unpack(lw_json, "{s:s}", "tipc_bearer", &tipc_bearer);
+		if (err) {
+			pr_err("Failed to parse JSON tipc_bearer link watch dump\n");
+			return -EINVAL;
+		}
+		pr_out2("tipc bearer: %s\n", tipc_bearer);
+	}  else {
 		pr_err("Failed to parse JSON unknown link watch info dump.\n");
 		return -EINVAL;
 	}
