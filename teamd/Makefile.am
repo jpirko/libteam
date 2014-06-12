@@ -14,10 +14,10 @@ bin_PROGRAMS=teamd
 teamd_SOURCES=teamd.c teamd_common.c teamd_json.c teamd_config.c teamd_state.c \
 	      teamd_workq.c teamd_events.c teamd_per_port.c \
 	      teamd_option_watch.c teamd_ifinfo_watch.c teamd_lw_ethtool.c \
-	      teamd_lw_psr.c teamd_lw_arp_ping.c teamd_link_watch.c \
-	      teamd_ctl.c teamd_dbus.c teamd_zmq.c teamd_usock.c \
-	      teamd_phys_port_check.c teamd_bpf_chef.c teamd_hash_func.c \
-	      teamd_balancer.c teamd_runner_basic_ones.c \
+	      teamd_lw_psr.c teamd_lw_arp_ping.c teamd_lw_nsna_ping.c \
+	      teamd_link_watch.c teamd_ctl.c teamd_dbus.c teamd_zmq.c \
+	      teamd_usock.c teamd_phys_port_check.c teamd_bpf_chef.c \
+	      teamd_hash_func.c teamd_balancer.c teamd_runner_basic_ones.c \
 	      teamd_runner_activebackup.c teamd_runner_loadbalance.c \
 	      teamd_runner_lacp.c
 
