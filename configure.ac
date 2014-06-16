@@ -101,40 +101,6 @@ AC_ARG_ENABLE([zmq],
 	fi
 fi
 
-AC_MSG_CHECKING([if TIPC is available and supports link state supervision])
-AC_COMPILE_IFELSE([
-	AC_LANG_PROGRAM([[
-		#include <stdlib.h>
-		#include <string.h>
-		#include <errno.h>
-		#include <sys/socket.h>
-		#include <sys/ioctl.h>
-		#include <netinet/in.h>
-		#include <linux/tipc.h>
-		]],[[
-                #ifndef TIPC_LINK_STATE
-		#error TIPC link state monitoring is not available for your kernel
-		#endif
-		int sd = 0;
-		struct tipc_sioc_ln_req lnr = { 0 };
-
-		if ((sd = socket(AF_TIPC, SOCK_SEQPACKET, 0)) == -1) {
-			return errno;
-		}
-		lnr.peer = 0;
-		lnr.bearer_id = 0;
-		if ((ioctl(sd, SIOCGETLINKNAME, &lnr) < 0) < 0) {
-			return errno;
-		}
-		]])],
-               [teamd_tipc_support=yes],
-               [teamd_tipc_support=no])
-AC_MSG_RESULT([$teamd_tipc_support])
-if test "x$teamd_tipc_support" = "xyes"; then
-	AC_DEFINE(TEAMD_ENABLE_TIPC, 1, [TIPC support enabled])
-fi
-AM_CONDITIONAL(TEAMD_ENABLE_TIPC, test "x$teamd_tipc_support" = "xyes")
-
 AC_CONFIG_FILES([Makefile
 include/Makefile \
 libteam/Makefile \
