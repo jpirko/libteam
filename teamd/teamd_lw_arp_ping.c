@@ -122,7 +122,7 @@ static char *str_in_addr(struct in_addr *addr)
 
 	memcpy(&sin.sin_addr, addr, sizeof(*addr));
 	return __str_sockaddr((struct sockaddr *) &sin, sizeof(sin), AF_INET,
-			      buf);
+			      buf, sizeof(buf));
 }
 
 static int lw_ap_sock_open(struct lw_psr_port_priv *psr_ppriv)

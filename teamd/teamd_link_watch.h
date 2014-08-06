@@ -45,7 +45,7 @@ struct lw_psr_port_priv {
 int __set_sockaddr(struct sockaddr *sa, socklen_t sa_len, sa_family_t family,
 		   const char *hostname);
 char *__str_sockaddr(struct sockaddr *sa, socklen_t sa_len, sa_family_t family,
-		     char buf[]);
+		     char *buf, size_t buflen);
 
 static inline bool teamd_link_watch_link_up_differs(struct lw_common_port_priv *common_ppriv,
 					     bool new_link_up)

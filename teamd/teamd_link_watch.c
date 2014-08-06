@@ -64,13 +64,12 @@ int __set_sockaddr(struct sockaddr *sa, socklen_t sa_len, sa_family_t family,
 
 
 char *__str_sockaddr(struct sockaddr *sa, socklen_t sa_len, sa_family_t family,
-		     char buf[])
+		     char *buf, size_t buflen)
 {
 	int err;
 
 	sa->sa_family = family;
-	err = getnameinfo(sa, sa_len, buf, sizeof(buf),
-			  NULL, 0, NI_NUMERICHOST);
+	err = getnameinfo(sa, sa_len, buf, buflen, NULL, 0, NI_NUMERICHOST);
 	if (err) {
 		teamd_log_err("getnameinfo failed: %s", gai_strerror(err));
 		return NULL;

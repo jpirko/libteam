@@ -45,8 +45,9 @@ static int set_sockaddr_in6(struct sockaddr_in6 *sin6, const char *hostname)
 static char *str_sockaddr_in6(struct sockaddr_in6 *sin6)
 {
 	static char buf[NI_MAXHOST];
-	return __str_sockaddr((struct sockaddr *) sin6,
-			      sizeof(*sin6), AF_INET6, buf);
+
+	return __str_sockaddr((struct sockaddr *) sin6, sizeof(*sin6), AF_INET6,
+			      buf, sizeof(buf));
 }
 
 struct lw_nsnap_port_priv {
