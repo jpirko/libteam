@@ -34,14 +34,14 @@
 
 struct tipc_link {
 	LIST_ENTRY(tipc_link) next;
-	char name[255];
+	char name[TIPC_MAX_LINK_NAME];
 	bool up;
 };
 
 struct lw_tipc_port_priv {
 	struct lw_common_port_priv common;
 	int topsrv_sock;
-	char bearer[255];
+	char bearer[TIPC_MAX_BEARER_NAME];
 	LIST_HEAD(links, tipc_link) links;
 	int active_links;
 };
@@ -56,8 +56,9 @@ static int lw_tipc_load_options(struct teamd_context *ctx,
 	err = teamd_config_string_get(ctx, &tipc_bearer, "@.tipc_bearer", cpcookie);
 	if (err)
 		return -EINVAL;
+	if (strlen(tipc_bearer) >= TIPC_MAX_BEARER_NAME)
+		return -EINVAL;
 	strcpy(tipc_ppriv->bearer, tipc_bearer);
-
 	return 0;
 }
 
@@ -100,7 +101,7 @@ link_up:
 static int lw_tipc_filter_events(struct lw_tipc_port_priv *tipc_ppriv,
 				 struct tipc_sioc_ln_req *lnr)
 {
-	char name[255];
+	char name[TIPC_MAX_LINK_NAME];
 	char needle[24];
 	char *remote, *bearer;
 
@@ -225,7 +226,6 @@ static void lw_tipc_port_removed(struct teamd_context *ctx,
 	close(tipc_ppriv->topsrv_sock);
 	while (tipc_ppriv->links.lh_first != NULL)
 		LIST_REMOVE(tipc_ppriv->links.lh_first, next);
-
 }
 
 int lw_tipc_state_bearer_get(struct teamd_context *ctx,
