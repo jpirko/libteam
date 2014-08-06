@@ -88,7 +88,7 @@ static inline int ifname2ifindex(uint32_t *p_ifindex, char *ifname)
 	if (sock == -1)
 		return -errno;
 	memset(&ifr, 0, sizeof(ifr));
-	strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
+	strncpy(ifr.ifr_name, ifname, IFNAMSIZ - 1);
 	ret = ioctl(sock, SIOCGIFINDEX, &ifr);
 	close(sock);
 	if (ret == -1) {
