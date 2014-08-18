@@ -17,6 +17,20 @@
  *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+/**
+ * @ingroup libteam
+ * @defgroup option Team options functions
+ * Wrapper for team generic netlink option-related communication
+ *
+ * @{
+ *
+ * Header
+ * ------
+ * ~~~~{.c}
+ * #include <team.h>
+ * ~~~~
+ */
+
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -33,6 +47,8 @@
 #include <private/misc.h>
 #include "team_private.h"
 #include "nl_updates.h"
+
+/* \cond HIDDEN_SYMBOLS */
 
 struct team_option_id {
 	char *			name;
@@ -401,14 +417,15 @@ static struct team_option *find_option(struct team_handle *th,
 	return option;
 }
 
+/* \endcond */
+
 /**
- * team_get_option:
- * @th: libteam library context
- * @fmt: format string
+ * @param th		libteam library context
+ * @param fmt		format string
  *
- * Get option structure referred by format sttring.
+ * @details Get option structure referred by format string.
  *
- * Returns: pointer to option structure or NULL in case of an error.
+ * @return Pointer to option structure or NULL in case of an error.
  **/
 TEAM_EXPORT
 struct team_option *team_get_option(struct team_handle *th,
@@ -445,13 +462,12 @@ struct team_option *team_get_option(struct team_handle *th,
 }
 
 /**
- * team_get_next_option:
- * @th: libteam library context
- * @option: option structure
+ * @param th		libteam library context
+ * @param option	option structure
  *
- * Get next option in list.
+ * @details Get next option in list.
  *
- * Returns: option next to @option passed.
+ * @return Option next to option passed.
  **/
 TEAM_EXPORT
 struct team_option *team_get_next_option(struct team_handle *th,
@@ -466,12 +482,11 @@ struct team_option *team_get_next_option(struct team_handle *th,
 }
 
 /**
- * team_is_option_initialized:
- * @option: option structure
+ * @param option	option structure
  *
- * See if option values are initialized.
+ * @details See if option values are initialized.
  *
- * Returns: true if option is initialized.
+ * @return True if option is initialized.
  **/
 TEAM_EXPORT
 bool team_is_option_initialized(struct team_option *option)
@@ -480,12 +495,11 @@ bool team_is_option_initialized(struct team_option *option)
 }
 
 /**
- * team_get_option_name:
- * @option: option structure
+ * @param option	option structure
  *
- * Get option name.
+ * @details Get option name.
  *
- * Returns: pointer to string containing option name.
+ * @return Pointer to string containing option name.
  **/
 TEAM_EXPORT
 char *team_get_option_name(struct team_option *option)
@@ -494,12 +508,11 @@ char *team_get_option_name(struct team_option *option)
 }
 
 /**
- * team_get_option_port_ifindex:
- * @option: option structure
+ * @param option	option structure
  *
- * Get option port ifindex.
+ * @details Get option port ifindex.
  *
- * Returns: port interface index.
+ * @return Port interface index.
  * to any port.
  **/
 TEAM_EXPORT
@@ -509,12 +522,11 @@ uint32_t team_get_option_port_ifindex(struct team_option *option)
 }
 
 /**
- * team_is_option_per_port:
- * @option: option structure
+ * @param option	option structure
  *
- * See if option is per-port.
+ * @details See if option is per-port.
  *
- * Returns: true if option is per-port.
+ * @return True if option is per-port.
  **/
 TEAM_EXPORT
 bool team_is_option_per_port(struct team_option *option)
@@ -523,13 +535,11 @@ bool team_is_option_per_port(struct team_option *option)
 }
 
 /**
- * team_get_option_array_index:
- * @option: option structure
+ * @param option	option structure
  *
- * Get option array index.
+ * @details Get option array index.
  *
- * Returns: array index.
- * to any port.
+ * @return Array index.
  **/
 TEAM_EXPORT
 uint32_t team_get_option_array_index(struct team_option *option)
@@ -538,12 +548,11 @@ uint32_t team_get_option_array_index(struct team_option *option)
 }
 
 /**
- * team_is_option_array:
- * @option: option structure
+ * @param option	option structure
  *
- * See if option is array.
+ * @details See if option is array.
  *
- * Returns: true if option is array.
+ * @return True if option is array.
  **/
 TEAM_EXPORT
 bool team_is_option_array(struct team_option *option)
@@ -552,12 +561,11 @@ bool team_is_option_array(struct team_option *option)
 }
 
 /**
- * team_get_option_type:
- * @option: option structure
+ * @param option	option structure
  *
- * Get option type.
+ * @details Get option type.
  *
- * Returns: number identificating option type.
+ * @return Number identificating option type.
  **/
 TEAM_EXPORT
 enum team_option_type team_get_option_type(struct team_option *option)
@@ -566,12 +574,11 @@ enum team_option_type team_get_option_type(struct team_option *option)
 }
 
 /**
- * team_is_option_changed:
- * @option: option structure
+ * @param option	option structure
  *
- * See if option values got changed.
+ * @details See if option values got changed.
  *
- * Returns: true if option got changed.
+ * @return True if option got changed.
  **/
 TEAM_EXPORT
 bool team_is_option_changed(struct team_option *option)
@@ -580,12 +587,11 @@ bool team_is_option_changed(struct team_option *option)
 }
 
 /**
- * team_is_option_changed_locally:
- * @option: option structure
+ * @param option	option structure
  *
- * See if option values got changed locally.
+ * @details See if option values got changed locally.
  *
- * Returns: true if option got changed locally.
+ * @return True if option got changed locally.
  **/
 TEAM_EXPORT
 bool team_is_option_changed_locally(struct team_option *option)
@@ -594,10 +600,11 @@ bool team_is_option_changed_locally(struct team_option *option)
 }
 
 /**
- * team_get_option_value_len:
- * @option: option structure
+ * @param option	option structure
  *
- * Get option value length.
+ * @details Get option value length.
+ *
+ * @return Option value length.
  **/
 TEAM_EXPORT
 unsigned int team_get_option_value_len(struct team_option *option)
@@ -606,12 +613,11 @@ unsigned int team_get_option_value_len(struct team_option *option)
 }
 
 /**
- * team_get_option_value_u32:
- * @option: option structure
+ * @param option	option structure
  *
- * Get option value as unsigned 32-bit number.
+ * @details Get option value as unsigned 32-bit number.
  *
- * Returns: number.
+ * @return Number.
  **/
 TEAM_EXPORT
 uint32_t team_get_option_value_u32(struct team_option *option)
@@ -620,12 +626,11 @@ uint32_t team_get_option_value_u32(struct team_option *option)
 }
 
 /**
- * team_get_option_value_string:
- * @option: option structure
+ * @param option	option structure
  *
- * Get option value as string.
+ * @details Get option value as string.
  *
- * Returns: pointer to string.
+ * @return Pointer to string.
  **/
 TEAM_EXPORT
 char *team_get_option_value_string(struct team_option *option)
@@ -634,12 +639,11 @@ char *team_get_option_value_string(struct team_option *option)
 }
 
 /**
- * team_get_option_value_binary:
- * @option: option structure
+ * @param option	option structure
  *
- * Get option value as void pointer.
+ * @details Get option value as void pointer.
  *
- * Returns: pointer to data.
+ * @return Pointer to data.
  **/
 TEAM_EXPORT
 void *team_get_option_value_binary(struct team_option *option)
@@ -648,12 +652,11 @@ void *team_get_option_value_binary(struct team_option *option)
 }
 
 /**
- * team_get_option_value_bool:
- * @option: option structure
+ * @param option	option structure
  *
- * Get option value as bool.
+ * @details Get option value as bool.
  *
- * Returns: bool.
+ * @return Bool.
  **/
 TEAM_EXPORT
 bool team_get_option_value_bool(struct team_option *option)
@@ -662,12 +665,11 @@ bool team_get_option_value_bool(struct team_option *option)
 }
 
 /**
- * team_get_option_value_s32:
- * @option: option structure
+ * @param option	option structure
  *
- * Get option value as signed 32-bit number.
+ * @details Get option value as signed 32-bit number.
  *
- * Returns: number.
+ * @return Number.
  **/
 TEAM_EXPORT
 int32_t team_get_option_value_s32(struct team_option *option)
@@ -782,14 +784,13 @@ nla_put_failure:
 }
 
 /**
- * team_set_option_value_u32:
- * @th: libteam library context
- * @option: option structure
- * @val: value to be set
+ * @param th		libteam library context
+ * @param option	option structure
+ * @param val		value to be set
  *
- * Set 32-bit number type option.
+ * @details Set 32-bit number type option.
  *
- * Returns: zero on success or negative number in case of an error.
+ * @return Zero on success or negative number in case of an error.
  **/
 TEAM_EXPORT
 int team_set_option_value_u32(struct team_handle *th,
@@ -800,14 +801,13 @@ int team_set_option_value_u32(struct team_handle *th,
 }
 
 /**
- * team_set_option_value_string:
- * @th: libteam library context
- * @option: option structure
- * @str: string to be set
+ * @param th		libteam library context
+ * @param option	option structure
+ * @param str		string to be set
  *
- * Set string type option.
+ * @details Set string type option.
  *
- * Returns: zero on success or negative number in case of an error.
+ * @return Zero on success or negative number in case of an error.
  **/
 TEAM_EXPORT
 int team_set_option_value_string(struct team_handle *th,
@@ -817,15 +817,14 @@ int team_set_option_value_string(struct team_handle *th,
 }
 
 /**
- * team_set_option_value_by_name_binary:
- * @th: libteam library context
- * @option: option structure
- * @data: binary data to be set
- * @data_len: binary data length
+ * @param th		libteam library context
+ * @param option	option structure
+ * @param data		binary data to be set
+ * @param data_len	binary data length
  *
- * Set binary type option.
+ * @details Set binary type option.
  *
- * Returns: zero on success or negative number in case of an error.
+ * @return Zero on success or negative number in case of an error.
  **/
 TEAM_EXPORT
 int team_set_option_value_binary(struct team_handle *th,
@@ -837,14 +836,13 @@ int team_set_option_value_binary(struct team_handle *th,
 }
 
 /**
- * team_set_option_value_by_name_bool:
- * @th: libteam library context
- * @option: option structure
- * @val: value to be set
+ * @param th		libteam library context
+ * @param option	option structure
+ * @param val		value to be set
  *
- * Set bool type option.
+ * @details Set bool type option.
  *
- * Returns: zero on success or negative number in case of an error.
+ * @return Zero on success or negative number in case of an error.
  **/
 TEAM_EXPORT
 int team_set_option_value_bool(struct team_handle *th,
@@ -854,14 +852,13 @@ int team_set_option_value_bool(struct team_handle *th,
 }
 
 /**
- * team_set_option_value_s32:
- * @th: libteam library context
- * @option: option structure
- * @val: value to be set
+ * @param th		libteam library context
+ * @param option	option structure
+ * @param val		value to be set
  *
- * Set 32-bit signed number type option.
+ * @details Set 32-bit signed number type option.
  *
- * Returns: zero on success or negative number in case of an error.
+ * @return Zero on success or negative number in case of an error.
  **/
 TEAM_EXPORT
 int team_set_option_value_s32(struct team_handle *th,
@@ -870,3 +867,7 @@ int team_set_option_value_s32(struct team_handle *th,
 	return set_option_value(th, option, &val, 0,
 				TEAM_OPTION_TYPE_S32);
 }
+
+/**
+ * @}
+ */
