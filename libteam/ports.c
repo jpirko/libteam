@@ -17,6 +17,19 @@
  *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+/**
+ * @ingroup libteam
+ * @defgroup ports Team ports functions
+ * Wrapper for team generic netlink port-related communication
+ *
+ * @{
+ *
+ * Header
+ * ------
+ * ~~~~{.c}
+ * #include <team.h>
+ * ~~~~
+ */
 #include <stdbool.h>
 #include <stdlib.h>
 #include <netlink/netlink.h>
@@ -31,6 +44,8 @@
 #include <private/list.h>
 #include <private/misc.h>
 #include "team_private.h"
+
+/* \cond HIDDEN_SYMBOLS */
 
 struct team_port {
 	struct list_item	list;
@@ -211,14 +226,15 @@ void port_list_free(struct team_handle *th)
 	flush_port_list(th);
 }
 
+/* \endcond */
+
 /**
- * team_get_next_port:
- * @th: libteam library context
- * @port: port structure
+ * @param th		libteam library context
+ * @param port		port structure
  *
- * Get next port in list.
+ * @details Get next port in list.
  *
- * Returns: port next to @port passed.
+ * @return Port next to port passed.
  **/
 TEAM_EXPORT
 struct team_port *team_get_next_port(struct team_handle *th,
@@ -228,12 +244,11 @@ struct team_port *team_get_next_port(struct team_handle *th,
 }
 
 /**
- * team_get_port_ifindex:
- * @port: port structure
+ * @param port		port structure
  *
- * Get port interface index.
+ * @details Get port interface index.
  *
- * Returns: port interface index as idenfified by in kernel.
+ * @return Port interface index as idenfified by in kernel.
  **/
 TEAM_EXPORT
 uint32_t team_get_port_ifindex(struct team_port *port)
@@ -242,12 +257,11 @@ uint32_t team_get_port_ifindex(struct team_port *port)
 }
 
 /**
- * team_get_port_speed:
- * @port: port structure
+ * @param port		port structure
  *
- * Get port speed.
+ * @details Get port speed.
  *
- * Returns: port speed in Mbits/s.
+ * @return Port speed in Mbits/s.
  **/
 TEAM_EXPORT
 uint32_t team_get_port_speed(struct team_port *port)
@@ -256,12 +270,11 @@ uint32_t team_get_port_speed(struct team_port *port)
 }
 
 /**
- * team_get_port_duplex:
- * @port: port structure
+ * @param port		port structure
  *
- * Get port duplex.
+ * @details Get port duplex.
  *
- * Returns: 0 = half-duplex, 1 = full-duplex
+ * @return 0 = half-duplex, 1 = full-duplex
  **/
 TEAM_EXPORT
 uint8_t team_get_port_duplex(struct team_port *port)
@@ -270,12 +283,11 @@ uint8_t team_get_port_duplex(struct team_port *port)
 }
 
 /**
- * team_is_port_link_up:
- * @port: port structure
+ * @param port		port structure
  *
- * See if port link is up.
+ * @details See if port link is up.
  *
- * Returns: true if port link is up.
+ * @return True if port link is up.
  **/
 TEAM_EXPORT
 bool team_is_port_link_up(struct team_port *port)
@@ -284,12 +296,11 @@ bool team_is_port_link_up(struct team_port *port)
 }
 
 /**
- * team_is_port_changed:
- * @port: port structure
+ * @param port		port structure
  *
- * See if port values got changed.
+ * @details See if port values got changed.
  *
- * Returns: true if port got changed.
+ * @return True if port got changed.
  **/
 TEAM_EXPORT
 bool team_is_port_changed(struct team_port *port)
@@ -298,12 +309,11 @@ bool team_is_port_changed(struct team_port *port)
 }
 
 /**
- * team_is_port_removed:
- * @port: port structure
+ * @param port		port structure
  *
- * See if port was removed.
+ * @details See if port was removed.
  *
- * Returns: true if port was removed.
+ * @return True if port was removed.
  **/
 TEAM_EXPORT
 bool team_is_port_removed(struct team_port *port)
@@ -312,12 +322,11 @@ bool team_is_port_removed(struct team_port *port)
 }
 
 /**
- * team_get_port_ifinfo:
- * @port: port structure
+ * @param port		port structure
  *
- * Get port rtnetlink interface info.
+ * @details Get port rtnetlink interface info.
  *
- * Returns: pointer to appropriate team_ifinfo structure.
+ * @return Pointer to appropriate team_ifinfo structure.
  **/
 TEAM_EXPORT
 struct team_ifinfo *team_get_port_ifinfo(struct team_port *port)
@@ -326,13 +335,12 @@ struct team_ifinfo *team_get_port_ifinfo(struct team_port *port)
 }
 
 /**
- * team_is_port_present:
- * @th: libteam library context
- * @port: port structure
+ * @param th		libteam library context
+ * @param port		port structure
  *
- * See if port is actually present in this team.
+ * @details See if port is actually present in this team.
  *
- * Returns: true if port is present at a moment.
+ * @return True if port is present at a moment.
  **/
 TEAM_EXPORT
 bool team_is_port_present(struct team_handle *th, struct team_port *port)
@@ -342,3 +350,7 @@ bool team_is_port_present(struct team_handle *th, struct team_port *port)
 	return team_get_ifinfo_master_ifindex(ifinfo) == th->ifindex &&
 	       !team_is_port_removed(port);
 }
+
+/**
+ * @}
+ */
