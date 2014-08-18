@@ -17,6 +17,20 @@
  *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+/**
+ * @ingroup libteam
+ * @defgroup ifinfo Interface information functions
+ * Wrapper for rtnetlink interface info
+ *
+ * @{
+ *
+ * Header
+ * ------
+ * ~~~~{.c}
+ * #include <team.h>
+ * ~~~~
+ */
+
 #include <stdbool.h>
 #include <stdlib.h>
 #include <netlink/netlink.h>
@@ -29,6 +43,8 @@
 #include <private/list.h>
 #include <private/misc.h>
 #include "team_private.h"
+
+/* \cond HIDDEN_SYMBOLS */
 
 struct team_ifinfo {
 	struct list_item	list;
@@ -390,14 +406,15 @@ void ifinfo_unlink(struct team_ifinfo *ifinfo)
 	ifinfo->linked = false;
 }
 
+/* \endcond */
+
 /**
- * team_get_next_ifinfo:
- * @th: libteam library context
- * @ifinfo: ifinfo structure
+ * @param th		libteam library context
+ * @param ifinfo	ifinfo structure
  *
- * Get next ifinfo in list.
+ * @details Get next ifinfo in list.
  *
- * Returns: ifinfo next to @ifinfo passed.
+ * @return Ifinfo next to ifinfo passed.
  **/
 TEAM_EXPORT
 struct team_ifinfo *team_get_next_ifinfo(struct team_handle *th,
@@ -412,12 +429,12 @@ struct team_ifinfo *team_get_next_ifinfo(struct team_handle *th,
 }
 
 /**
- * team_is_ifinfo_removed:
- * @ifinfo: ifinfo structure
+ * @param ifinfo	ifinfo structure
  *
- * See if ifinfo got removed. This means that the interface got removed.
+ * @details See if ifinfo got removed. This means that the interface
+ *	    got removed.
  *
- * Returns: true if ifinfo got changed.
+ * @return True if ifinfo got changed.
  **/
 TEAM_EXPORT
 bool team_is_ifinfo_removed(struct team_ifinfo *ifinfo)
@@ -426,12 +443,11 @@ bool team_is_ifinfo_removed(struct team_ifinfo *ifinfo)
 }
 
 /**
- * team_get_ifinfo_ifindex:
- * @ifinfo: ifinfo structure
+ * @param ifinfo	ifinfo structure
  *
- * Get ifinfo interface index.
+ * @details Get ifinfo interface index.
  *
- * Returns: ifinfo interface index as idenfified by in kernel.
+ * @return Ifinfo interface index as idenfified by in kernel.
  **/
 TEAM_EXPORT
 uint32_t team_get_ifinfo_ifindex(struct team_ifinfo *ifinfo)
@@ -440,12 +456,11 @@ uint32_t team_get_ifinfo_ifindex(struct team_ifinfo *ifinfo)
 }
 
 /**
- * team_get_ifinfo_port:
- * @ifinfo: ifinfo structure
+ * @param ifinfo	ifinfo structure
  *
- * Get port associated to rtnetlink interface info.
+ * @details Get port associated to rtnetlink interface info.
  *
- * Returns: pointer to appropriate team_port structure
+ * @return Pointer to appropriate team_port structure
  *	    or NULL if not associated.
  **/
 TEAM_EXPORT
@@ -455,12 +470,11 @@ struct team_port *team_get_ifinfo_port(struct team_ifinfo *ifinfo)
 }
 
 /**
- * team_get_ifinfo_hwaddr:
- * @ifinfo: ifinfo structure
+ * @param ifinfo	ifinfo structure
  *
- * Get ifinfo hardware address.
+ * @details Get ifinfo hardware address.
  *
- * Returns: pointer to memory place where hwaddr is.
+ * @return Pointer to memory place where hwaddr is.
  **/
 TEAM_EXPORT
 char *team_get_ifinfo_hwaddr(struct team_ifinfo *ifinfo)
@@ -469,12 +483,11 @@ char *team_get_ifinfo_hwaddr(struct team_ifinfo *ifinfo)
 }
 
 /**
- * team_is_ifinfo_hwaddr_changed:
- * @ifinfo: ifinfo structure
+ * @param ifinfo	ifinfo structure
  *
- * See if ifinfo hardware address got changed.
+ * @details See if ifinfo hardware address got changed.
  *
- * Returns: true if hardware address got changed.
+ * @return True if hardware address got changed.
  **/
 TEAM_EXPORT
 bool team_is_ifinfo_hwaddr_changed(struct team_ifinfo *ifinfo)
@@ -483,12 +496,11 @@ bool team_is_ifinfo_hwaddr_changed(struct team_ifinfo *ifinfo)
 }
 
 /**
- * team_get_ifinfo_hwaddr_len:
- * @ifinfo: ifinfo structure
+ * @param ifinfo	ifinfo structure
  *
- * Get ifinfo hardware address length.
+ * @details Get ifinfo hardware address length.
  *
- * Returns: hardware address length.
+ * @return Hardware address length.
  **/
 TEAM_EXPORT
 size_t team_get_ifinfo_hwaddr_len(struct team_ifinfo *ifinfo)
@@ -497,12 +509,11 @@ size_t team_get_ifinfo_hwaddr_len(struct team_ifinfo *ifinfo)
 }
 
 /**
- * team_is_ifinfo_hwaddr_len_changed:
- * @ifinfo: ifinfo structure
+ * @param ifinfo	ifinfo structure
  *
- * See if ifinfo hardware address length got changed.
+ * @details See if ifinfo hardware address length got changed.
  *
- * Returns: true if ifinfo hardware address length changed.
+ * @return True if ifinfo hardware address length changed.
  **/
 TEAM_EXPORT
 bool team_is_ifinfo_hwaddr_len_changed(struct team_ifinfo *ifinfo)
@@ -511,12 +522,11 @@ bool team_is_ifinfo_hwaddr_len_changed(struct team_ifinfo *ifinfo)
 }
 
 /**
- * team_get_ifinfo_orig_hwaddr:
- * @ifinfo: ifinfo structure
+ * @param ifinfo	ifinfo structure
  *
- * Get ifinfo original hardware address.
+ * @details Get ifinfo original hardware address.
  *
- * Returns: pointer to memory place where hwaddr is.
+ * @return Pointer to memory place where hwaddr is.
  **/
 TEAM_EXPORT
 char *team_get_ifinfo_orig_hwaddr(struct team_ifinfo *ifinfo)
@@ -525,12 +535,11 @@ char *team_get_ifinfo_orig_hwaddr(struct team_ifinfo *ifinfo)
 }
 
 /**
- * team_get_ifinfo_orig_hwaddr_len:
- * @ifinfo: ifinfo structure
+ * @param ifinfo	ifinfo structure
  *
- * Get ifinfo original hardware address length.
+ * @details Get ifinfo original hardware address length.
  *
- * Returns: hardware address length.
+ * @return Hardware address length.
  **/
 TEAM_EXPORT
 uint8_t team_get_ifinfo_orig_hwaddr_len(struct team_ifinfo *ifinfo)
@@ -539,12 +548,11 @@ uint8_t team_get_ifinfo_orig_hwaddr_len(struct team_ifinfo *ifinfo)
 }
 
 /**
- * team_get_ifinfo_ifname:
- * @ifinfo: ifinfo structure
+ * @param ifinfo	ifinfo structure
  *
- * Get ifinfo interface name.
+ * @details Get ifinfo interface name.
  *
- * Returns: pointer to memory place where interface name is.
+ * @return Pointer to memory place where interface name is.
  **/
 TEAM_EXPORT
 char *team_get_ifinfo_ifname(struct team_ifinfo *ifinfo)
@@ -553,12 +561,11 @@ char *team_get_ifinfo_ifname(struct team_ifinfo *ifinfo)
 }
 
 /**
- * team_is_ifinfo_ifname_changed:
- * @ifinfo: ifinfo structure
+ * @param ifinfo	ifinfo structure
  *
- * See if ifinfo interface name got changed.
+ * @details See if ifinfo interface name got changed.
  *
- * Returns: true if ifinfo interface name got changed.
+ * @return True if ifinfo interface name got changed.
  **/
 TEAM_EXPORT
 bool team_is_ifinfo_ifname_changed(struct team_ifinfo *ifinfo)
@@ -567,12 +574,11 @@ bool team_is_ifinfo_ifname_changed(struct team_ifinfo *ifinfo)
 }
 
 /**
- * team_get_ifinfo_master_ifindex:
- * @ifinfo: ifinfo structure
+ * @param ifinfo	ifinfo structure
  *
- * Get interface index of master interface.
+ * @details Get interface index of master interface.
  *
- * Returns: master interface index as idenfified by in kernel.
+ * @return Master interface index as idenfified by in kernel.
  **/
 TEAM_EXPORT
 uint32_t team_get_ifinfo_master_ifindex(struct team_ifinfo *ifinfo)
@@ -581,12 +587,11 @@ uint32_t team_get_ifinfo_master_ifindex(struct team_ifinfo *ifinfo)
 }
 
 /**
- * team_is_ifinfo_master_ifindex_changed:
- * @ifinfo: ifinfo structure
+ * @param ifinfo	ifinfo structure
  *
- * See if interface index of master interface got changed.
+ * @details See if interface index of master interface got changed.
  *
- * Returns: true if interface index of master interface got changed.
+ * @return True if interface index of master interface got changed.
  **/
 TEAM_EXPORT
 bool team_is_ifinfo_master_ifindex_changed(struct team_ifinfo *ifinfo)
@@ -595,12 +600,11 @@ bool team_is_ifinfo_master_ifindex_changed(struct team_ifinfo *ifinfo)
 }
 
 /**
- * team_get_ifinfo_phys_port_id:
- * @ifinfo: ifinfo structure
+ * @param ifinfo	ifinfo structure
  *
- * Get ifinfo physical port ID.
+ * @details Get ifinfo physical port ID.
  *
- * Returns: pointer to memory place where physical por ID is.
+ * @return Pointer to memory place where physical por ID is.
  **/
 TEAM_EXPORT
 char *team_get_ifinfo_phys_port_id(struct team_ifinfo *ifinfo)
@@ -610,11 +614,10 @@ char *team_get_ifinfo_phys_port_id(struct team_ifinfo *ifinfo)
 
 /**
  * team_is_ifinfo_phys_port_id_changed:
- * @ifinfo: ifinfo structure
  *
- * See if ifinfo physical port ID got changed.
+ * @details See if ifinfo physical port ID got changed.
  *
- * Returns: true if physical port ID. got changed.
+ * @return True if physical port ID. got changed.
  **/
 TEAM_EXPORT
 bool team_is_ifinfo_phys_port_id_changed(struct team_ifinfo *ifinfo)
@@ -624,11 +627,10 @@ bool team_is_ifinfo_phys_port_id_changed(struct team_ifinfo *ifinfo)
 
 /**
  * team_get_ifinfo_phys_port_id_len:
- * @ifinfo: ifinfo structure
  *
- * Get ifinfo physical port ID length.
+ * @details Get ifinfo physical port ID length.
  *
- * Returns: physical port ID length.
+ * @return Physical port ID length.
  **/
 TEAM_EXPORT
 size_t team_get_ifinfo_phys_port_id_len(struct team_ifinfo *ifinfo)
@@ -637,12 +639,11 @@ size_t team_get_ifinfo_phys_port_id_len(struct team_ifinfo *ifinfo)
 }
 
 /**
- * team_is_ifinfo_phys_port_id_len_changed:
- * @ifinfo: ifinfo structure
+ * @param ifinfo	ifinfo structure
  *
- * See if ifinfo physical port ID length got changed.
+ * @details See if ifinfo physical port ID length got changed.
  *
- * Returns: true if ifinfo physical port ID length changed.
+ * @return True if ifinfo physical port ID length changed.
  **/
 TEAM_EXPORT
 bool team_is_ifinfo_phys_port_id_len_changed(struct team_ifinfo *ifinfo)
@@ -651,15 +652,18 @@ bool team_is_ifinfo_phys_port_id_len_changed(struct team_ifinfo *ifinfo)
 }
 
 /**
- * team_is_ifinfo_changed:
- * @ifinfo: ifinfo structure
+ * @param ifinfo	ifinfo structure
  *
- * See if ifinfo got changed.
+ * @details See if ifinfo got changed.
  *
- * Returns: true if ifinfo changed.
+ * @return True if ifinfo changed.
  **/
 TEAM_EXPORT
 bool team_is_ifinfo_changed(struct team_ifinfo *ifinfo)
 {
 	return is_changed(ifinfo, CHANGED_ANY);
 }
+
+/**
+ * @}
+ */
