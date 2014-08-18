@@ -17,6 +17,19 @@
  *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+/**
+ * @defgroup libteamdctl Libteamdctl
+ * Teamd daemon control library
+ *
+ * @{
+ *
+ * Header
+ * ------
+ * ~~~~{.c}
+ * #include <teamdctl.h>
+ * ~~~~
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -35,7 +48,6 @@
 
 /**
  * SECTION: logging
- * @short_description: libteamdctl logging facility
  */
 void teamdctl_log(struct teamdctl *tdc, int priority,
 		  const char *file, int line, const char *fn,
@@ -76,7 +88,6 @@ static int log_priority(const char *priority)
 
 /**
  * SECTION: reply cache
- * @short_description: libteamdctl reply cache facility
  */
 
 static void reply_cache_clean(struct teamdctl *tdc)
@@ -144,16 +155,9 @@ skip_create:
 }
 
 /**
- * SECTION: Context functions
- * @short_description: Core context functions
- */
-
-/**
- * teamdctl_alloc:
+ * @details Allocates library context and does initial setup.
  *
- * Allocates library context and does initial setup.
- *
- * Returns: new libteam library context
+ * @return New libteam library context.
  **/
 TEAMDCTL_EXPORT
 struct teamdctl *teamdctl_alloc(void)
@@ -179,11 +183,9 @@ struct teamdctl *teamdctl_alloc(void)
 }
 
 /**
- * teamdctl_free:
- * @tdc: libteam library context
+ * @param tdc		libteam library context
  *
- * Do library context cleanup.
- *
+ * @details Do library context cleanup.
  **/
 TEAMDCTL_EXPORT
 void teamdctl_free(struct teamdctl *tdc)
@@ -193,14 +195,12 @@ void teamdctl_free(struct teamdctl *tdc)
 }
 
 /**
- * teamdctl_set_log_fn:
- * @tdc: libteamdctl library context
- * @log_fn: function to be called for logging messages
+ * @param tdc		libteamdctl library context
+ * @param log_fn	function to be called for logging messages
  *
- * The built-in logging writes to stderr. It can be
- * overridden by a custom function, to plug log messages
- * into the user's logging functionality.
- *
+ * @details The built-in logging writes to stderr. It can be overridden
+ *	    by a custom function, to plug log messages into the user's
+ *	    logging functionality.
  **/
 TEAMDCTL_EXPORT
 void teamdctl_set_log_fn(struct teamdctl *tdc,
@@ -214,10 +214,9 @@ void teamdctl_set_log_fn(struct teamdctl *tdc,
 }
 
 /**
- * teamdctl_get_log_priority:
- * @tdc: libteamdctl library context
+ * @param tdc		libteamdctl library context
  *
- * Returns: the current logging priority
+ * @return The current logging priority.
  **/
 TEAMDCTL_EXPORT
 int teamdctl_get_log_priority(struct teamdctl *tdc)
@@ -226,12 +225,11 @@ int teamdctl_get_log_priority(struct teamdctl *tdc)
 }
 
 /**
- * teamdctl_set_log_priority:
- * @tdc: libteamdctl library context
- * @priority: the new logging priority
+ * @param tdc		libteamdctl library context
+ * @param priority	the new logging priority
  *
- * Set the current logging priority. The value controls which messages
- * are logged.
+ * @details Set the current logging priority. The value controls which messages
+ *	    are logged.
  **/
 TEAMDCTL_EXPORT
 void teamdctl_set_log_priority(struct teamdctl *tdc, int priority)
@@ -283,17 +281,18 @@ static void cli_fini(struct teamdctl *tdc)
 }
 
 /**
- * teamdctl_connect:
- * @tdc: libteamdctl library context
- * @team_name: team device name
- * @cli_type: client type
+ * @param tdc		libteamdctl library context
+ * @param team_name	team device name
+ * @param addr		address (for zeromq only)
+ * @param cli_type	client type
  *
- * Connect to teamd instance controlling team driver instance with interface
- * name @team_name. Use client type @cli_type to connect. That can be either
- * "dbus" for connection over D-Bus, "usock" which will use unix domain socket
- * or NULL to select the type automatically.
+ * @details Connect to teamd instance controlling team driver instance
+ *	    with interface name team_name. Use client type cli_type to connect.
+ *	    That can be either "dbus" for connection over D-Bus, "usock" which
+ *	    will use unix domain socket or NULL to select the type
+ *	    automatically.
  *
- * Returns: zero on success or negative number in case of an error.
+ * @return Zero on success or negative number in case of an error.
  **/
 TEAMDCTL_EXPORT
 int teamdctl_connect(struct teamdctl *tdc, const char *team_name,
@@ -370,10 +369,9 @@ err_out:
 }
 
 /**
- * teamdctl_disconnect:
- * @tdc: libteamdctl library context
+ * @param tdc		libteamdctl library context
  *
- * Disconnect from teamd instance.
+ * @details Disconnect from teamd instance.
  **/
 TEAMDCTL_EXPORT
 void teamdctl_disconnect(struct teamdctl *tdc)
@@ -399,6 +397,13 @@ static int cache_config(struct teamdctl *tdc, const char *id, char **p_reply)
 	return 0;
 }
 
+/**
+ * @param tdc		libteamdctl library context
+ *
+ * @details Refresh cache.
+ *
+ * @return Zero on success or negative number in case of an error.
+ **/
 TEAMDCTL_EXPORT
 int teamdctl_refresh(struct teamdctl *tdc)
 {
@@ -417,13 +422,12 @@ int teamdctl_refresh(struct teamdctl *tdc)
 }
 
 /**
- * teamdctl_port_add:
- * @tdc: libteamdctl library context
- * @port_devname: port device name
+ * @param tdc		libteamdctl library context
+ * @param port_devname	port device name
  *
- * Adds specified port to team.
+ * @details Adds specified port to team.
  *
- * Returns: zero on success or negative number in case of an error.
+ * @return Zero on success or negative number in case of an error.
  **/
 TEAMDCTL_EXPORT
 int teamdctl_port_add(struct teamdctl *tdc, const char *port_devname)
@@ -432,13 +436,12 @@ int teamdctl_port_add(struct teamdctl *tdc, const char *port_devname)
 }
 
 /**
- * teamdctl_port_remove:
- * @tdc: libteamdctl library context
- * @port_devname: port device name
+ * @param tdc		libteamdctl library context
+ * @param port_devname	port device name
  *
- * Removes specified port from team.
+ * @details Removes specified port from team.
  *
- * Returns: zero on success or negative number in case of an error.
+ * @return Zero on success or negative number in case of an error.
  **/
 TEAMDCTL_EXPORT
 int teamdctl_port_remove(struct teamdctl *tdc, const char *port_devname)
@@ -447,14 +450,13 @@ int teamdctl_port_remove(struct teamdctl *tdc, const char *port_devname)
 }
 
 /**
- * teamdctl_port_config_update_raw:
- * @tdc: libteamdctl library context
- * @port_devname: port device name
- * @port_config_raw: port config
+ * @param tdc			libteamdctl library context
+ * @param port_devname		port device name
+ * @param port_config_raw	port config
  *
- * Update config for specified port.
+ * @details Update config for specified port.
  *
- * Returns: zero on success or negative number in case of an error.
+ * @return Zero on success or negative number in case of an error.
  **/
 TEAMDCTL_EXPORT
 int teamdctl_port_config_update_raw(struct teamdctl *tdc,
@@ -466,17 +468,15 @@ int teamdctl_port_config_update_raw(struct teamdctl *tdc,
 }
 
 /**
- * teamdctl_port_config_get_raw_direct:
- * @tdc: libteamdctl library context
- * @port_devname: port device name
- * @p_cfg: pointer to string which will be set
+ * @param tdc		libteamdctl library context
+ * @param port_devname	port device name
+ * @param p_cfg		pointer to string which will be set
  *
- * Gets raw port config string.
- * Does direct method call avoiding possible stale data in the cache.
+ * @details Gets raw port config string.
+ *	    Does direct method call avoiding possible stale data in the cache.
+ *	    Note: the obtained string should not be modified or freed by caller.
  *
- * Note: the obtained string should not be modified or freed by caller.
- *
- * Returns: zero on success or negative number in case of an error.
+ * @return Zero on success or negative number in case of an error.
  **/
 TEAMDCTL_EXPORT
 int teamdctl_port_config_get_raw_direct(struct teamdctl *tdc,
@@ -503,16 +503,14 @@ int teamdctl_port_config_get_raw_direct(struct teamdctl *tdc,
 }
 
 /**
- * teamdctl_config_get_raw:
- * @tdc: libteamdctl library context
+ * @param tdc		libteamdctl library context
  *
- * Gets raw config string.
- * Using reply cache. Return value is never NULL.
- * To refresh the cache, use teamdctl_refresh function.
+ * @details Gets raw config string.
+ *	    Using reply cache. Return value is never NULL.
+ *	    To refresh the cache, use teamdctl_refresh function.
+ *	    Note: the obtained string should not be modified or freed by caller.
  *
- * Note: the obtained string should not be modified or freed by caller.
- *
- * Returns: pointer to cached config string.
+ * Return Pointer to cached config string.
  **/
 TEAMDCTL_EXPORT
 char *teamdctl_config_get_raw(struct teamdctl *tdc)
@@ -521,16 +519,14 @@ char *teamdctl_config_get_raw(struct teamdctl *tdc)
 }
 
 /**
- * teamdctl_config_get_raw_direct:
- * @tdc: libteamdctl library context
- * @p_cfg: pointer to string which will be set
+ * @param tdc		libteamdctl library context
+ * @param p_cfg		pointer to string which will be set
  *
- * Gets raw config string.
- * Does direct method call avoiding possible stale data in the cache.
+ * @details Gets raw config string.
+ *	    Does direct method call avoiding possible stale data in the cache.
+ *	    Note: the obtained string should not be modified or freed by caller.
  *
- * Note: the obtained string should not be modified or freed by caller.
- *
- * Returns: zero on success or negative number in case of an error.
+ * @return Zero on success or negative number in case of an error.
  **/
 TEAMDCTL_EXPORT
 int teamdctl_config_get_raw_direct(struct teamdctl *tdc, char **p_cfg)
@@ -539,16 +535,14 @@ int teamdctl_config_get_raw_direct(struct teamdctl *tdc, char **p_cfg)
 }
 
 /**
- * teamdctl_config_actual_get_raw:
- * @tdc: libteamdctl library context
+ * @param tdc		libteamdctl library context
  *
- * Gets raw actual config string.
- * Using reply cache. Return value is never NULL.
- * To refresh the cache, use teamdctl_refresh function.
+ * @details Gets raw actual config string.
+ *	    Using reply cache. Return value is never NULL.
+ *	    To refresh the cache, use teamdctl_refresh function.
+ *	    Note: the obtained string should not be modified or freed by caller.
  *
- * Note: the obtained string should not be modified or freed by caller.
- *
- * Returns: pointer to cached actual config string.
+ * @return Pointer to cached actual config string.
  **/
 TEAMDCTL_EXPORT
 char *teamdctl_config_actual_get_raw(struct teamdctl *tdc)
@@ -557,16 +551,14 @@ char *teamdctl_config_actual_get_raw(struct teamdctl *tdc)
 }
 
 /**
- * teamdctl_config_actual_get_raw_direct:
- * @tdc: libteamdctl library context
- * @p_cfg: pointer to string which will be set
+ * @param tdc		libteamdctl library context
+ * @param p_cfg		pointer to string which will be set
  *
- * Gets raw actual config string.
- * Does direct method call avoiding possible stale data in the cache.
+ * @details Gets raw actual config string.
+ *	    Does direct method call avoiding possible stale data in the cache.
+ *	    Note: the obtained string should not be modified or freed by caller.
  *
- * Note: the obtained string should not be modified or freed by caller.
- *
- * Returns: zero on success or negative number in case of an error.
+ * @return Zero on success or negative number in case of an error.
  **/
 TEAMDCTL_EXPORT
 int teamdctl_config_actual_get_raw_direct(struct teamdctl *tdc, char **p_cfg)
@@ -575,16 +567,14 @@ int teamdctl_config_actual_get_raw_direct(struct teamdctl *tdc, char **p_cfg)
 }
 
 /**
- * teamdctl_state_get_raw:
- * @tdc: libteamdctl library context
+ * @param tdc		libteamdctl library context
  *
- * Gets raw state string.
- * Using reply cache. Return value is never NULL.
- * To refresh the cache, use teamdctl_refresh function.
+ * @details Gets raw state string.
+ *	    Using reply cache. Return value is never NULL.
+ *	    To refresh the cache, use teamdctl_refresh function.
+ *	    Note: the obtained string should not be modified or freed by caller.
  *
- * Note: the obtained string should not be modified or freed by caller.
- *
- * Returns: pointer to cached state string.
+ * @return Pointer to cached state string.
  **/
 TEAMDCTL_EXPORT
 char *teamdctl_state_get_raw(struct teamdctl *tdc)
@@ -593,16 +583,14 @@ char *teamdctl_state_get_raw(struct teamdctl *tdc)
 }
 
 /**
- * teamdctl_state_get_raw_direct:
- * @tdc: libteamdctl library context
- * @p_cfg: pointer to string which will be set
+ * @param tdc		libteamdctl library context
+ * @param p_cfg		pointer to string which will be set
  *
- * Gets raw state string.
- * Does direct method call avoiding possible stale data in the cache.
+ * @details Gets raw state string.
+ *	    Does direct method call avoiding possible stale data in the cache.
+ *	    Note: the obtained string should not be modified or freed by caller.
  *
- * Note: the obtained string should not be modified or freed by caller.
- *
- * Returns: zero on success or negative number in case of an error.
+ * @return Zero on success or negative number in case of an error.
  **/
 TEAMDCTL_EXPORT
 int teamdctl_state_get_raw_direct(struct teamdctl *tdc, char **p_cfg)
@@ -611,14 +599,14 @@ int teamdctl_state_get_raw_direct(struct teamdctl *tdc, char **p_cfg)
 }
 
 /**
- * teamdctl_state_item_value_get:
- * @tdc: libteamdctl library context
- * @item_path: path to item
- * @p_value: pointer where reply string will be stored
+ * @param tdc		libteamdctl library context
+ * @param item_path	path to item
+ * @param p_value	pointer where reply string will be stored
  *
- * Get state item value. Note that caller is responsible to free *p_value.
+ * @details Get state item value. Note that caller is responsible to
+ *	    free *p_value.
  *
- * Returns: zero on success or negative number in case of an error.
+ * @return Zero on success or negative number in case of an error.
  **/
 TEAMDCTL_EXPORT
 int teamdctl_state_item_value_get(struct teamdctl *tdc, const char *item_path,
@@ -628,14 +616,13 @@ int teamdctl_state_item_value_get(struct teamdctl *tdc, const char *item_path,
 			       "s", item_path);
 }
 /**
- * teamdctl_state_item_value_set:
- * @tdc: libteamdctl library context
- * @item_path: path to item
- * @value: new value to be set
+ * @param tdc		libteamdctl library context
+ * @param item_path	path to item
+ * @param value		new value to be set
  *
- * Set state item value.
+ * @details Set state item value.
  *
- * Returns: zero on success or negative number in case of an error.
+ * @return Zero on success or negative number in case of an error.
  **/
 TEAMDCTL_EXPORT
 int teamdctl_state_item_value_set(struct teamdctl *tdc, const char *item_path,
@@ -644,3 +631,7 @@ int teamdctl_state_item_value_set(struct teamdctl *tdc, const char *item_path,
 	return cli_method_call(tdc, "StateItemValueSet", NULL,
 			       "ss", item_path, value);
 }
+
+/**
+ * @}
+ */

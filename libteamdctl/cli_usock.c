@@ -28,9 +28,11 @@
 #include "teamdctl_private.h"
 #include "../teamd/teamd_usock_common.h"
 
+/* \cond HIDDEN_SYMBOLS */
 struct cli_usock_priv {
 	int sock;
 };
+/* \endcond */
 
 static int cli_usock_process_msg(struct teamdctl *tdc, char *msg,
 				 char **p_replystr)
