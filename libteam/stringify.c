@@ -17,6 +17,20 @@
  *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+/**
+ * @ingroup libteam
+ * @defgroup stringify String conversion functions
+ * Helpers for conversion team objects to string
+ *
+ * @{
+ *
+ * Header
+ * ------
+ * ~~~~{.c}
+ * #include <team.h>
+ * ~~~~
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
@@ -115,14 +129,13 @@ static bool __team_option_value_str(struct team_option *option,
 }
 
 /**
- * team_option_value_str:
- * @option: option structure
- * @buf: buffer where string will be stored
- * @bufsiz: available buffer size
+ * @param option	option structure
+ * @param buf		buffer where string will be stored
+ * @param bufsiz	available buffer size
  *
- * Converts option value to string.
+ * @details Converts option value to string.
  *
- * Returns: true in case buffer is not big enough to contain whole string.
+ * @return True in case buffer is not big enough to contain whole string.
  **/
 TEAM_EXPORT
 bool team_option_value_str(struct team_option *option, char *buf, size_t bufsiz)
@@ -236,14 +249,13 @@ static int __set_optval_from_str_bool(struct team_handle *th,
 }
 
 /**
- * team_set_option_value_from_string:
- * @th: libteam library context
- * @option: option structure
- * @str: string containing option value
+ * @param th		libteam library context
+ * @param option	option structure
+ * @param str		string containing option value
  *
- * Convert option value from string and set it.
+ * @details Convert option value from string and set it.
  *
- * Returns: zero on success or negative number in case of an error.
+ * @return Zero on success or negative number in case of an error.
  **/
 TEAM_EXPORT
 int team_set_option_value_from_string(struct team_handle *th,
@@ -306,15 +318,14 @@ static bool __team_option_str(struct team_handle *th,
 }
 
 /**
- * team_option_str:
- * @th: libteam library context
- * @option: option structure
- * @buf: buffer where string will be stored
- * @bufsiz: available buffer size
+ * @param th		libteam library context
+ * @param option	option structure
+ * @param buf		buffer where string will be stored
+ * @param bufsiz	available buffer size
  *
- * Converts option structure to string.
+ * @details Converts option structure to string.
  *
- * Returns: true in case buffer is not big enough to contain whole string.
+ * @return True in case buffer is not big enough to contain whole string.
  **/
 TEAM_EXPORT
 bool team_option_str(struct team_handle *th, struct team_option *option,
@@ -340,14 +351,13 @@ static bool __team_port_str(struct team_port *port,
 }
 
 /**
- * team_port_str:
- * @port: port structure
- * @buf: buffer where string will be stored
- * @bufsiz: available buffer size
+ * @param port		port structure
+ * @param buf		buffer where string will be stored
+ * @param bufsiz	available buffer size
  *
- * Converts port structure to string.
+ * @details Converts port structure to string.
  *
- * Returns: true in case buffer is not big enough to contain whole string.
+ * @return True in case buffer is not big enough to contain whole string.
  **/
 TEAM_EXPORT
 bool team_port_str(struct team_port *port, char *buf, size_t bufsiz)
@@ -376,17 +386,20 @@ static bool __team_ifinfo_str(struct team_ifinfo *ifinfo,
 }
 
 /**
- * team_ifinfo_str:
- * @ifinfo: ifinfo structure
- * @buf: buffer where string will be stored
- * @bufsiz: available buffer size
+ * @param ifinfo	ifinfo structure
+ * @param buf		buffer where string will be stored
+ * @param bufsiz	available buffer size
  *
- * Converts ifinfo structure to string.
+ * @details Converts ifinfo structure to string.
  *
- * Returns: true in case buffer is not big enough to contain whole string.
+ * @return True in case buffer is not big enough to contain whole string.
  **/
 TEAM_EXPORT
 bool team_ifinfo_str(struct team_ifinfo *ifinfo, char *buf, size_t bufsiz)
 {
 	return __team_ifinfo_str(ifinfo, &buf, &bufsiz);
 }
+
+/**
+ * @}
+ */
