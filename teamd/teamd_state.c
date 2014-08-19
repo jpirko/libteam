@@ -225,8 +225,8 @@ static int teamd_state_val_dump(struct teamd_context *ctx,
 	int ret;
 
 	subpath_end = strrchr(subpath, '.');
-	subpath_end++;
 	TEAMD_BUG_ON(!subpath_end);
+	subpath_end++;
 	err = teamd_state_build_val_json_subpath(&vg_json_obj, root_json_obj,
 						 tdport, subpath);
 	if (err)
