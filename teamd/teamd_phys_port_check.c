@@ -43,7 +43,7 @@ static int teamd_sriov_physfn_addr(struct pcie_addr *addr, const char *ifname)
 	if (ret == -1)
 		return -ENOMEM;
 
-	ret = readlink(path, link, sizeof(link));
+	ret = readlink(path, link, sizeof(link) - 1);
 	free(path);
 	if (ret == -1)
 		return -errno;
