@@ -72,10 +72,6 @@ static int cli_zmq_process_msg(struct teamdctl *tdc, char *msg,
 	return 0;
 }
 
-void my_free_msg(void *data, void *hind) {
-	free(data);
-}
-
 static int cli_zmq_send(struct teamdctl *tdc, void *sock, char *buf)
 {
 	int ret;

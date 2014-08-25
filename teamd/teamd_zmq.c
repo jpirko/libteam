@@ -83,10 +83,6 @@ out:
 	return err;
 }
 
-void my_free_msg(void *data, void *hind) {
-	free(data);
-}
-
 static void zmq_custom_send(struct zmq_ops_priv *zmq_ops_priv,
 			    char *buf, size_t buflen)
 {
