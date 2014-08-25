@@ -38,7 +38,7 @@ struct cli_zmq_priv {
 };
 
 static int cli_zmq_process_msg(struct teamdctl *tdc, char *msg,
-				 char **p_replystr)
+			       char **p_replystr)
 {
 	char *str;
 	char *rest = msg;
@@ -76,7 +76,7 @@ void my_free_msg(void *data, void *hind) {
 	free(data);
 }
 
-static int cli_zmq_send(void *sock, char *buf)
+static int cli_zmq_send(struct teamdctl *tdc, void *sock, char *buf)
 {
 	int ret;
 	int buflen = strlen(buf);
@@ -84,28 +84,28 @@ static int cli_zmq_send(void *sock, char *buf)
 	ret = zmq_send(sock, buf, buflen, 0);
 
 	if (ret == -1) {
-		teamd_log_warn("zmq: send failed: %s", strerror(errno));
+		warn(tdc, "zmq: send failed: %s", strerror(errno));
 		return -errno;
 	}
 	free(buf);
 	return 0;
 }
 
-static int cli_zmq_recv(void *sock, char **p_str)
+static int cli_zmq_recv(struct teamdctl *tdc, void *sock, char **p_str)
 {
 	int ret;
 	zmq_msg_t msg;
 	char *buf;
 
 	if (zmq_msg_init(&msg) == -1) {
-		teamd_log_dbg("zmq: Unable initiate message for receive.");
+		dbg(tdc, "zmq: Unable initiate message for receive.");
 		return -errno;
 	}
 
 	ret = zmq_msg_recv(&msg, sock, 0);
 
 	if (ret == -1) {
-		teamd_log_warn("zmq: send failed: %s", strerror(errno));
+		warn(tdc, "zmq: send failed: %s", strerror(errno));
 		return -errno;
 	}
 
@@ -115,7 +115,7 @@ static int cli_zmq_recv(void *sock, char **p_str)
 
 	if (zmq_msg_close(&msg) == -1) {
 		free(buf);
-		teamd_log_dbg("zmq: Unable close message.");
+		dbg(tdc, "zmq: Unable close message.");
 		return -errno;
 	}
 
@@ -142,8 +142,8 @@ static int myasprintf(char **p_str, const char *fmt, ...)
 }
 
 static int cli_zmq_method_call(struct teamdctl *tdc, const char *method_name,
-				 char **p_reply, void *priv,
-				 const char *fmt, va_list ap)
+			       char **p_reply, void *priv,
+			       const char *fmt, va_list ap)
 {
 	struct cli_zmq_priv *cli_zmq = priv;
 	char *str;
@@ -172,11 +172,11 @@ static int cli_zmq_method_call(struct teamdctl *tdc, const char *method_name,
 		}
 	}
 
-	err = cli_zmq_send(cli_zmq->sock, msg);
+	err = cli_zmq_send(tdc, cli_zmq->sock, msg);
 	if (err)
 		goto send_err;
 
-	err = cli_zmq_recv(cli_zmq->sock, &recvmsg);
+	err = cli_zmq_recv(tdc, cli_zmq->sock, &recvmsg);
 	if (err)
 		goto send_err;
 
@@ -203,7 +203,7 @@ send_err:
 }
 
 static int cli_zmq_init(struct teamdctl *tdc, const char *team_name,
-			  void *priv)
+			void *priv)
 {
 	int err;
 	struct cli_zmq_priv *cli_zmq = priv;
@@ -212,13 +212,13 @@ static int cli_zmq_init(struct teamdctl *tdc, const char *team_name,
 
 	context = zmq_ctx_new();
 	if (!context) {
-		teamd_log_err("zmq: Failed to create context.");
+		err(tdc, "zmq: Failed to create context.");
 		return -errno;
 	}
 
 	sock = zmq_socket(context, ZMQ_REQ);
 	if (!sock) {
-		teamd_log_err("zmq: Failed to create socket.");
+		err(tdc, "zmq: Failed to create socket.");
 		return -errno;
 	}
 

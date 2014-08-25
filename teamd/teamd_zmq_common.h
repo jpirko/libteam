@@ -25,8 +25,6 @@
 #include <sys/ioctl.h>
 #include <linux/sockios.h>
 
-#include "teamd.h"
-
 #define TEAMD_ZMQ_REQUEST_PREFIX	"REQUEST"
 #define TEAMD_ZMQ_REPLY_ERR_PREFIX	"REPLY_ERROR"
 #define TEAMD_ZMQ_REPLY_SUCC_PREFIX	"REPLY_SUCCESS"
