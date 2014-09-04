@@ -35,6 +35,7 @@
 struct tipc_link {
 	LIST_ENTRY(tipc_link) next;
 	char name[TIPC_MAX_LINK_NAME];
+	unsigned int peer;
 	bool up;
 };
 
@@ -62,40 +63,50 @@ static int lw_tipc_load_options(struct teamd_context *ctx,
 	return 0;
 }
 
+static bool lw_tipc_topology_check(struct lw_tipc_port_priv *priv,
+				   unsigned int addr)
+{
+	struct tipc_link *l;
 
-static int lw_tipc_link_state_change(struct teamd_context *ctx, char *name,
+	LIST_FOREACH(l, &priv->links, next) {
+		if ((tipc_cluster(l->peer) == tipc_cluster(addr)) && l->up)
+			return true;
+	}
+	return false;
+}
+
+static int lw_tipc_link_state_change(struct teamd_context *ctx,
+				     struct tipc_sioc_ln_req *lnr,
 				     struct lw_tipc_port_priv *priv,
 				     bool link_up)
 {
+	bool path_ok;
 	struct tipc_link *link;
-	struct teamd_port *tdport = priv->common.tdport;
+	struct lw_common_port_priv *ppriv = (struct lw_common_port_priv *)priv;
+
 	LIST_FOREACH(link, &priv->links, next) {
-		if (!strcmp(link->name, name)) {
-			teamd_log_info("tipc: link <%s> went %s.", name,
-					link_up ? "up" : "down");
-			link->up = link_up;
-			if (!link_up && ((--(priv->active_links) == 0))) {
-				return teamd_link_watch_check_link_up(ctx, tdport,
-					(struct lw_common_port_priv *)priv, link_up);
-			}
-			goto link_up;
-		}
+		if (strcmp(link->name, lnr->linkname))
+			continue;
+		link->up = link_up;
+		teamd_log_dbg("tipc: link <%s> went %s.",
+			       lnr->linkname, link_up ? "up" : "down");
+check:
+		path_ok = lw_tipc_topology_check(priv, link->peer);
+		return teamd_link_watch_check_link_up(ctx, ppriv->tdport, ppriv,
+						      path_ok);
 	}
 	if (!link_up) {
 		teamd_log_err("tipc: received spurious down event for link <%s>",
-			      name);
+			      lnr->linkname);
 		return -EINVAL;
 	}
-	teamd_log_dbg("tipc: established new link <%s>", name);
+	teamd_log_dbg("tipc: established new link <%s>", lnr->linkname);
 	link = malloc(sizeof(struct tipc_link));
-	strcpy(link->name, name);
+	strcpy(link->name, lnr->linkname);
 	link->up = link_up;
+	link->peer = lnr->peer;
 	LIST_INSERT_HEAD(&priv->links, link, next);
-link_up:
-	priv->active_links++;
-	return teamd_link_watch_check_link_up(ctx, tdport,
-				       (struct lw_common_port_priv *)priv,
-				       link_up);
+	goto check;
 }
 
 static int lw_tipc_filter_events(struct lw_tipc_port_priv *tipc_ppriv,
@@ -136,9 +147,9 @@ static int lw_tipc_callback_socket(struct teamd_context *ctx, int events, void *
 	if (lw_tipc_filter_events(tipc_ppriv, &lnr))
 		return 0;
 	if (event.event == htonl(TIPC_PUBLISHED))
-		return lw_tipc_link_state_change(ctx, lnr.linkname, tipc_ppriv, true);
+		return lw_tipc_link_state_change(ctx, &lnr, tipc_ppriv, true);
 	else if (event.event == htonl(TIPC_WITHDRAWN))
-		return lw_tipc_link_state_change(ctx, lnr.linkname, tipc_ppriv, false);
+		return lw_tipc_link_state_change(ctx, &lnr, tipc_ppriv, false);
 tipc_cb_err:
 	teamd_log_dbg("tipc: link state event error");
 	return -EINVAL;
