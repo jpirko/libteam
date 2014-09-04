@@ -170,7 +170,7 @@ static int lw_tipc_topsrv_subscribe(struct teamd_context *ctx, struct lw_tipc_po
 	err = teamd_loop_callback_fd_add(ctx, LW_TIPC_TOPSRV_SOCKET, priv,
 				 lw_tipc_callback_socket,
 				 priv->topsrv_sock,
-				 POLLIN);
+				 TEAMD_LOOP_FD_EVENT_READ);
 	if (err) {
 		teamd_log_err("Failed to add socket callback");
 		err = -errno;
@@ -214,18 +214,21 @@ static int lw_tipc_port_added(struct teamd_context *ctx,
 	return 0;
 }
 
-
-
 static void lw_tipc_port_removed(struct teamd_context *ctx,
 				 struct teamd_port *tdport,
 				 void *priv, void *creator_priv)
 {
 	struct lw_tipc_port_priv *tipc_ppriv = priv;
+	struct tipc_link *link;
 
 	teamd_log_dbg("tipc port removed\n");
+	teamd_loop_callback_del(ctx, LW_TIPC_TOPSRV_SOCKET, priv);
 	close(tipc_ppriv->topsrv_sock);
-	while (tipc_ppriv->links.lh_first != NULL)
-		LIST_REMOVE(tipc_ppriv->links.lh_first, next);
+	while (!LIST_EMPTY(&tipc_ppriv->links)) {
+		link = LIST_FIRST(&tipc_ppriv->links);
+		LIST_REMOVE(link, next);
+		free(link);
+	}
 }
 
 int lw_tipc_state_bearer_get(struct teamd_context *ctx,
