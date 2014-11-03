@@ -1458,7 +1458,9 @@ static int teamd_start(struct teamd_context *ctx, enum teamd_exit_code *p_ret)
 	}
 
 	pid = daemon_pid_file_is_running();
-	if (pid >= 0) {
+	if (pid == 0)
+		daemon_pid_file_remove();
+	if (pid > 0) {
 		teamd_log_err("Daemon already running on PID %u.", pid);
 		return -EEXIST;
 	}
@@ -1729,14 +1731,18 @@ int main(int argc, char **argv)
 	case DAEMON_CMD_VERSION:
 		break;
 	case DAEMON_CMD_KILL:
-		err = daemon_pid_file_kill_wait(SIGTERM, 5);
-		if (err)
-			teamd_log_warn("Failed to kill daemon: %s", strerror(errno));
-		else
-			ret = TEAMD_EXIT_SUCCESS;
+		if (daemon_pid_file_is_running() > 0) {
+			err = daemon_pid_file_kill_wait(SIGTERM, 5);
+			if (err)
+				teamd_log_warn("Failed to kill daemon: %s", strerror(errno));
+			else
+				ret = TEAMD_EXIT_SUCCESS;
+		} else {
+			teamd_log_warn("Daemon not running");
+		}
 		break;
 	case DAEMON_CMD_CHECK:
-		ret = (daemon_pid_file_is_running() >= 0) ? TEAMD_EXIT_SUCCESS :
+		ret = (daemon_pid_file_is_running() > 0) ? TEAMD_EXIT_SUCCESS :
 							    TEAMD_EXIT_FAILURE;
 		break;
 	case DAEMON_CMD_RUN:
