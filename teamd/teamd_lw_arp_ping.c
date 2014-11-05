@@ -118,7 +118,7 @@ static int set_in_addr(struct in_addr *addr, const char *hostname)
 static char *str_in_addr(struct in_addr *addr)
 {
 	struct sockaddr_in sin;
-	char buf[NI_MAXHOST];
+	static char buf[NI_MAXHOST];
 
 	memcpy(&sin.sin_addr, addr, sizeof(*addr));
 	return __str_sockaddr((struct sockaddr *) &sin, sizeof(sin), AF_INET,
