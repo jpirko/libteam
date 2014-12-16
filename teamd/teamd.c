@@ -1452,7 +1452,7 @@ static int teamd_start(struct teamd_context *ctx, enum teamd_exit_code *p_ret)
 		return -errno;
 	}
 
-	if (daemon_unblock_sigs(-1) < 0) {
+	if (daemon_unblock_sigs(SIGPIPE, -1) < 0) {
 		teamd_log_err("Failed to unblock all signals.");
 		return -errno;
 	}
