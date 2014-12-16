@@ -531,7 +531,7 @@ char *teamdctl_config_get_raw(struct teamdctl *tdc)
 TEAMDCTL_EXPORT
 int teamdctl_config_get_raw_direct(struct teamdctl *tdc, char **p_cfg)
 {
-	return cache_config(tdc, "ConfigActual", p_cfg);
+	return cache_config(tdc, "ConfigDump", p_cfg);
 }
 
 /**
