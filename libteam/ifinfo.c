@@ -149,6 +149,8 @@ static void update_phys_port_id(struct team_ifinfo *ifinfo,
 	nl_data = rtnl_link_get_phys_port_id(link);
 	if (nl_data) {
 		phys_port_id_len = nl_data_get_size(nl_data);
+		if (phys_port_id_len > MAX_PHYS_PORT_ID_LEN)
+			phys_port_id_len = 0;
 		phys_port_id = nl_data_get(nl_data);
 	}
 
@@ -156,7 +158,8 @@ static void update_phys_port_id(struct team_ifinfo *ifinfo,
 		ifinfo->phys_port_id_len = phys_port_id_len;
 		set_changed(ifinfo, CHANGED_PHYS_PORT_ID_LEN);
 	}
-	if (memcmp(ifinfo->phys_port_id, phys_port_id, phys_port_id_len)) {
+	if (phys_port_id_len &&
+	    memcmp(ifinfo->phys_port_id, phys_port_id, phys_port_id_len)) {
 		memcpy(ifinfo->phys_port_id, phys_port_id, phys_port_id_len);
 		set_changed(ifinfo, CHANGED_PHYS_PORT_ID);
 	}
