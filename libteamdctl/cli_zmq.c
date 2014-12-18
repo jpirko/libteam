@@ -101,7 +101,7 @@ static int cli_zmq_recv(struct teamdctl *tdc, void *sock, char **p_str)
 	ret = zmq_msg_recv(&msg, sock, 0);
 
 	if (ret == -1) {
-		warn(tdc, "zmq: send failed: %s", strerror(errno));
+		warn(tdc, "zmq: recv failed: %s", strerror(errno));
 		return -errno;
 	}
 
