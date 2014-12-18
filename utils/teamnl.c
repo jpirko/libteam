@@ -104,6 +104,7 @@ static int run_cmd_getoption(char *cmd_name, struct team_handle *th,
 {
 	struct team_option *option;
 	char *buf = NULL;
+	char *tmpbuf;
 	size_t bufsiz = 0;
 	bool trunc;
 
@@ -118,11 +119,12 @@ static int run_cmd_getoption(char *cmd_name, struct team_handle *th,
 
 	do {
 		bufsiz += BUFSIZSTEP;
-		buf = realloc(buf, bufsiz);
-		if (!buf) {
+		tmpbuf = realloc(buf, bufsiz);
+		if (!tmpbuf) {
 			free(buf);
 			return -ENOMEM;
 		}
+		buf = tmpbuf;
 		trunc = team_option_value_str(option, buf, bufsiz);
 	} while(trunc);
 
