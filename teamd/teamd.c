@@ -565,7 +565,7 @@ int teamd_loop_callback_timer_add_set(struct teamd_context *ctx,
 				      struct timespec *initial)
 {
 	int err;
-	int fd = fd;
+	int fd;
 
 	fd = timerfd_create(CLOCK_MONOTONIC, 0);
 	if (fd < 0) {
@@ -1541,7 +1541,7 @@ static int teamd_generate_devname(struct teamd_context *ctx)
 {
 	char buf[IFNAMSIZ];
 	int i = 0;
-	uint32_t ifindex = ifindex;
+	uint32_t ifindex = 0; /* gcc needs this initialized */
 	int ret;
 	int err;
 

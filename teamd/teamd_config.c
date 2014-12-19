@@ -252,7 +252,7 @@ struct teamd_config_path_cookie *
 teamd_config_path_cookie_get(struct teamd_context *ctx, const char *fmt, ...)
 {
 	va_list ap;
-	json_t *json_obj = json_obj;
+	json_t *json_obj = NULL; /* gcc needs this initialized */
 	int err;
 
 	va_start(ap, fmt);
@@ -266,7 +266,7 @@ teamd_config_path_cookie_get(struct teamd_context *ctx, const char *fmt, ...)
 bool teamd_config_path_exists(struct teamd_context *ctx, const char *fmt, ...)
 {
 	va_list ap;
-	json_t *json_obj = json_obj;
+	json_t *json_obj = NULL; /* gcc needs this initialized */
 	int err;
 
 	va_start(ap, fmt);
@@ -278,7 +278,7 @@ bool teamd_config_path_exists(struct teamd_context *ctx, const char *fmt, ...)
 bool teamd_config_path_is_arr(struct teamd_context *ctx, const char *fmt, ...)
 {
 	va_list ap;
-	json_t *json_obj = json_obj;
+	json_t *json_obj = NULL; /* gcc needs this initialized */
 	int err;
 
 	va_start(ap, fmt);
@@ -291,7 +291,7 @@ int teamd_config_string_get(struct teamd_context *ctx, const char **p_str_val,
 			    const char *fmt, ...)
 {
 	va_list ap;
-	json_t *json_obj = json_obj;
+	json_t *json_obj = NULL; /* gcc needs this initialized */
 	int err;
 
 	va_start(ap, fmt);
@@ -312,7 +312,7 @@ int teamd_config_string_set(struct teamd_context *ctx, const char *str_val,
 			    const char *fmt, ...)
 {
 	va_list ap;
-	json_t *json_obj = json_obj;
+	json_t *json_obj = NULL; /* gcc needs this initialized */
 	int err;
 	int ret;
 
@@ -332,7 +332,7 @@ int teamd_config_int_get(struct teamd_context *ctx, int *p_int_val,
 			 const char *fmt, ...)
 {
 	va_list ap;
-	json_t *json_obj = json_obj;
+	json_t *json_obj = NULL; /* gcc needs this initialized */
 	int err;
 
 	va_start(ap, fmt);
@@ -353,7 +353,7 @@ int teamd_config_int_set(struct teamd_context *ctx, int int_val,
 			 const char *fmt, ...)
 {
 	va_list ap;
-	json_t *json_obj = json_obj;
+	json_t *json_obj = NULL; /* gcc needs this initialized */
 	int err;
 
 	va_start(ap, fmt);
@@ -370,7 +370,7 @@ int teamd_config_bool_get(struct teamd_context *ctx, bool *p_bool_val,
 			  const char *fmt, ...)
 {
 	va_list ap;
-	json_t *json_obj = json_obj;
+	json_t *json_obj = NULL; /* gcc needs this initialized */
 	int err;
 
 	va_start(ap, fmt);
@@ -391,7 +391,7 @@ const char *teamd_config_next_key(struct teamd_context *ctx, const char *key,
 				  const char *fmt, ...)
 {
 	va_list ap;
-	json_t *json_obj = json_obj;
+	json_t *json_obj = NULL; /* gcc needs this initialized */
 	void *iter;
 	int err;
 
@@ -412,7 +412,7 @@ const char *teamd_config_next_key(struct teamd_context *ctx, const char *key,
 size_t teamd_config_arr_size(struct teamd_context *ctx, const char *fmt, ...)
 {
 	va_list ap;
-	json_t *json_obj = json_obj;
+	json_t *json_obj = NULL; /* gcc needs this initialized */
 	int err;
 
 	va_start(ap, fmt);
@@ -428,7 +428,7 @@ size_t teamd_config_arr_string_append(struct teamd_context *ctx,
 				      const char *fmt, ...)
 {
 	va_list ap;
-	json_t *json_arr = json_arr;
+	json_t *json_arr = NULL; /* gcc needs this initialized */
 	json_t *json_str;
 	int err;
 	int ret;

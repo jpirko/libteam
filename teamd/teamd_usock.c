@@ -205,7 +205,7 @@ static int callback_usock_acc_conn(struct teamd_context *ctx, int events,
 				   void *priv)
 {
 	struct usock_acc_conn *acc_conn = priv;
-	char *msg = msg;
+	char *msg = NULL; /* gcc needs this initialized */
 	int err;
 
 	err = teamd_usock_recv_msg(acc_conn->sock, &msg);

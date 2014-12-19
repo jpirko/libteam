@@ -219,8 +219,8 @@ static int teamd_state_val_dump(struct teamd_context *ctx,
 	void *priv = item->priv;
 	char *subpath_end;
 	struct team_state_gsc gsc;
-	json_t *val_json_obj = val_json_obj;
-	json_t *vg_json_obj = vg_json_obj;
+	json_t *val_json_obj = NULL; /* gcc needs this initialized */
+	json_t *vg_json_obj = NULL; /* gcc needs this initialized */
 	int err;
 	int ret;
 
@@ -338,7 +338,7 @@ int teamd_state_item_value_get(struct teamd_context *ctx, const char *item_path,
 	void *priv;
 	struct team_state_gsc gsc;
 	int err;
-	int ret = ret;
+	int ret = 0; /* gcc needs this initialized */
 
 	memset(&gsc, 0, sizeof(gsc));
 	err = __find_by_item_path(&item, &gsc.info.tdport, ctx, item_path);

@@ -73,7 +73,7 @@ static int __teamd_json_path_lite_va(json_t **p_json_obj, json_t *json_root,
 
 	while (ptr - path < pathlen) {
 		if (*ptr == '.') {
-			char tmp = tmp;
+			char tmp = 0; /* gcc needs this initialized */
 
 			ptr++;
 			end = __strchrs(ptr, ".[");

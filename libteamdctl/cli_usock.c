@@ -158,7 +158,7 @@ static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 	struct cli_usock_priv *cli_usock = priv;
 	char *str;
 	char *msg = NULL;
-	char *recv_message = recv_message;
+	char *recv_message = NULL; /* gcc needs this initialized */
 	char *replystr;
 	int err;
 

@@ -456,7 +456,7 @@ static void dispatch_exit(void *priv)
 
 static int teamd_dbus_mainloop_init(struct teamd_context *ctx)
 {
-	struct dispatch_priv *dp = dp;
+	struct dispatch_priv *dp = NULL; /* gcc needs this initialized */
 	int err;
 
 	err = dispatch_init(&dp, ctx);

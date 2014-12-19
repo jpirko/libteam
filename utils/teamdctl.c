@@ -877,7 +877,7 @@ static int check_command_params(struct command_type *command_type,
 static int check_team_devname(char *team_devname)
 {
 	int err;
-	uint32_t ifindex = ifindex;
+	uint32_t ifindex = 0; /* gcc needs this initialized */
 
 	err = ifname2ifindex(&ifindex, team_devname);
 	if (err) {

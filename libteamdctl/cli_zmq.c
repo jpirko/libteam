@@ -144,7 +144,7 @@ static int cli_zmq_method_call(struct teamdctl *tdc, const char *method_name,
 	struct cli_zmq_priv *cli_zmq = priv;
 	char *str;
 	char *msg = NULL;
-	char *recv_message = recv_message;
+	char *recv_message = NULL; /* gcc needs this initialized */
 	char *replystr;
 	int err;
 
