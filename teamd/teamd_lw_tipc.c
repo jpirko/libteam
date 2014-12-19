@@ -102,6 +102,8 @@ check:
 	}
 	teamd_log_dbg("tipc: established new link <%s>", lnr->linkname);
 	link = malloc(sizeof(struct tipc_link));
+	if (!link)
+		return -ENOMEM;
 	strcpy(link->name, lnr->linkname);
 	link->up = link_up;
 	link->peer = lnr->peer;
