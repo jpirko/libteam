@@ -55,6 +55,7 @@ int __set_sockaddr(struct sockaddr *sa, socklen_t sa_len, sa_family_t family,
 	if (sa_len != result->ai_addrlen) {
 		/* This should not happen, so just to be safe */
 		teamd_log_err("Wrong address length in result.");
+		freeaddrinfo(result);
 		return -EINVAL;
 	}
 	memcpy(sa, result->ai_addr, sa_len);
