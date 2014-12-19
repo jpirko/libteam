@@ -158,7 +158,7 @@ static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 	struct cli_usock_priv *cli_usock = priv;
 	char *str;
 	char *msg = NULL;
-	char *recvmsg = recvmsg;
+	char *recv_message = recv_message;
 	char *replystr;
 	int err;
 
@@ -198,25 +198,25 @@ static int cli_usock_method_call(struct teamdctl *tdc, const char *method_name,
 		goto free_msg;
 	}
 
-	err = teamd_usock_recv_msg(cli_usock->sock, &recvmsg);
+	err = teamd_usock_recv_msg(cli_usock->sock, &recv_message);
 	if (err)
 		goto free_msg;
 
-	err = cli_usock_process_msg(tdc, recvmsg, &replystr);
+	err = cli_usock_process_msg(tdc, recv_message, &replystr);
 	if (err)
-		goto free_recvmsg;
+		goto free_recv_message;
 
 	if (p_reply) {
 		replystr = strdup(replystr);
 		if (!replystr) {
 			err = -ENOMEM;
-			goto free_recvmsg;
+			goto free_recv_message;
 		}
 		*p_reply = replystr;
 	}
 
-free_recvmsg:
-	free(recvmsg);
+free_recv_message:
+	free(recv_message);
 free_msg:
 	free(msg);
 	return err;

@@ -144,7 +144,7 @@ static int cli_zmq_method_call(struct teamdctl *tdc, const char *method_name,
 	struct cli_zmq_priv *cli_zmq = priv;
 	char *str;
 	char *msg = NULL;
-	char *recvmsg = recvmsg;
+	char *recv_message = recv_message;
 	char *replystr;
 	int err;
 
@@ -172,25 +172,25 @@ static int cli_zmq_method_call(struct teamdctl *tdc, const char *method_name,
 	if (err)
 		goto send_err;
 
-	err = cli_zmq_recv(tdc, cli_zmq->sock, &recvmsg);
+	err = cli_zmq_recv(tdc, cli_zmq->sock, &recv_message);
 	if (err)
 		goto send_err;
 
-	err = cli_zmq_process_msg(tdc, recvmsg, &replystr);
+	err = cli_zmq_process_msg(tdc, recv_message, &replystr);
 	if (err)
-		goto free_recvmsg;
+		goto free_recv_message;
 
 	if (p_reply) {
 		replystr = strdup(replystr);
 		if (!replystr) {
 			err = -ENOMEM;
-			goto free_recvmsg;
+			goto free_recv_message;
 		}
 		*p_reply = replystr;
 	}
 
-free_recvmsg:
-	free(recvmsg);
+free_recv_message:
+	free(recv_message);
 	goto send_err;
 free_msg:
 	free(msg);
