@@ -15,6 +15,7 @@ struct lw_common_port_priv {
 	struct teamd_context *ctx;
 	struct teamd_port *tdport;
 	bool link_up;
+	int link_down_count;
 	bool forced_send;
 	struct teamd_config_path_cookie *cpcookie;
 };

@@ -26,6 +26,7 @@
 #include <sys/types.h>
 #include <netdb.h>
 #include <time.h>
+#include <limits.h>
 #include <private/misc.h>
 #include <team.h>
 
@@ -90,6 +91,8 @@ int teamd_link_watch_check_link_up(struct teamd_context *ctx,
 	common_ppriv->link_up = new_link_up;
 	teamd_log_info("%s: %s-link went %s.", tdport->ifname, lw_name,
 		       new_link_up ? "up" : "down");
+	if (!new_link_up && common_ppriv->link_down_count < INT_MAX)
+		common_ppriv->link_down_count++;
 	return teamd_event_port_link_changed(ctx, tdport);
 }
 
@@ -181,6 +184,16 @@ static int link_watch_state_up_get(struct teamd_context *ctx,
 	return 0;
 }
 
+static int link_watch_state_down_count_get(struct teamd_context *ctx,
+					   struct team_state_gsc *gsc,
+					   void *priv)
+{
+	struct lw_common_port_priv *common_ppriv = priv;
+
+	gsc->data.int_val = common_ppriv->link_down_count;
+	return 0;
+}
+
 static const struct teamd_state_val link_watch_state_vals[] = {
 	{
 		.subpath = "name",
@@ -191,6 +204,11 @@ static const struct teamd_state_val link_watch_state_vals[] = {
 		.subpath = "up",
 		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
 		.getter = link_watch_state_up_get,
+	},
+	{
+		.subpath = "down_count",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = link_watch_state_down_count_get,
 	},
 };
 
