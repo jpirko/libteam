@@ -276,6 +276,7 @@ static int stateview_json_port_link_watches_list_process(json_t *port_link_watch
 {
 	int err;
 	int up;
+	int down_count;
 	json_t *lw_list_json;
 	json_t *lw_json;
 	char *lw_name;
@@ -285,8 +286,9 @@ static int stateview_json_port_link_watches_list_process(json_t *port_link_watch
 	if (err)
 		return 0;
 	json_object_foreach(lw_list_json, key, lw_json) {
-		err = json_unpack(lw_json, "{s:b, s:s}",
-				  "up", &up, "name", &lw_name);
+		err = json_unpack(lw_json, "{s:b, s:s, s:i}",
+				  "up", &up, "name", &lw_name,
+				  "down_count", &down_count);
 		if (err) {
 			pr_err("Failed to parse JSON port link watch dump.\n");
 			return -EINVAL;
@@ -295,6 +297,7 @@ static int stateview_json_port_link_watches_list_process(json_t *port_link_watch
 		pr_out_indent_inc();
 		pr_out("name: %s\n", lw_name);
 		pr_out("link: %s\n", boolupdown(up));
+		pr_out("down count: %d\n", down_count);
 		err = stateview_json_link_watch_info_process(lw_name,
 							     lw_json);
 		if (err)
