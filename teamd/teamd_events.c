@@ -124,6 +124,13 @@ int teamd_event_ifinfo_hwaddr_changed(struct teamd_context *ctx,
 
 	list_for_each_node_entry(watch, &ctx->event_watch_list, list) {
 		if (watch->ops->hwaddr_changed && ctx->ifindex == ifindex) {
+			/* ctx->hwaddr is previously set to
+			 * team_get_ifinfo_hwaddr(ctx->ifinfo) in teamd_init.
+			 * We set hwaddr_len there as well, but when it changes,
+			 * we need to set it again now.
+			 */
+			ctx->hwaddr_len = team_get_ifinfo_hwaddr_len(ifinfo);
+
 			err = watch->ops->hwaddr_changed(ctx, watch->priv);
 			if (err)
 				return err;
