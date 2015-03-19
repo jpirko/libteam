@@ -1272,6 +1272,24 @@ static const struct teamd_port_priv lacp_port_priv = {
 	.priv_size = sizeof(struct lacp_port),
 };
 
+static int lacp_event_watch_hwaddr_changed(struct teamd_context *ctx,
+					   void *priv)
+{
+	struct teamd_port *tdport;
+	int err;
+
+	teamd_for_each_tdport(tdport, ctx) {
+		err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
+				      ctx->hwaddr_len);
+		if (err) {
+			teamd_log_err("%s: Failed to set port hardware address.",
+				      tdport->ifname);
+			return err;
+		}
+	}
+	return 0;
+}
+
 static int lacp_event_watch_port_added(struct teamd_context *ctx,
 				       struct teamd_port *tdport, void *priv)
 {
@@ -1302,6 +1320,7 @@ static int lacp_event_watch_port_changed(struct teamd_context *ctx,
 }
 
 static const struct teamd_event_watch_ops lacp_port_watch_ops = {
+	.hwaddr_changed = lacp_event_watch_hwaddr_changed,
 	.port_added = lacp_event_watch_port_added,
 	.port_removed = lacp_event_watch_port_removed,
 	.port_changed = lacp_event_watch_port_changed,
