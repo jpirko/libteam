@@ -271,6 +271,7 @@ static void event_handler_obj_input_dellink(struct nl_object *obj, void *arg)
 	struct rtnl_link *link;
 	struct team_ifinfo *ifinfo;
 	uint32_t ifindex;
+	int err;
 
 	ifinfo_destroy_removed(th);
 
@@ -280,6 +281,17 @@ static void event_handler_obj_input_dellink(struct nl_object *obj, void *arg)
 	ifinfo = ifinfo_find_create(th, ifindex);
 	if (!ifinfo)
 		return;
+
+	/* It might happen that dellink message comes even in case the device
+	 * is not actually removed. For example in case of bridge port removal.
+	 * So better to check actual state before taking actions
+	 */
+	err = rtnl_link_get_kernel(th->nl_cli.sock, ifindex, NULL, &link);
+	if (!err) {
+		rtnl_link_put(link);
+		return;
+	}
+
 	clear_last_changed(th);
 	set_changed(ifinfo, CHANGED_REMOVED);
 	set_call_change_handlers(th, TEAM_IFINFO_CHANGE);
