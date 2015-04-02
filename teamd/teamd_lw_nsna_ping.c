@@ -110,6 +110,8 @@ close_sock:
 	in_struct_offset(struct nd_neighbor_advert, nd_na_type)
 
 static struct sock_filter na_flt[] = {
+	BPF_STMT(BPF_LD + BPF_B + BPF_ABS, SKF_AD_OFF + SKF_AD_PROTOCOL),
+	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ETH_P_IPV6, 0, 5),
 	BPF_STMT(BPF_LD + BPF_B + BPF_ABS, OFFSET_NEXT_HEADER),
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, IPPROTO_ICMPV6, 0, 3),
 	BPF_STMT(BPF_LD + BPF_B + BPF_ABS, OFFSET_NA_TYPE),
@@ -136,7 +138,7 @@ static int lw_nsnap_sock_open(struct lw_psr_port_priv *psr_ppriv)
 	 */
 	err = teamd_packet_sock_open(&psr_ppriv->sock,
 				     psr_ppriv->common.tdport->ifindex,
-				     htons(ETH_P_IPV6), &na_fprog, NULL);
+				     htons(ETH_P_ALL), &na_fprog, NULL);
 	if (err)
 		return err;
 	err = icmp6_sock_open(&nsnap_ppriv->tx_sock);
