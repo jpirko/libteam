@@ -1,6 +1,6 @@
 /*
  *   teamd_lw_ethtool.c - Team port ethtool link watcher
- *   Copyright (C) 2012-2013 Jiri Pirko <jiri@resnulli.us>
+ *   Copyright (C) 2012-2015 Jiri Pirko <jiri@resnulli.us>
  *   Copyright (C) 2014 Erik Hugne <erik.hugne@ericsson.com>
  *
  *   This library is free software; you can redistribute it and/or

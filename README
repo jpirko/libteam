@@ -25,7 +25,7 @@ One thing to note is that Team driver project does try to provide the similar fu
 
 ## License
 
-Copyright (C) 2011-2013 Jiri Pirko <jiri@resnulli.us>
+Copyright (C) 2011-2015 Jiri Pirko <jiri@resnulli.us>
 
 libteam is distributed under GNU Lesser General Public License version 2.1.
 See the file "COPYING" in the source distribution for information on terms & conditions for accessing and otherwise using libteam.

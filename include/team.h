@@ -1,6 +1,6 @@
 /*
  *   team.h - Network team device driver library
- *   Copyright (C) 2011-2013 Jiri Pirko <jiri@resnulli.us>
+ *   Copyright (C) 2011-2015 Jiri Pirko <jiri@resnulli.us>
  *
  *   This library is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU Lesser General Public
