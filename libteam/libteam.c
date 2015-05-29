@@ -458,6 +458,9 @@ static int do_create(struct team_handle *th, const char *team_name, bool recreat
 		return -ENOMEM;
 
 	if (team_name) {
+		if (strlen(team_name) >= IFNAMSIZ)
+			return -ENAMETOOLONG;
+
 		rtnl_link_set_name(link, team_name);
 
 		if (recreate && team_ifname2ifindex(th, team_name)) {
