@@ -83,7 +83,8 @@ static struct team_port *port_create(struct team_handle *th,
 static void port_destroy(struct team_handle *th,
 			 struct team_port *port)
 {
-	ifinfo_unlink(port->ifinfo);
+	if (port->ifinfo)
+		ifinfo_unlink(port->ifinfo);
 	list_del(&port->list);
 	free(port);
 }
@@ -224,6 +225,11 @@ int port_list_init(struct team_handle *th)
 void port_list_free(struct team_handle *th)
 {
 	flush_port_list(th);
+}
+
+void port_unlink(struct team_port *port)
+{
+	port->ifinfo = NULL;
 }
 
 /* \endcond */

@@ -105,6 +105,7 @@ int get_port_list_handler(struct nl_msg *msg, void *arg);
 int port_list_alloc(struct team_handle *th);
 int port_list_init(struct team_handle *th);
 void port_list_free(struct team_handle *th);
+void port_unlink(struct team_port *port);
 int ifinfo_event_handler(struct nl_msg *msg, void *arg);
 int ifinfo_list_alloc(struct team_handle *th);
 int ifinfo_list_init(struct team_handle *th);

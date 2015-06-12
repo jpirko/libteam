@@ -213,6 +213,8 @@ static struct team_ifinfo *ifinfo_find_create(struct team_handle *th,
 
 static void ifinfo_destroy(struct team_ifinfo *ifinfo)
 {
+	if (ifinfo->linked && ifinfo->port)
+		port_unlink(ifinfo->port);
 	list_del(&ifinfo->list);
 	free(ifinfo);
 }
