@@ -903,6 +903,10 @@ static int lacp_port_actor_update(struct lacp_port *lacp_port)
 	teamd_log_dbg("%s: lacp info state: 0x%02X.", lacp_port->tdport->ifname,
 						      state);
 	lacp_port->actor.state = state;
+
+	if (lacp_port->periodic_on)
+		return 0;
+
 	return lacpdu_send(lacp_port);
 }
 
@@ -1056,7 +1060,8 @@ static int lacpdu_recv(struct lacp_port *lacp_port)
 		return err;
 
 	/* Check if the other side has correct info about us */
-	if (memcmp(&lacpdu.partner, &lacp_port->actor,
+	if (!lacp_port->periodic_on &&
+	    memcmp(&lacpdu.partner, &lacp_port->actor,
 		   sizeof(struct lacpdu_info))) {
 		err = lacpdu_send(lacp_port);
 		if (err)
