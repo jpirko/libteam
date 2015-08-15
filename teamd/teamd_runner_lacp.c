@@ -870,15 +870,22 @@ static int lacp_port_partner_update(struct lacp_port *lacp_port)
 	return 0;
 }
 
+static void lacp_port_actor_system_update(struct lacp_port *lacp_port)
+{
+	struct lacpdu_info *actor = &lacp_port->actor;
+
+	memcpy(actor->system, lacp_port->ctx->hwaddr, ETH_ALEN);
+}
+
 static void lacp_port_actor_init(struct lacp_port *lacp_port)
 {
 	struct lacpdu_info *actor = &lacp_port->actor;
 
 	actor->system_priority = htons(lacp_port->lacp->cfg.sys_prio);
-	memcpy(actor->system, lacp_port->ctx->hwaddr, ETH_ALEN);
-        actor->key = htons(lacp_port->cfg.lacp_key);
-        actor->port_priority = htons(lacp_port->cfg.lacp_prio);
+	actor->key = htons(lacp_port->cfg.lacp_key);
+	actor->port_priority = htons(lacp_port->cfg.lacp_prio);
 	actor->port = htons(lacp_port->tdport->ifindex);
+	lacp_port_actor_system_update(lacp_port);
 }
 
 static int lacpdu_send(struct lacp_port *lacp_port);
@@ -1280,17 +1287,17 @@ static const struct teamd_port_priv lacp_port_priv = {
 static int lacp_event_watch_hwaddr_changed(struct teamd_context *ctx,
 					   void *priv)
 {
+	struct lacp *lacp = priv;
 	struct teamd_port *tdport;
 	int err;
 
 	teamd_for_each_tdport(tdport, ctx) {
-		err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
-				      ctx->hwaddr_len);
-		if (err) {
-			teamd_log_err("%s: Failed to set port hardware address.",
-				      tdport->ifname);
+		struct lacp_port *lacp_port = lacp_port_get(lacp, tdport);
+
+		err = lacp_port_set_mac(ctx, tdport);
+		if (err)
 			return err;
-		}
+		lacp_port_actor_system_update(lacp_port);
 	}
 	return 0;
 }
