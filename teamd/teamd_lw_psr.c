@@ -39,6 +39,9 @@ static int lw_psr_callback_periodic(struct teamd_context *ctx, int events, void 
 	bool link_up = common_ppriv->link_up;
 	int err;
 
+	if (!psr_ppriv->ops)
+		return -EINVAL;
+
 	if (psr_ppriv->reply_received) {
 		link_up = true;
 		psr_ppriv->missed = 0;
@@ -64,6 +67,9 @@ static int lw_psr_callback_periodic(struct teamd_context *ctx, int events, void 
 static int lw_psr_callback_socket(struct teamd_context *ctx, int events, void *priv)
 {
 	struct lw_psr_port_priv *psr_ppriv = priv;
+
+	if (!psr_ppriv->ops)
+		return -EINVAL;
 
 	return psr_ppriv->ops->receive(psr_ppriv);
 }
@@ -119,6 +125,9 @@ int lw_psr_port_added(struct teamd_context *ctx, struct teamd_port *tdport,
 {
 	struct lw_psr_port_priv *psr_ppriv = priv;
 	int err;
+
+	if (!psr_ppriv->ops)
+		return -EINVAL;
 
 	err = lw_psr_load_options(ctx, tdport, psr_ppriv);
 	if (err) {
@@ -181,6 +190,9 @@ void lw_psr_port_removed(struct teamd_context *ctx, struct teamd_port *tdport,
 			 void *priv, void *creator_priv)
 {
 	struct lw_psr_port_priv *psr_ppriv = priv;
+
+	if (!psr_ppriv->ops)
+		return;
 
 	teamd_loop_callback_del(ctx, LW_PERIODIC_CB_NAME, psr_ppriv);
 	teamd_loop_callback_del(ctx, LW_SOCKET_CB_NAME, psr_ppriv);
