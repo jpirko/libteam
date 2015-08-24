@@ -340,6 +340,11 @@ int teamd_port_add_ifname(struct teamd_context *ctx, const char *port_name)
 	teamd_log_dbg("%s: Adding port (found ifindex \"%d\").",
 		      port_name, ifindex);
 	err = team_port_add(ctx->th, ifindex);
+	if (err == -ENODEV) {
+		teamd_log_err("%s: Failed to add missing port.", port_name);
+		return 0;
+	}
+
 	if (err)
 		teamd_log_err("%s: Failed to add port.", port_name);
 	return err;
