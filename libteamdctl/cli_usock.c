@@ -79,7 +79,8 @@ static int cli_usock_send(int sock, char *msg)
 	return 0;
 }
 
-#define WAIT_USEC (TEAMDCTL_REPLY_TIMEOUT * 1000)
+#define WAIT_SEC (TEAMDCTL_REPLY_TIMEOUT / 1000)
+#define WAIT_USEC (TEAMDCTL_REPLY_TIMEOUT % 1000 * 1000)
 
 static int cli_usock_wait_recv(int sock)
 {
@@ -88,7 +89,7 @@ static int cli_usock_wait_recv(int sock)
 	int ret;
 	struct timeval tv;
 
-	tv.tv_sec = 0;
+	tv.tv_sec = WAIT_SEC;
 	tv.tv_usec = WAIT_USEC;
 	FD_ZERO(&rfds);
 	FD_SET(sock, &rfds);
