@@ -60,7 +60,26 @@ static int lb_event_watch_port_link_changed(struct teamd_context *ctx,
 	return teamd_port_check_enable(ctx, tdport, port_up, !port_up);
 }
 
+static int lb_event_watch_hwaddr_changed(struct teamd_context *ctx, void *priv)
+{
+	struct teamd_port *tdport;
+	int err;
+
+	teamd_for_each_tdport(tdport, ctx) {
+		err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
+				      ctx->hwaddr_len);
+		if (err) {
+			teamd_log_err("%s: Failed to set port hardware address.",
+				      tdport->ifname);
+			return err;
+		}
+	}
+
+	return 0;
+}
+
 static const struct teamd_event_watch_ops lb_port_watch_ops = {
+	.hwaddr_changed = lb_event_watch_hwaddr_changed,
 	.port_added = lb_event_watch_port_added,
 	.port_removed = lb_event_watch_port_removed,
 	.port_link_changed = lb_event_watch_port_link_changed,
