@@ -167,6 +167,23 @@ int teamd_event_ifinfo_ifname_changed(struct teamd_context *ctx,
 	return 0;
 }
 
+int teamd_event_ifinfo_admin_state_changed(struct teamd_context *ctx,
+					   struct team_ifinfo *ifinfo)
+{
+	struct event_watch_item *watch;
+	uint32_t ifindex = team_get_ifinfo_ifindex(ifinfo);
+	int err;
+
+	list_for_each_node_entry(watch, &ctx->event_watch_list, list) {
+		if (watch->ops->admin_state_changed && ctx->ifindex == ifindex) {
+			err = watch->ops->admin_state_changed(ctx, watch->priv);
+			if (err)
+				return err;
+		}
+	}
+	return 0;
+}
+
 int teamd_events_init(struct teamd_context *ctx)
 {
 	list_init(&ctx->event_watch_list);

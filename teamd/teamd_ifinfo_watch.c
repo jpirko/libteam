@@ -36,10 +36,16 @@ static int ifinfo_change_handler_func(struct team_handle *th, void *priv,
 	int err;
 
 	team_for_each_ifinfo(ifinfo, th) {
-		if (ctx->ifinfo == ifinfo &&
-		    team_is_ifinfo_removed(ifinfo)) {
-			teamd_log_warn("Team device removal detected.");
-			teamd_run_loop_quit(ctx, 0);
+		if (ctx->ifinfo == ifinfo) {
+			if (team_is_ifinfo_removed(ifinfo)) {
+				teamd_log_warn("Team device removal detected.");
+				teamd_run_loop_quit(ctx, 0);
+			}
+			if (team_is_ifinfo_admin_state_changed(ifinfo)) {
+				err = teamd_event_ifinfo_admin_state_changed(ctx, ifinfo);
+				if (err)
+					return err;
+			}
 		}
 
 		if (team_is_ifinfo_hwaddr_changed(ifinfo) ||

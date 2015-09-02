@@ -174,6 +174,7 @@ struct teamd_runner {
 struct teamd_event_watch_ops {
 	int (*hwaddr_changed)(struct teamd_context *ctx, void *priv);
 	int (*ifname_changed)(struct teamd_context *ctx, void *priv);
+	int (*admin_state_changed)(struct teamd_context *ctx, void *priv);
 	int (*port_added)(struct teamd_context *ctx,
 			  struct teamd_port *tdport, void *priv);
 	void (*port_removed)(struct teamd_context *ctx,
@@ -205,6 +206,8 @@ int teamd_event_ifinfo_hwaddr_changed(struct teamd_context *ctx,
 				      struct team_ifinfo *ifinfo);
 int teamd_event_ifinfo_ifname_changed(struct teamd_context *ctx,
 				      struct team_ifinfo *ifinfo);
+int teamd_event_ifinfo_admin_state_changed(struct teamd_context *ctx,
+					   struct team_ifinfo *ifinfo);
 int teamd_events_init(struct teamd_context *ctx);
 void teamd_events_fini(struct teamd_context *ctx);
 int teamd_event_watch_register(struct teamd_context *ctx,

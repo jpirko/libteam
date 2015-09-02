@@ -57,6 +57,7 @@ struct team_ifinfo {
 	size_t			orig_hwaddr_len;
 	char			ifname[IFNAMSIZ];
 	uint32_t		master_ifindex;
+	bool			admin_state;
 #define MAX_PHYS_PORT_ID_LEN 32
 	char			phys_port_id[MAX_PHYS_PORT_ID_LEN];
 	size_t			phys_port_id_len;
@@ -70,10 +71,11 @@ struct team_ifinfo {
 #define CHANGED_MASTER_IFINDEX		(1 << 4)
 #define CHANGED_PHYS_PORT_ID		(1 << 5)
 #define CHANGED_PHYS_PORT_ID_LEN	(1 << 6)
+#define CHANGED_ADMIN_STATE		(1 << 7)
 #define CHANGED_ANY	(CHANGED_REMOVED | CHANGED_HWADDR | \
 			 CHANGED_HWADDR_LEN | CHANGED_IFNAME | \
 			 CHANGED_MASTER_IFINDEX | CHANGED_PHYS_PORT_ID | \
-			 CHANGED_PHYS_PORT_ID_LEN)
+			 CHANGED_PHYS_PORT_ID_LEN | CHANGED_ADMIN_STATE)
 
 static void set_changed(struct team_ifinfo *ifinfo, int bit)
 {
@@ -127,6 +129,20 @@ static void update_ifname(struct team_ifinfo *ifinfo, struct rtnl_link *link)
 	}
 }
 
+static void update_admin_state(struct team_ifinfo *ifinfo, struct rtnl_link *link)
+{
+	unsigned int flags;
+	bool admin_state;
+
+	flags = rtnl_link_get_flags(link);
+	admin_state = ((flags & IFF_UP) == IFF_UP);
+
+	if (admin_state != ifinfo->admin_state) {
+		ifinfo->admin_state = admin_state;
+		set_changed(ifinfo, CHANGED_ADMIN_STATE);
+	}
+}
+
 static void update_master(struct team_ifinfo *ifinfo, struct rtnl_link *link)
 {
 	uint32_t master_ifindex;
@@ -172,6 +188,7 @@ static void ifinfo_update(struct team_ifinfo *ifinfo, struct rtnl_link *link)
 	update_master(ifinfo, link);
 	update_hwaddr(ifinfo, link);
 	update_phys_port_id(ifinfo, link);
+	update_admin_state(ifinfo, link);
 }
 
 static struct team_ifinfo *ifinfo_find(struct team_handle *th, uint32_t ifindex)
@@ -475,6 +492,19 @@ uint32_t team_get_ifinfo_ifindex(struct team_ifinfo *ifinfo)
 /**
  * @param ifinfo	ifinfo structure
  *
+ * @details Get ifinfo admin state.
+ *
+ * @return Ifinfo interface index as idenfified by in kernel.
+ **/
+TEAM_EXPORT
+bool team_get_ifinfo_admin_state(struct team_ifinfo *ifinfo)
+{
+	return ifinfo->admin_state;
+}
+
+/**
+ * @param ifinfo	ifinfo structure
+ *
  * @details Get port associated to rtnetlink interface info.
  *
  * @return Pointer to appropriate team_port structure
@@ -614,6 +644,19 @@ TEAM_EXPORT
 bool team_is_ifinfo_master_ifindex_changed(struct team_ifinfo *ifinfo)
 {
 	return is_changed(ifinfo, CHANGED_MASTER_IFINDEX);
+}
+
+/**
+ * @param ifinfo	ifinfo structure
+ *
+ * @details See if admin state of interface got changed.
+ *
+ * @return True if admin state of interface got changed.
+ **/
+TEAM_EXPORT
+bool team_is_ifinfo_admin_state_changed(struct team_ifinfo *ifinfo)
+{
+	return is_changed(ifinfo, CHANGED_ADMIN_STATE);
 }
 
 /**
