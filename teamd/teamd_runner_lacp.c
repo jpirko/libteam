@@ -1016,6 +1016,11 @@ static int lacpdu_send(struct lacp_port *lacp_port)
 	struct sockaddr_ll ll_my;
 	struct sockaddr_ll ll_slow;
 	int err;
+	bool admin_state;
+
+	admin_state = team_get_ifinfo_admin_state(lacp_port->ctx->ifinfo);
+	if (!admin_state)
+		return 0;
 
 	err = teamd_getsockname_hwaddr(lacp_port->sock, &ll_my, 0);
 	if (err)
@@ -1302,6 +1307,27 @@ static int lacp_event_watch_hwaddr_changed(struct teamd_context *ctx,
 	return 0;
 }
 
+static int lacp_event_watch_admin_state_changed(struct teamd_context *ctx,
+					        void *priv)
+{
+	struct lacp *lacp = priv;
+	struct teamd_port *tdport;
+	bool admin_state;
+	int err;
+
+	teamd_for_each_tdport(tdport, ctx) {
+		struct lacp_port *lacp_port = lacp_port_get(lacp, tdport);
+
+		admin_state = team_get_ifinfo_admin_state(ctx->ifinfo);
+		err = lacp_port_set_state(lacp_port,
+					  admin_state?PORT_STATE_CURRENT:PORT_STATE_DISABLED);
+		if (err)
+			return err;
+	}
+	return 0;
+}
+
+
 static int lacp_event_watch_port_added(struct teamd_context *ctx,
 				       struct teamd_port *tdport, void *priv)
 {
@@ -1331,11 +1357,12 @@ static int lacp_event_watch_port_changed(struct teamd_context *ctx,
 	return lacp_port_link_update(lacp_port);
 }
 
-static const struct teamd_event_watch_ops lacp_port_watch_ops = {
+static const struct teamd_event_watch_ops lacp_event_watch_ops = {
 	.hwaddr_changed = lacp_event_watch_hwaddr_changed,
 	.port_added = lacp_event_watch_port_added,
 	.port_removed = lacp_event_watch_port_removed,
 	.port_changed = lacp_event_watch_port_changed,
+	.admin_state_changed = lacp_event_watch_admin_state_changed,
 };
 
 static int lacp_carrier_init(struct teamd_context *ctx, struct lacp *lacp)
@@ -1816,7 +1843,7 @@ static int lacp_init(struct teamd_context *ctx, void *priv)
 		teamd_log_err("Failed to initialize carrier.");
 		return err;
 	}
-	err = teamd_event_watch_register(ctx, &lacp_port_watch_ops, lacp);
+	err = teamd_event_watch_register(ctx, &lacp_event_watch_ops, lacp);
 	if (err) {
 		teamd_log_err("Failed to register event watch.");
 		return err;
@@ -1836,7 +1863,7 @@ static int lacp_init(struct teamd_context *ctx, void *priv)
 balancer_fini:
 	teamd_balancer_fini(lacp->tb);
 event_watch_unregister:
-	teamd_event_watch_unregister(ctx, &lacp_port_watch_ops, lacp);
+	teamd_event_watch_unregister(ctx, &lacp_event_watch_ops, lacp);
 	return err;
 }
 
@@ -1846,7 +1873,7 @@ static void lacp_fini(struct teamd_context *ctx, void *priv)
 
 	teamd_state_val_unregister(ctx, &lacp_state_vg, lacp);
 	teamd_balancer_fini(lacp->tb);
-	teamd_event_watch_unregister(ctx, &lacp_port_watch_ops, lacp);
+	teamd_event_watch_unregister(ctx, &lacp_event_watch_ops, lacp);
 	lacp_carrier_fini(ctx, lacp);
 }
 
