@@ -138,6 +138,7 @@ struct team_ifinfo *team_get_next_ifinfo(struct team_handle *th,
 /* ifinfo getters */
 bool team_is_ifinfo_removed(struct team_ifinfo *ifinfo);
 uint32_t team_get_ifinfo_ifindex(struct team_ifinfo *ifinfo);
+bool team_get_ifinfo_admin_state(struct team_ifinfo *ifinfo);
 struct team_port *team_get_ifinfo_port(struct team_ifinfo *ifinfo);
 char *team_get_ifinfo_hwaddr(struct team_ifinfo *ifinfo);
 bool team_is_ifinfo_hwaddr_changed(struct team_ifinfo *ifinfo);
@@ -149,6 +150,7 @@ char *team_get_ifinfo_ifname(struct team_ifinfo *ifinfo);
 bool team_is_ifinfo_ifname_changed(struct team_ifinfo *ifinfo);
 uint32_t team_get_ifinfo_master_ifindex(struct team_ifinfo *ifinfo);
 bool team_is_ifinfo_master_ifindex_changed(struct team_ifinfo *ifinfo);
+bool team_is_ifinfo_admin_state_changed(struct team_ifinfo *ifinfo);
 char *team_get_ifinfo_phys_port_id(struct team_ifinfo *ifinfo);
 bool team_is_ifinfo_phys_port_id_changed(struct team_ifinfo *ifinfo);
 size_t team_get_ifinfo_phys_port_id_len(struct team_ifinfo *ifinfo);
