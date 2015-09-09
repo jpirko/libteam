@@ -846,8 +846,14 @@ static int teamd_add_ports(struct teamd_context *ctx)
 
 	teamd_config_for_each_key(key, ctx, "$.ports") {
 		err = teamd_port_add_ifname(ctx, key);
-		if (err)
+		if (err == -ENODEV) {
+			teamd_log_warn("%s: Skipped adding a missing port.", key);
+			continue;
+		} else if (err) {
+			teamd_log_err("%s: Failed to add port (%s).", key,
+				      strerror(-err));
 			return err;
+		}
 	}
 	return 0;
 }

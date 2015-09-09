@@ -102,6 +102,11 @@ static int teamd_ctl_method_port_add(struct teamd_context *ctx,
 	teamd_log_dbgx(ctx, 2, "port_devname \"%s\"", port_devname);
 
 	err = teamd_port_add_ifname(ctx, port_devname);
+	if (err) {
+		teamd_log_err("%s: Failed to add port (%s).", port_devname,
+			      strerror(-err));
+	}
+
 	switch (err) {
 	case -ENODEV:
 		return ops->reply_err(ops_priv, "NoSuchDev", "No such device.");

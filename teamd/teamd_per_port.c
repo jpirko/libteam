@@ -333,16 +333,12 @@ next_one:
 
 int teamd_port_add_ifname(struct teamd_context *ctx, const char *port_name)
 {
-	int err;
 	uint32_t ifindex;
 
 	ifindex = team_ifname2ifindex(ctx->th, port_name);
 	teamd_log_dbg("%s: Adding port (found ifindex \"%d\").",
 		      port_name, ifindex);
-	err = team_port_add(ctx->th, ifindex);
-	if (err)
-		teamd_log_err("%s: Failed to add port.", port_name);
-	return err;
+	return team_port_add(ctx->th, ifindex);
 }
 
 static int teamd_port_remove(struct teamd_context *ctx,
