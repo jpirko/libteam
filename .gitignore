@@ -13,3 +13,5 @@ Makefile.in
 /config.*
 /configure
 /libtool
+
+stamp-h1
