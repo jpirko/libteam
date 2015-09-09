@@ -308,6 +308,13 @@ static int teamd_usock_sock_open(struct teamd_context *ctx)
 		return -errno;
 	}
 
+	err = fchmod(sock, 0700);
+	if (err == -1) {
+		teamd_log_err("usock: Failed to change socket permissions.");
+		err = -errno;
+		goto close_sock;
+	}
+
 	addr.sun_family = AF_UNIX;
 	teamd_usock_get_sockpath(addr.sun_path, sizeof(addr.sun_path),
 				 ctx->team_devname);
