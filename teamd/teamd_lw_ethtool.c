@@ -109,7 +109,7 @@ static int lw_ethtool_load_options(struct teamd_context *ctx,
 	int err;
 	int tmp;
 
-	err = teamd_config_int_get(ctx, &tmp, "@.queue_id", cpcookie);
+	err = teamd_config_int_get(ctx, &tmp, "@.delay_up", cpcookie);
 	if (!err) {
 		if (tmp < 0) {
 			teamd_log_err("\"delay_up\" must not be negative number.");
