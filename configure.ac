@@ -77,6 +77,31 @@ AS_IF([test "x$enable_debug" = "xyes"], [
 	AC_DEFINE(ENABLE_DEBUG, [1], [Debug messages.])
 ])
 
+user=root
+AC_ARG_WITH([user],
+	[AS_HELP_STRING([--with-user@<:@=username@:>@], [Set default daemon user @<:@default=root@:>@])],
+	[case "$withval" in
+		yes|no|"") ;;
+		*) user="$withval" ;;
+	esac]
+)
+AC_DEFINE_UNQUOTED(TEAMD_USER, "${user}", [TEAMD USER.])
+
+group=root
+AC_ARG_WITH([group],
+	[AS_HELP_STRING([--with-group@<:@=groupname@:>@], [Specify the system group @<:@default=root@:>@])],
+	[case "$withval" in
+		yes|no|"") ;;
+		*) group="$withval" ;;
+	esac]
+)
+AC_DEFINE_UNQUOTED(TEAMD_GROUP, "${group}", [TEAMD GROUP.])
+
+AM_CONDITIONAL([LIBCAP], [test "x$user" != "xroot" -o "x$group" != "xroot"])
+AM_COND_IF([LIBCAP],
+	[AC_CHECK_LIB([cap], [cap_init],,
+		AC_MSG_ERROR([*** Non-root daemon support requested but libcap-devel library not found]))])
+
 have_dbus=no
 AC_ARG_ENABLE([dbus],
 	AS_HELP_STRING([--disable-dbus], [disable D-Bus API @<:@default=enabled@:>@]))

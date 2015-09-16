@@ -1447,10 +1447,8 @@ static int teamd_start(struct teamd_context *ctx, enum teamd_exit_code *p_ret)
 	pid_t pid;
 	int err = 0;
 
-	if (getuid() != 0) {
-		teamd_log_err("This program is intended to be run as root.");
-		return -EPERM;
-	}
+	if (getuid() == 0)
+		teamd_log_warn("This program is not intended to be run as root.");
 
 	if (daemon_reset_sigs(-1) < 0) {
 		teamd_log_err("Failed to reset all signal handlers.");
@@ -1666,6 +1664,96 @@ static void teamd_context_fini(struct teamd_context *ctx)
 	free(ctx);
 }
 
+
+#ifdef HAVE_LIBCAP
+#include <sys/prctl.h>
+#include <sys/capability.h>
+#include <sys/types.h>
+#include <pwd.h>
+#include <grp.h>
+
+#ifndef TEAMD_USER
+#define TEAMD_USER "root"
+#endif
+#ifndef TEAMD_GROUP
+#define TEAMD_GROUP "root"
+#endif
+
+static int teamd_drop_privileges()
+{
+	cap_value_t cv[] = {CAP_NET_ADMIN, CAP_NET_BIND_SERVICE};
+	cap_t my_caps;
+	struct passwd *pw = NULL;
+	struct group *grpent = NULL;
+
+	if ((pw = getpwnam(TEAMD_USER)) == NULL) {
+		fprintf(stderr, "Error reading user %s entry (%m)\n", TEAMD_USER);
+		goto error;
+	}
+
+	if (pw->pw_uid == 0)
+		return 0;
+
+	if ((grpent = getgrnam(TEAMD_GROUP)) == NULL) {
+		fprintf(stderr, "Error reading group %s entry (%m)\n", TEAMD_GROUP);
+		goto error;
+	}
+
+	if (pw->pw_gid != grpent->gr_gid) {
+		fprintf(stderr, "%s GID (%u) does not match %s GID (%u)\n",
+			TEAMD_USER, pw->pw_gid, TEAMD_GROUP, grpent->gr_gid);
+		goto error;
+	}
+
+	if (chown(TEAMD_RUN_DIR, pw->pw_uid, pw->pw_gid) < 0) {
+		fprintf(stderr, "Unable to change ownership of %s to %s/%s (%m)\n",
+			TEAMD_RUN_DIR, TEAMD_USER, TEAMD_GROUP);
+		goto error;
+	}
+
+	if (prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0) < 0)
+		goto error;
+
+	if (setgid(pw->pw_gid) < 0) {
+		fprintf(stderr, "Unable to set process GID to %u (%m)\n", pw->pw_gid);
+		goto error;
+	}
+
+	if (initgroups(TEAMD_USER, pw->pw_gid) < 0) {
+		fprintf(stderr, "Unable to initialize the group access list for %s user with GID %u (%m)\n",
+			TEAMD_USER, pw->pw_gid);
+		goto error;
+	}
+	if (setuid(pw->pw_uid) < 0) {
+		fprintf(stderr, "Unable to set UID to %u (%m)\n", pw->pw_uid);
+		goto error;
+	}
+
+	if ((my_caps = cap_init()) == NULL)
+		goto error;
+	if (cap_set_flag(my_caps, CAP_EFFECTIVE, 2, cv, CAP_SET) < 0)
+		goto error;
+	if (cap_set_flag(my_caps, CAP_PERMITTED, 2, cv, CAP_SET) < 0)
+		goto error;
+	if (cap_set_proc(my_caps) < 0)
+		goto error;
+	cap_free(my_caps);
+
+	return 0;
+error:
+	fprintf(stderr, "Failed to drop privileges\n");
+	return -EINVAL;
+}
+
+#else
+
+static int teamd_drop_privileges()
+{
+	return 0;
+}
+
+#endif
+
 int main(int argc, char **argv)
 {
 	enum teamd_exit_code ret = TEAMD_EXIT_FAILURE;
@@ -1673,6 +1761,10 @@ int main(int argc, char **argv)
 	struct teamd_context *ctx;
 
 	err = teamd_make_rundir();
+	if (err)
+		return ret;
+
+	err = teamd_drop_privileges();
 	if (err)
 		return ret;
 
