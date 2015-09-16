@@ -78,11 +78,15 @@ AS_IF([test "x$enable_debug" = "xyes"], [
 ])
 
 user=root
+dbus_policy_template="teamd/teamd.conf.in"
+dbus_policy_file="teamd/dbus/teamd.conf"
 AC_ARG_WITH([user],
 	[AS_HELP_STRING([--with-user@<:@=username@:>@], [Set default daemon user @<:@default=root@:>@])],
 	[case "$withval" in
-		yes|no|"") ;;
-		*) user="$withval" ;;
+		root|yes|no|"") ;;
+		*) user="$withval"
+		   sed -e "s|[@]teamd_user[@]|$user|g" \
+			< $dbus_policy_template > $dbus_policy_file ;;
 	esac]
 )
 AC_DEFINE_UNQUOTED(TEAMD_USER, "${user}", [TEAMD USER.])
