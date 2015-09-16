@@ -101,6 +101,14 @@ AC_ARG_ENABLE([zmq],
 	fi
 fi
 
+AC_ARG_WITH([run-dir],
+	[AS_HELP_STRING([--with-run-dir@<:@=DIR@:>@], [Teamd run time directory @<:@default=${localstatedir}@:>@])],
+	[case "$withval" in
+		yes|no|"") ;;
+		*) AC_DEFINE_UNQUOTED(TEAMD_RUN_DIR, "${withval}/", [TEAMD RUN DIR.]) ;;
+	esac]
+)
+
 AC_CHECK_PROGS([DOXYGEN], [doxygen])
 if test -z "$DOXYGEN";
 	then AC_MSG_WARN([Doxygen not found - continuing without Doxygen support])

@@ -67,7 +67,9 @@ static inline void TEAMD_BUG_ON(bool condition)
 		TEAMD_BUG();
 }
 
+#ifndef TEAMD_RUN_DIR
 #define TEAMD_RUN_DIR "/var/run/teamd/"
+#endif
 
 static inline int teamd_make_rundir(void)
 {
