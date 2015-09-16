@@ -1621,10 +1621,6 @@ static int teamd_set_default_pid_file(struct teamd_context *ctx)
 	if (ctx->pid_file)
 		return 0;
 
-	err = teamd_make_rundir();
-	if (err)
-		return err;
-
 	err = asprintf(&ctx->pid_file, TEAMD_RUN_DIR"%s.pid", ctx->team_devname);
 	if (err == -1) {
 		teamd_log_err("Failed allocate memory for PID file string.");
@@ -1675,6 +1671,10 @@ int main(int argc, char **argv)
 	enum teamd_exit_code ret = TEAMD_EXIT_FAILURE;
 	int err;
 	struct teamd_context *ctx;
+
+	err = teamd_make_rundir();
+	if (err)
+		return ret;
 
 	err = teamd_context_init(&ctx);
 	if (err) {

@@ -298,10 +298,6 @@ static int teamd_usock_sock_open(struct teamd_context *ctx)
 	int sock;
 	int err;
 
-	err = teamd_make_rundir();
-	if (err)
-		return err;
-
 	sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
 	if (sock == -1) {
 		teamd_log_err("usock: Failed to create socket.");
