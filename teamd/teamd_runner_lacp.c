@@ -888,9 +888,7 @@ static void lacp_port_actor_init(struct lacp_port *lacp_port)
 	lacp_port_actor_system_update(lacp_port);
 }
 
-static int lacpdu_send(struct lacp_port *lacp_port);
-
-static int lacp_port_actor_update(struct lacp_port *lacp_port)
+static void lacp_port_actor_update(struct lacp_port *lacp_port)
 {
 	uint8_t state = 0;
 
@@ -910,12 +908,9 @@ static int lacp_port_actor_update(struct lacp_port *lacp_port)
 	teamd_log_dbg("%s: lacp info state: 0x%02X.", lacp_port->tdport->ifname,
 						      state);
 	lacp_port->actor.state = state;
-
-	if (lacp_port->periodic_on)
-		return 0;
-
-	return lacpdu_send(lacp_port);
 }
+
+static int lacpdu_send(struct lacp_port *lacp_port);
 
 static int lacp_port_set_state(struct lacp_port *lacp_port,
 			       enum lacp_port_state new_state)
@@ -971,7 +966,10 @@ static int lacp_port_set_state(struct lacp_port *lacp_port,
 	if (err)
 		return err;
 
-	return lacp_port_actor_update(lacp_port);
+	lacp_port_actor_update(lacp_port);
+	if (lacp_port->periodic_on)
+		return 0;
+	return lacpdu_send(lacp_port);
 }
 
 static enum lacp_port_state lacp_port_get_state(struct lacp_port *lacp_port)
@@ -1114,6 +1112,7 @@ static int lacp_callback_periodic(struct teamd_context *ctx, int events,
 {
 	struct lacp_port *lacp_port = priv;
 
+	lacp_port_actor_update(lacp_port);
 	return lacpdu_send(lacp_port);
 }
 
