@@ -1,5 +1,6 @@
 [Unit]
 Description=Team Daemon for device %I
+Before=network.target
 
 [Service]
 BusName=org.libteam.teamd.%i
