@@ -28,6 +28,9 @@
 
 #ifndef NLA_S8
 #define NLA_S8 12
+#endif
+
+#ifndef NLA_PUT_S8
 
 /**
  * Add 8 bit signed integer attribute to netlink message.
@@ -67,6 +70,9 @@ int8_t nla_get_s8(struct nlattr *nla)
 
 #ifndef NLA_S16
 #define NLA_S16 13
+#endif
+
+#ifndef NLA_PUT_S16
 
 /**
  * Add 16 bit signed integer attribute to netlink message.
@@ -106,6 +112,9 @@ int16_t nla_get_s16(struct nlattr *nla)
 
 #ifndef NLA_S32
 #define NLA_S32 14
+#endif
+
+#ifndef NLA_PUT_S32
 
 /**
  * Add 32 bit signed integer attribute to netlink message.
@@ -145,6 +154,9 @@ int32_t nla_get_s32(struct nlattr *nla)
 
 #ifndef NLA_S64
 #define NLA_S64 15
+#endif
+
+#ifndef NLA_PUT_S64
 
 /**
  * Add 64 bit signed integer attribute to netlink message.
