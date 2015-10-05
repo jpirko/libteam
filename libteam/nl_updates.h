@@ -61,7 +61,7 @@ static inline int nla_put_s8(struct nl_msg *msg, int attrtype, int8_t value)
  *
  * @return Payload as 8 bit signed integer.
  */
-int8_t nla_get_s8(struct nlattr *nla)
+static inline int8_t nla_get_s8(struct nlattr *nla)
 {
 	return *(int8_t *) nla_data(nla);
 }
@@ -83,7 +83,7 @@ int8_t nla_get_s8(struct nlattr *nla)
  * @see nla_put
  * @return 0 on success or a negative error code.
  */
-int nla_put_s16(struct nl_msg *msg, int attrtype, int16_t value)
+static inline int nla_put_s16(struct nl_msg *msg, int attrtype, int16_t value)
 {
 	return nla_put(msg, attrtype, sizeof(int16_t), &value);
 }
@@ -103,7 +103,7 @@ int nla_put_s16(struct nl_msg *msg, int attrtype, int16_t value)
  *
  * @return Payload as 16 bit signed integer.
  */
-int16_t nla_get_s16(struct nlattr *nla)
+static inline int16_t nla_get_s16(struct nlattr *nla)
 {
 	return *(int16_t *) nla_data(nla);
 }
@@ -125,7 +125,7 @@ int16_t nla_get_s16(struct nlattr *nla)
  * @see nla_put
  * @return 0 on success or a negative error code.
  */
-int nla_put_s32(struct nl_msg *msg, int attrtype, int32_t value)
+static inline int nla_put_s32(struct nl_msg *msg, int attrtype, int32_t value)
 {
 	return nla_put(msg, attrtype, sizeof(int32_t), &value);
 }
@@ -145,7 +145,7 @@ int nla_put_s32(struct nl_msg *msg, int attrtype, int32_t value)
  *
  * @return Payload as 32 bit signed integer.
  */
-int32_t nla_get_s32(struct nlattr *nla)
+static inline int32_t nla_get_s32(struct nlattr *nla)
 {
 	return *(int32_t *) nla_data(nla);
 }
@@ -167,7 +167,7 @@ int32_t nla_get_s32(struct nlattr *nla)
  * @see nla_put
  * @return 0 on success or a negative error code.
  */
-int nla_put_s64(struct nl_msg *msg, int attrtype, int64_t value)
+static inline int nla_put_s64(struct nl_msg *msg, int attrtype, int64_t value)
 {
 	return nla_put(msg, attrtype, sizeof(int64_t), &value);
 }
@@ -187,7 +187,7 @@ int nla_put_s64(struct nl_msg *msg, int attrtype, int64_t value)
  *
  * @return Payload as 64 bit signed integer.
  */
-int64_t nla_get_s64(struct nlattr *nla)
+static inline int64_t nla_get_s64(struct nlattr *nla)
 {
 	int64_t tmp;
 
