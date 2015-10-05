@@ -21,7 +21,7 @@ teamd_SOURCES=teamd.c teamd_common.c teamd_json.c teamd_config.c teamd_state.c \
 	      teamd_runner_basic_ones.c teamd_runner_activebackup.c \
 	      teamd_runner_loadbalance.c teamd_runner_lacp.c
 
-EXTRA_DIST = example_configs dbus redhat
+EXTRA_DIST = example_configs dbus redhat teamd.conf.in
 
 noinst_HEADERS = teamd.h teamd_workq.h teamd_bpf_chef.h teamd_ctl.h \
 		 teamd_json.h teamd_dbus.h teamd_zmq.h teamd_usock.h \
