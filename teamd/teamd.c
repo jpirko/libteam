@@ -1681,7 +1681,7 @@ static void teamd_context_fini(struct teamd_context *ctx)
 
 static int teamd_drop_privileges()
 {
-	cap_value_t cv[] = {CAP_NET_ADMIN, CAP_NET_BIND_SERVICE};
+	cap_value_t cv[] = {CAP_NET_ADMIN, CAP_NET_BIND_SERVICE, CAP_NET_RAW};
 	cap_t my_caps;
 	struct passwd *pw = NULL;
 	struct group *grpent = NULL;
@@ -1731,9 +1731,9 @@ static int teamd_drop_privileges()
 
 	if ((my_caps = cap_init()) == NULL)
 		goto error;
-	if (cap_set_flag(my_caps, CAP_EFFECTIVE, 2, cv, CAP_SET) < 0)
+	if (cap_set_flag(my_caps, CAP_EFFECTIVE, ARRAY_SIZE(cv), cv, CAP_SET) < 0)
 		goto error;
-	if (cap_set_flag(my_caps, CAP_PERMITTED, 2, cv, CAP_SET) < 0)
+	if (cap_set_flag(my_caps, CAP_PERMITTED, ARRAY_SIZE(cv), cv, CAP_SET) < 0)
 		goto error;
 	if (cap_set_proc(my_caps) < 0)
 		goto error;
