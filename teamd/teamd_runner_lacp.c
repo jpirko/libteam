@@ -1314,12 +1314,13 @@ static int lacp_event_watch_admin_state_changed(struct teamd_context *ctx,
 	bool admin_state;
 	int err;
 
+	admin_state = team_get_ifinfo_admin_state(ctx->ifinfo);
+
 	teamd_for_each_tdport(tdport, ctx) {
 		struct lacp_port *lacp_port = lacp_port_get(lacp, tdport);
 
-		admin_state = team_get_ifinfo_admin_state(ctx->ifinfo);
 		err = lacp_port_set_state(lacp_port,
-					  admin_state?PORT_STATE_CURRENT:PORT_STATE_DISABLED);
+					  admin_state?PORT_STATE_EXPIRED:PORT_STATE_DISABLED);
 		if (err)
 			return err;
 	}
