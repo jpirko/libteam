@@ -4,11 +4,9 @@
 <busconfig>
 	<policy user="root">
 		<allow own_prefix="org.libteam.teamd"/>
-		<allow send_interface="org.libteam.teamd"/>
 	</policy>
 	<policy user="@teamd_user@">
 		<allow own_prefix="org.libteam.teamd"/>
-		<allow send_interface="org.libteam.teamd"/>
 	</policy>
 	<policy context="default">
 		<deny own_prefix="org.libteam.teamd"/>
