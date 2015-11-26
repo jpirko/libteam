@@ -366,24 +366,39 @@ int get_ifinfo_list(struct team_handle *th)
 		.rtgen_family = AF_UNSPEC,
 	};
 	int ret;
+	int retry = 1;
 
-	ret = nl_send_simple(th->nl_cli.sock, RTM_GETLINK, NLM_F_DUMP,
-			     &rt_hdr, sizeof(rt_hdr));
+	while (retry) {
+		retry = 0;
+		ret = nl_send_simple(th->nl_cli.sock, RTM_GETLINK, NLM_F_DUMP,
+				     &rt_hdr, sizeof(rt_hdr));
+		if (ret < 0) {
+			err(th, "get_ifinfo_list: nl_send_simple failed");
+			return -nl2syserr(ret);
+		}
+		orig_cb = nl_socket_get_cb(th->nl_cli.sock);
+		cb = nl_cb_clone(orig_cb);
+		nl_cb_put(orig_cb);
+		if (!cb) {
+			err(th, "get_ifinfo_list: nl_cb_clone failed");
+			return -ENOMEM;
+		}
+
+		nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, valid_handler, th);
+
+		ret = nl_recvmsgs(th->nl_cli.sock, cb);
+		nl_cb_put(cb);
+		if (ret < 0) {
+			err(th, "get_ifinfo_list: nl_recvmsgs failed");
+			if (ret != -NLE_DUMP_INTR)
+				return -nl2syserr(ret);
+			retry = 1;
+		}
+	}
+	ret = check_call_change_handlers(th, TEAM_IFINFO_CHANGE);
 	if (ret < 0)
-		return -nl2syserr(ret);
-	orig_cb = nl_socket_get_cb(th->nl_cli.sock);
-	cb = nl_cb_clone(orig_cb);
-	nl_cb_put(orig_cb);
-	if (!cb)
-		return -ENOMEM;
-
-	nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, valid_handler, th);
-
-	ret = nl_recvmsgs(th->nl_cli.sock, cb);
-	nl_cb_put(cb);
-	if (ret < 0)
-		return -nl2syserr(ret);
-	return check_call_change_handlers(th, TEAM_IFINFO_CHANGE);
+		err(th, "get_ifinfo_list: check_call_change_handers failed");
+	return ret;
 }
 
 int ifinfo_list_init(struct team_handle *th)
