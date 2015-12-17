@@ -1,7 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_INIT([libteam], [1.22], [jiri@resnulli.us])
+AC_INIT([libteam], [1.23], [jiri@resnulli.us])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS([config.h])
@@ -24,7 +24,7 @@ AM_PROG_AR
 #    release, then set age to 0.
 
 AC_SUBST(LIBTEAM_CURRENT, 8)
-AC_SUBST(LIBTEAM_REVISION, 2)
+AC_SUBST(LIBTEAM_REVISION, 3)
 AC_SUBST(LIBTEAM_AGE, 3)
 
 AC_SUBST(LIBTEAMDCTL_CURRENT, 1)
