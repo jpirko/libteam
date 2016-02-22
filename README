@@ -19,9 +19,9 @@ One thing to note is that Team driver project does try to provide the similar fu
 
 * Project Home:     http://www.libteam.org/
 * Git Source Tree:  https://github.com/jpirko/libteam/
-* Wiki:             https://fedorahosted.org/libteam/
-* Tutorial:         https://fedorahosted.org/libteam/wiki/Tutorial
-* Documentation:    https://fedorahosted.org/libteam/wiki/InfrastructureSpecification
+* Wiki:             https://github.com/jpirko/libteam/wiki
+* Tutorial:         https://github.com/jpirko/libteam/wiki/Tutorial
+* Documentation:    https://github.com/jpirko/libteam/wiki/Infrastructure-Specification
 
 ## License
 
