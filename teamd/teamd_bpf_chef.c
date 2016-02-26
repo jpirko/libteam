@@ -26,6 +26,7 @@
 
 /* protocol offsets */
 #define ETH_TYPE_OFFSET		12
+#define VLAN_TAG_OFFSET		14
 #define IPV4_FLAGS_OFFSET	20
 #define IPV4_PROTO_OFFSET	23
 #define IPV4_FRAG_BITS		0x1fff
@@ -35,6 +36,7 @@
 /* protocol codes */
 #define PROTOID_IPV4		0x800
 #define PROTOID_IPV6		0x86dd
+#define PROTOID_VLAN		0x8100
 #define PROTOID_TCP		0x6
 #define PROTOID_UDP		0x11
 #define PROTOID_SCTP		0x84
@@ -45,7 +47,7 @@
 #define FIX_K	0x4
 
 
-#define VLAN_HEADER_SIZE 2
+#define VLAN_HEADER_SIZE 4
 static int vlan_hdr_shift(unsigned int offset)
 {
 	return offset + VLAN_HEADER_SIZE;
@@ -82,6 +84,9 @@ static int __add_inst(struct sock_fprog *fprog, struct sock_filter *inst)
 
 #define bpf_load_word(pos)						\
 	add_inst(fprog, BPF_STMT(BPF_LD + BPF_W + BPF_ABS, pos))
+
+#define bpf_and_word(w)							\
+	add_inst(fprog, BPF_STMT(BPF_AND + BPF_ALU, w))
 
 #define bpf_push_a()							\
 	add_inst(fprog, BPF_STMT(BPF_ST, 0))
@@ -150,6 +155,7 @@ static int __add_inst(struct sock_fprog *fprog, struct sock_filter *inst)
 
 enum bpf_labels {
 	LABEL_VLAN_BRANCH,
+	LABEL_VLAN_TAG_SKIP,
 	LABEL_NOVLAN_IPV6,
 	LABEL_NOVLAN_L4v4_OUT,
 	LABEL_NOVLAN_TRY_UDP4,
@@ -472,6 +478,19 @@ err_add_inst:
 	return err;
 }
 
+static int bpf_vlan_hash_header(struct sock_fprog *fprog)
+{
+	int err;
+
+	bpf_load_half(VLAN_TAG_OFFSET);
+	bpf_and_word(0x0fff);
+	bpf_calc_hash();
+	bpf_move_to_x();
+
+err_add_inst:
+	return err;
+}
+
 static int __bpf_ipv4_hash(struct sock_fprog *fprog, bool vlan)
 {
 	int vlan_shift = vlan ? vlan_hdr_shift(0) : 0;
@@ -647,13 +666,25 @@ static int bpf_create_code(struct sock_fprog *fprog, struct hash_flags *flags)
 		return 0;
 	}
 
-	bpf_vlan_tag_present();
-	bpf_cmp(0, LABEL_VLAN_BRANCH, 0, FIX_JF);
+	bpf_load_half(ETH_TYPE_OFFSET);
+	bpf_cmp(LABEL_VLAN_BRANCH, 0, PROTOID_VLAN, FIX_JT);
+
+	/* no vlan branch, but might be offloaded */
+	if (hash_test_and_set_flag(flags, HASH_VLAN)) {
+		bpf_vlan_tag_present();
+		bpf_cmp(LABEL_VLAN_TAG_SKIP, 0, 0, FIX_JT);
+		bpf_vlan_hash(fprog);
+		push_label(fprog, LABEL_VLAN_TAG_SKIP);
+	}
+
 	if (!hash_is_novlan_l3l4_enabled(flags))
 		bpf_hash_return();
 
+	/* vlan hashing overwrote this */
+	if (hash_is_enabled(flags, HASH_VLAN))
+		bpf_load_half(ETH_TYPE_OFFSET);
+
 	/* no vlan branch */
-	bpf_load_half(ETH_TYPE_OFFSET);
 	bpf_cmp(0, LABEL_NOVLAN_IPV6, PROTOID_IPV4, FIX_JF);
 
 	/* no vlan ipv4 branch */
@@ -747,7 +778,7 @@ static int bpf_create_code(struct sock_fprog *fprog, struct hash_flags *flags)
 	/* vlan branch */
 	push_label(fprog, LABEL_VLAN_BRANCH);
 	if (hash_test_and_set_flag(flags, HASH_VLAN))
-		bpf_vlan_hash(fprog);
+		bpf_vlan_hash_header(fprog);
 
 	if (hash_is_complete(flags)) {
 		bpf_hash_return();
