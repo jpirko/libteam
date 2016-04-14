@@ -30,6 +30,7 @@
 #include <errno.h>
 #include <team.h>
 #include <private/misc.h>
+#include <net/ethernet.h>
 
 #include "teamd.h"
 #include "teamd_config.h"
@@ -60,6 +61,7 @@ struct lacpdu_info {
 } __attribute__((__packed__));
 
 struct lacpdu {
+	struct ether_header	hdr;
 	uint8_t			subtype;
 	uint8_t			version_number;
 	uint8_t			actor_tlv_type;
@@ -1013,6 +1015,8 @@ static int lacpdu_send(struct lacp_port *lacp_port)
 	struct lacpdu lacpdu;
 	struct sockaddr_ll ll_my;
 	struct sockaddr_ll ll_slow;
+	char *hwaddr;
+	unsigned char hwaddr_len;
 	int err;
 	bool admin_state;
 
@@ -1028,12 +1032,19 @@ static int lacpdu_send(struct lacp_port *lacp_port)
 
 	memcpy(lacp_port->actor.system, lacp_port->ctx->hwaddr, ETH_ALEN);
 
+	hwaddr = team_get_ifinfo_orig_hwaddr(lacp_port->tdport->team_ifinfo);
+	hwaddr_len = team_get_ifinfo_orig_hwaddr_len(lacp_port->tdport->team_ifinfo);
+	if (hwaddr_len != ETH_ALEN)
+		return 0;
+
 	lacpdu_init(&lacpdu);
 	lacpdu.actor = lacp_port->actor;
 	lacpdu.partner = lacp_port->partner;
+	memcpy(lacpdu.hdr.ether_shost, hwaddr, hwaddr_len);
+	memcpy(lacpdu.hdr.ether_dhost, ll_slow.sll_addr, ll_slow.sll_halen);
+	lacpdu.hdr.ether_type = htons(ETH_P_SLOW);
 
-	err = teamd_sendto(lacp_port->sock, &lacpdu, sizeof(lacpdu), 0,
-			   (struct sockaddr *) &ll_slow, sizeof(ll_slow));
+	err = teamd_send(lacp_port->sock, &lacpdu, sizeof(lacpdu), 0);
 	return err;
 }
 
@@ -1201,9 +1212,9 @@ static int lacp_port_added(struct teamd_context *ctx,
 		return err;
 	}
 
-	err = teamd_packet_sock_open(&lacp_port->sock,
-				     tdport->ifindex,
-				     htons(ETH_P_SLOW), NULL, NULL);
+	err = teamd_packet_sock_open_type(SOCK_RAW, &lacp_port->sock,
+					  tdport->ifindex,
+					  htons(ETH_P_SLOW), NULL, NULL);
 	if (err)
 		return err;
 

@@ -81,17 +81,17 @@ static int attach_filter(int sock, const struct sock_fprog *pref_fprog,
 	return 0;
 }
 
-int teamd_packet_sock_open(int *sock_p, const uint32_t ifindex,
-			   const unsigned short family,
-			   const struct sock_fprog *fprog,
-			   const struct sock_fprog *alt_fprog)
+int teamd_packet_sock_open_type(int type, int *sock_p, const uint32_t ifindex,
+				const unsigned short family,
+				const struct sock_fprog *fprog,
+				const struct sock_fprog *alt_fprog)
 {
 	struct sockaddr_ll ll_my;
 	int sock;
 	int ret;
 	int err;
 
-	sock = socket(PF_PACKET, SOCK_DGRAM, 0);
+	sock = socket(PF_PACKET, type, 0);
 	if (sock == -1) {
 		teamd_log_err("Failed to create packet socket.");
 		return -errno;
@@ -119,6 +119,15 @@ int teamd_packet_sock_open(int *sock_p, const uint32_t ifindex,
 close_sock:
 	close(sock);
 	return err;
+}
+
+int teamd_packet_sock_open(int *sock_p, const uint32_t ifindex,
+			   const unsigned short family,
+			   const struct sock_fprog *fprog,
+			   const struct sock_fprog *alt_fprog)
+{
+	return teamd_packet_sock_open_type(SOCK_DGRAM, sock_p, ifindex, family,
+					   fprog, alt_fprog);
 }
 
 int teamd_getsockname_hwaddr(int sock, struct sockaddr_ll *addr,
@@ -158,6 +167,29 @@ resend:
 			return 0;
 		default:
 			teamd_log_err("sendto failed.");
+			return -errno;
+		}
+	}
+	return 0;
+}
+
+int teamd_send(int sockfd, const void *buf, size_t len, int flags)
+{
+	ssize_t ret;
+
+resend:
+	ret = send(sockfd, buf, len, flags);
+	if (ret == -1) {
+		switch(errno) {
+		case EINTR:
+			goto resend;
+		case ENETDOWN:
+		case ENETUNREACH:
+		case EADDRNOTAVAIL:
+		case ENXIO:
+			return 0;
+		default:
+			teamd_log_err("send failed.");
 			return -errno;
 		}
 	}

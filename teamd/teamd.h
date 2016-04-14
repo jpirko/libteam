@@ -353,6 +353,10 @@ void teamd_balancer_port_removed(struct teamd_balancer *tb,
 
 int teamd_hash_func_set(struct teamd_context *ctx);
 
+int teamd_packet_sock_open_type(int type, int *sock_p, const uint32_t ifindex,
+				const unsigned short family,
+				const struct sock_fprog *fprog,
+				const struct sock_fprog *alt_fprog);
 int teamd_packet_sock_open(int *sock_p, const uint32_t ifindex,
 			   const unsigned short family,
 			   const struct sock_fprog *fprog,
@@ -361,6 +365,7 @@ int teamd_getsockname_hwaddr(int sock, struct sockaddr_ll *addr,
 			     size_t expected_len);
 int teamd_sendto(int sockfd, const void *buf, size_t len, int flags,
 		 const struct sockaddr *dest_addr, socklen_t addrlen);
+int teamd_send(int sockfd, const void *buf, size_t len, int flags);
 int teamd_recvfrom(int sockfd, void *buf, size_t len, int flags,
 		   struct sockaddr *src_addr, socklen_t addrlen);
 
