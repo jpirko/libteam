@@ -259,6 +259,7 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 		int nla_type;
 		int opt_type;
 		long tmp;
+		bool tmp_bool;
 		void *data;
 		int data_len = 0;
 		int err;
@@ -317,8 +318,8 @@ int get_options_handler(struct nl_msg *msg, void *arg)
 			opt_type = TEAM_OPTION_TYPE_BINARY;
 			break;
 		case NLA_FLAG:
-			tmp = (long) (data_attr ? true : false);
-			data = &tmp;
+			tmp_bool = data_attr ? true : false;
+			data = &tmp_bool;
 			opt_type = TEAM_OPTION_TYPE_BOOL;
 			break;
 		case NLA_S32:
