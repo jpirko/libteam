@@ -905,7 +905,7 @@ static void lacp_port_actor_update(struct lacp_port *lacp_port)
 		state |= INFO_STATE_EXPIRED;
 	if (lacp_port->state == PORT_STATE_DEFAULTED)
 		state |= INFO_STATE_DEFAULTED;
-	if (teamd_port_count(lacp_port->ctx) > 1)
+	if (teamd_port_count(lacp_port->ctx) > 0)
 		state |= INFO_STATE_AGGREGATION;
 	teamd_log_dbg("%s: lacp info state: 0x%02X.", lacp_port->tdport->ifname,
 						      state);
