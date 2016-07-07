@@ -59,7 +59,9 @@ static inline void hwaddr_str(char *str, char *hwaddr, size_t len)
 		sprintf(str, "%02x:", (unsigned char) hwaddr[i]);
 		str += 3;
 	}
-	*(str - 1) = '\0';
+	if (len)
+		str--;
+	*str = '\0';
 }
 
 static inline size_t hwaddr_str_len(size_t len)
