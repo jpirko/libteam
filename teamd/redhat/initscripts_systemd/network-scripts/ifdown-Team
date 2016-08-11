@@ -45,5 +45,5 @@ if [ -n "${TEAM_CONFIG}" ]; then
 		is_ignored_file "$device" && continue
 		/sbin/ifdown ${device##*/}
 	done
-	/usr/bin/systemctl stop teamd@${DEVICE}.service || exit 1
+	/usr/bin/systemctl stop teamd@${DEVICE}.service --ignore-dependencies || exit 1
 fi
