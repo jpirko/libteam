@@ -20,7 +20,11 @@
 
 #include <arpa/inet.h>
 #include <net/if_arp.h>
+#if defined(__GLIBC__)
 #include <linux/if_ether.h>
+#else
+#include <net/ethernet.h>
+#endif
 #include <netdb.h>
 #include <private/misc.h>
 #include "teamd.h"
