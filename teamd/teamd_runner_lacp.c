@@ -297,7 +297,7 @@ static int lacp_load_config(struct teamd_context *ctx, struct lacp *lacp)
 	return 0;
 }
 
-static bool lacp_port_selectable(struct lacp_port *lacp_port)
+static bool lacp_port_loopback_free(struct lacp_port *lacp_port)
 {
 	if (!memcmp(lacp_port->actor.system,
 		    lacp_port->partner.system, ETH_ALEN)) {
@@ -305,9 +305,22 @@ static bool lacp_port_selectable(struct lacp_port *lacp_port)
 			       "team device.", lacp_port->tdport->ifname);
 		return false;
 	}
+	return true;
+}
+
+static bool lacp_port_selectable_state(struct lacp_port *lacp_port)
+{
 	if (lacp_port->state == PORT_STATE_CURRENT)
 		return true;
 	return false;
+}
+
+static bool lacp_port_unselectable_state(struct lacp_port *lacp_port)
+{
+	if (lacp_port->state == PORT_STATE_CURRENT ||
+	    lacp_port->state == PORT_STATE_EXPIRED)
+		return false;
+	return true;
 }
 
 static bool lacp_port_selected(struct lacp_port *lacp_port)
@@ -726,13 +739,15 @@ static bool lacp_port_mergeable(struct lacp_port *lacp_port)
 static int lacp_port_agg_update(struct lacp_port *lacp_port)
 {
 	if (lacp_port_selected(lacp_port) &&
-	    (!lacp_port_selectable(lacp_port) ||
+	    (lacp_port_unselectable_state(lacp_port) ||
+	     !lacp_port_loopback_free(lacp_port) ||
 	     !lacp_port_correct_aggregation(lacp_port) ||
 	     lacp_port_mergeable(lacp_port)))
 		lacp_port_agg_unselect(lacp_port);
 
 	if (!lacp_port_selected(lacp_port) &&
-	    lacp_port_selectable(lacp_port))
+	    (lacp_port_selectable_state(lacp_port) &&
+	     lacp_port_loopback_free(lacp_port)))
 		lacp_port_agg_select(lacp_port);
 
 	return lacp_selected_agg_update(lacp_port->lacp, NULL);
