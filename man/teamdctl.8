@@ -50,6 +50,8 @@ Prints out state of teamd parsed from JSON state document.
 .TP
 .BI "state item get " state_item_path
 Finds state item in JSON state document and returns its value.
+
+If PORTIFNAME in state_item_path has any sensitive character, use double quotation marks to escape it, like: ports."eth1.1".link_watches.up. To process state_item_path of 'state item set' is the same as here.
 .TP
 .BI "state item set " "state_item_path value"
 Finds state item in JSON state document and sets its value by value parameter. This is available only for a limited number of paths:

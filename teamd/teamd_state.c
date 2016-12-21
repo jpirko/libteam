@@ -195,7 +195,7 @@ static int teamd_state_build_val_json_subpath(json_t **p_vg_json_obj,
 	char *dot;
 
 	if (tdport)
-		ret = asprintf(&path, "$." TEAMD_STATE_PER_PORT_PREFIX "%s%s",
+		ret = asprintf(&path, "$." TEAMD_STATE_PER_PORT_PREFIX "\"%s\"%s",
 			       tdport->ifname, subpath);
 	else
 		ret = asprintf(&path, "$%s", subpath);
@@ -296,13 +296,25 @@ static int __find_by_item_path(struct teamd_state_val_item **p_item,
 
 	if (!strncmp(item_path, TEAMD_STATE_PER_PORT_PREFIX,
 		     strlen(TEAMD_STATE_PER_PORT_PREFIX))) {
+		char *ifname_start, *ifname_end;
 		struct teamd_port *cur_tdport;
-		char *ifname_start = strchr(item_path, '.') + 1;
-		char *ifname_end = strchr(ifname_start, '.');
-		size_t ifname_len = ifname_end - ifname_start;
+		size_t ifname_len;
 
-		if (!ifname_end)
-			return -EINVAL;
+		ifname_start = strchr(item_path, '.') + 1;
+		if (*ifname_start == '\"') {
+			ifname_start++;
+			ifname_end = strrchr(ifname_start, '\"');
+			if (!ifname_end)
+				return -EINVAL;
+			ifname_len = ifname_end - ifname_start;
+			ifname_end++;
+		} else {
+			ifname_end = strchr(ifname_start, '.');
+			if (!ifname_end)
+				return -EINVAL;
+			ifname_len = ifname_end - ifname_start;
+		}
+
 		subpath = ifname_end + 1;
 
 		teamd_for_each_tdport(cur_tdport, ctx) {
