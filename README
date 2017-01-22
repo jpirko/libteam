@@ -1,3 +1,7 @@
+# SUBMITTING PATCHES / PULL REQUESTS - README!!! #
+
+All github pull requests will be ignored! Please send the patches to the libteam mailing list, according to "SubmittingPatches" file.
+
 # libteam - Library for controlling team network device #
 
 The purpose of the Team driver is to provide a mechanism to team multiple NICs (ports) into one logical one (teamdev) at L2 layer. The process is called "channel bonding", "Ethernet bonding", "channel teaming", "link aggregation", etc. This is already implemented in the Linux kernel by the bonding driver.
