@@ -29,7 +29,11 @@ $ git show
 6) Extract the patch in a standard format into /tmp directory
 $ git format-patch origin -o /tmp --subject-prefix "patch libteam"
 
-7) Use git send-email to send the patch*.
+7) Use checkpatch script from the kernel sources to find possible styling
+   issues in your patch:
+$ path-to-kernel-sources/scripts/checkpatch.pl /tmp/0001-somepatch.patch
+
+8) Use git send-email to send the patch*.
 $ git send-email /tmp/0001-somepatch.patch \
   --to=libteam@lists.fedorahosted.org --cc=jiri@resnulli.us
 
