@@ -72,6 +72,10 @@ struct team_ifinfo {
 #define CHANGED_PHYS_PORT_ID		(1 << 5)
 #define CHANGED_PHYS_PORT_ID_LEN	(1 << 6)
 #define CHANGED_ADMIN_STATE		(1 << 7)
+/* This is only used when tagging interfaces for finding
+ * removed, and thus not included to CHANGED_ANY.
+ */
+#define CHANGED_REFRESHING		(1 << 8)
 #define CHANGED_ANY	(CHANGED_REMOVED | CHANGED_HWADDR | \
 			 CHANGED_HWADDR_LEN | CHANGED_IFNAME | \
 			 CHANGED_MASTER_IFINDEX | CHANGED_PHYS_PORT_ID | \
@@ -202,7 +206,7 @@ static struct team_ifinfo *ifinfo_find(struct team_handle *th, uint32_t ifindex)
 	return NULL;
 }
 
-static void clear_last_changed(struct team_handle *th)
+void ifinfo_clear_changed(struct team_handle *th)
 {
 	struct team_ifinfo *ifinfo;
 
@@ -236,7 +240,7 @@ static void ifinfo_destroy(struct team_ifinfo *ifinfo)
 	free(ifinfo);
 }
 
-static void ifinfo_destroy_removed(struct team_handle *th)
+void ifinfo_destroy_removed(struct team_handle *th)
 {
 	struct team_ifinfo *ifinfo, *tmp;
 
@@ -254,8 +258,6 @@ static void obj_input_newlink(struct nl_object *obj, void *arg, bool event)
 	uint32_t ifindex;
 	int err;
 
-	ifinfo_destroy_removed(th);
-
 	link = (struct rtnl_link *) obj;
 
 	ifindex = rtnl_link_get_ifindex(link);
@@ -269,7 +271,7 @@ static void obj_input_newlink(struct nl_object *obj, void *arg, bool event)
 			return;
 	}
 
-	clear_last_changed(th);
+	clear_changed(ifinfo);
 	ifinfo_update(ifinfo, link);
 
 	if (event)
@@ -292,8 +294,6 @@ static void event_handler_obj_input_dellink(struct nl_object *obj, void *arg)
 	uint32_t ifindex;
 	int err;
 
-	ifinfo_destroy_removed(th);
-
 	link = (struct rtnl_link *) obj;
 
 	ifindex = rtnl_link_get_ifindex(link);
@@ -311,7 +311,7 @@ static void event_handler_obj_input_dellink(struct nl_object *obj, void *arg)
 		return;
 	}
 
-	clear_last_changed(th);
+	clear_changed(ifinfo);
 	set_changed(ifinfo, CHANGED_REMOVED);
 	set_call_change_handlers(th, TEAM_IFINFO_CHANGE);
 }
@@ -367,6 +367,14 @@ int get_ifinfo_list(struct team_handle *th)
 	};
 	int ret;
 	int retry = 1;
+	struct team_ifinfo *ifinfo;
+
+	/* Tag all ifinfo, this is cleared in newlink handler.
+	 * Any interface that has this after dump is processed
+	 * has been removed.
+	 */
+	list_for_each_node_entry(ifinfo, &th->ifinfo_list, list)
+		set_changed(ifinfo, CHANGED_REFRESHING);
 
 	while (retry) {
 		retry = 0;
@@ -395,6 +403,15 @@ int get_ifinfo_list(struct team_handle *th)
 			retry = 1;
 		}
 	}
+
+	list_for_each_node_entry(ifinfo, &th->ifinfo_list, list) {
+		if (is_changed(ifinfo, CHANGED_REFRESHING)) {
+			clear_changed(ifinfo);
+			set_changed(ifinfo, CHANGED_REMOVED);
+			set_call_change_handlers(th, TEAM_IFINFO_CHANGE);
+		}
+	}
+
 	ret = check_call_change_handlers(th, TEAM_IFINFO_CHANGE);
 	if (ret < 0)
 		err(th, "get_ifinfo_list: check_call_change_handers failed");

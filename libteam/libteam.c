@@ -236,6 +236,10 @@ int check_call_change_handlers(struct team_handle *th,
 				break;
 		}
 	}
+	if (call_type_mask & TEAM_IFINFO_CHANGE) {
+		ifinfo_destroy_removed(th);
+		ifinfo_clear_changed(th);
+	}
 	th->change_handler.pending_type_mask &= ~call_type_mask;
 	return err;
 }
@@ -546,6 +550,11 @@ int team_destroy(struct team_handle *th)
 #endif
 /* \endcond */
 
+/* libnl uses default 32k socket receive buffer size,
+ * whicn can get too small. Use 96k for all sockets.
+ */
+#define NETLINK_RCVBUF 98304
+
 /**
  * @param th		libteam library context
  * @param ifindex	team device interface index
@@ -561,6 +570,8 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 	int err;
 	int grp_id;
 	int val;
+	int eventbufsize;
+	const char *env;
 
 	if (!ifindex) {
 		err(th, "Passed interface index %d is not valid.", ifindex);
@@ -589,12 +600,12 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 		return -errno;
 	}
 
-	err = nl_socket_set_buffer_size(th->nl_sock, 98304, 0);
+	err = nl_socket_set_buffer_size(th->nl_sock, NETLINK_RCVBUF, 0);
 	if (err) {
 		err(th, "Failed to set buffer size of netlink sock.");
 		return -nl2syserr(err);
 	}
-	err = nl_socket_set_buffer_size(th->nl_sock_event, 98304, 0);
+	err = nl_socket_set_buffer_size(th->nl_sock_event, NETLINK_RCVBUF, 0);
 	if (err) {
 		err(th, "Failed to set buffer size of netlink event sock.");
 		return -nl2syserr(err);
@@ -627,6 +638,25 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 	nl_socket_modify_cb(th->nl_cli.sock_event, NL_CB_VALID,
 			    NL_CB_CUSTOM, cli_event_handler, th);
 	nl_cli_connect(th->nl_cli.sock_event, NETLINK_ROUTE);
+
+	env = getenv("TEAM_EVENT_BUFSIZE");
+	if (env) {
+		eventbufsize = strtol(env, NULL, 10);
+		/* ignore other errors, libnl forces minimum 32k and
+		 * too large values are truncated to system rmem_max
+		 */
+		if (eventbufsize < 0)
+			eventbufsize = 0;
+	} else {
+		eventbufsize = NETLINK_RCVBUF;
+	}
+
+	err = nl_socket_set_buffer_size(th->nl_cli.sock_event, eventbufsize, 0);
+	if (err) {
+		err(th, "Failed to set cli event socket buffer size.");
+		return err;
+	}
+
 	err = nl_socket_add_membership(th->nl_cli.sock_event, RTNLGRP_LINK);
 	if (err < 0) {
 		err(th, "Failed to add netlink membership.");
@@ -767,7 +797,23 @@ static int get_cli_sock_event_fd(struct team_handle *th)
 
 static int cli_sock_event_handler(struct team_handle *th)
 {
-	nl_recvmsgs_default(th->nl_cli.sock_event);
+	int err;
+
+	err = nl_recvmsgs_default(th->nl_cli.sock_event);
+	err = -nl2syserr(err);
+
+	/* libnl thinks ENOBUFS and ENOMEM are same. Hope it was ENOBUFS. */
+	if (err == -ENOMEM) {
+		warn(th, "Lost link notifications from kernel.");
+		/* There's no way to know what events were lost and no
+		 * way to get them again. Refresh all.
+		 */
+		err = get_ifinfo_list(th);
+	}
+
+	if (err)
+		return err;
+
 	return check_call_change_handlers(th, TEAM_IFINFO_CHANGE);
 }
 

@@ -115,6 +115,9 @@ int ifinfo_link_with_port(struct team_handle *th, uint32_t ifindex,
 int ifinfo_link(struct team_handle *th, uint32_t ifindex,
 		struct team_ifinfo **p_ifinfo);
 void ifinfo_unlink(struct team_ifinfo *ifinfo);
+void ifinfo_clear_changed(struct team_handle *th);
+void ifinfo_destroy_removed(struct team_handle *th);
+int get_ifinfo_list(struct team_handle *th);
 int get_options_handler(struct nl_msg *msg, void *arg);
 int option_list_alloc(struct team_handle *th);
 int option_list_init(struct team_handle *th);
