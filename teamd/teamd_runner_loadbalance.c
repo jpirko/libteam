@@ -40,6 +40,15 @@ static int lb_event_watch_port_added(struct teamd_context *ctx,
 			      tdport->ifname);
 		return err;
 	}
+
+	if (!team_is_port_link_up(tdport->team_port)) {
+		err = team_set_port_enabled(ctx->th, tdport->ifindex, false);
+		if (err) {
+			teamd_log_err("%s: Failed to disable port.",
+				      tdport->ifname);
+			return TEAMD_ENOENT(err) ? 0 : err;
+		}
+	}
 	return teamd_balancer_port_added(lb->tb, tdport);
 }
 
