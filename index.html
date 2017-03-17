@@ -27,9 +27,9 @@
       <section>
 <h1><a name="libteam---library-for-controlling-team-network-device" class="anchor" href="#libteam---library-for-controlling-team-network-device"><span class="octicon octicon-link"></span></a>libteam - Library for controlling team network device</h1>
 
-<p>The purpose of the Team driver is to provide a mechanism to team multiple NICs (ports) into one logical one (teamdev) at L2 layer. The process is called "channel bonding", "Ethernet bonding", "channel teaming", "link aggregation", etc. This is already implemented in the Linux kernel by the bonding driver.</p>
+<p>The purpose of the Team softdev Linux driver is to provide a mechanism to team multiple NICs (ports) into one logical one (teamdev) at L2 layer. The process is called "channel bonding", "Ethernet bonding", "channel teaming", "link aggregation", etc. This is already implemented in the Linux kernel by the bonding driver.</p>
 
-<p>One thing to note is that Team driver project does try to provide the similar functionality as the bonding driver, however architecturally it is quite different from bonding driver. Team driver is modular, userspace driven, very lean and efficient, and it does have some distinct advantages over bonding. The way Team is configured differs dramatically from the way bonding is.</p>
+<p>One thing to note is that Team softdev Linux driver project does try to provide the similar functionality as the bonding driver, however architecturally it is quite different from bonding driver. Team softdev Linux driver is modular, userspace driven, very lean and efficient, and it does have some distinct advantages over bonding. The way Team is configured differs dramatically from the way bonding is.</p>
 
 <p>
 Note that there is no performance overhead added with the fact that the control logic happens in userspace. Packets never leave kernel. 
@@ -40,7 +40,7 @@ Note that there is no performance overhead added with the fact that the control 
 <ul>
 <li><a href="https://github.com/jpirko/libteam/wiki/Tutorial">Tutorial</a></li>
 <li><a href="https://github.com/jpirko/libteam/wiki/Infrastructure-Specification">Infrastructure Specification</a></li>
-<li><a href="https://github.com/jpirko/libteam/wiki/Bonding-vs.-Team-driver-features">Bonding vs. Team driver features</a></li>
+<li><a href="https://github.com/jpirko/libteam/wiki/Bonding-vs.-Team-driver-features">Bonding vs. Team features</a></li>
 <li><a href="https://github.com/jpirko/libteam/wiki/">Wiki</a></li>
 <li><a href="https://lists.fedorahosted.org/mailman/listinfo/libteam">Mailing list</a></li>
 </ul>
