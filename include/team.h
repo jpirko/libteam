@@ -68,6 +68,8 @@ int team_get_bpf_hash_func(struct team_handle *th, struct sock_fprog *fp);
 int team_set_bpf_hash_func(struct team_handle *th, const struct sock_fprog *fp);
 int team_set_port_enabled(struct team_handle *th,
 			  uint32_t port_ifindex, bool val);
+int team_get_port_enabled(struct team_handle *th,
+			  uint32_t port_ifindex, bool *enabled);
 int team_set_port_user_linkup_enabled(struct team_handle *th,
 				      uint32_t port_ifindex, bool val);
 int team_get_port_user_linkup(struct team_handle *th,

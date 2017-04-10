@@ -1341,6 +1341,28 @@ int team_set_port_enabled(struct team_handle *th,
 /**
  * @param th		libteam library context
  * @param port_ifindex	port interface index
+ * @param enabled	where the enabled state will be stored
+ *
+ * @details Gets enabled state for port identified by port_ifindex
+ *
+ * @return Zero on success or negative number in case of an error.
+ **/
+TEAM_EXPORT
+int team_get_port_enabled(struct team_handle *th,
+			  uint32_t port_ifindex, bool *enabled)
+{
+	struct team_option *option;
+
+	option = team_get_option(th, "np", "enabled", port_ifindex);
+	if (!option)
+		return -ENOENT;
+	*enabled = team_get_option_value_bool(option);
+	return 0;
+}
+
+/**
+ * @param th		libteam library context
+ * @param port_ifindex	port interface index
  * @param val		boolean value
  *
  * @details Enables or disable user linkup for port identified by port_ifindex
