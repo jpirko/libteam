@@ -247,7 +247,7 @@ static int lw_nsnap_receive(struct lw_psr_port_priv *psr_ppriv)
 		return err;
 
 	/* check IPV6 header */
-	if (nap.ip6h.ip6_vfc != 0x60 /* IPV6 */ ||
+	if ((nap.ip6h.ip6_vfc & 0xf0) != 0x60 /* IPV6 */ ||
 	    nap.ip6h.ip6_plen != htons(sizeof(nap) - sizeof(nap.ip6h)) ||
 	    nap.ip6h.ip6_nxt != IPPROTO_ICMPV6 ||
 	    nap.ip6h.ip6_hlim != 255 /* Do not route */ ||
