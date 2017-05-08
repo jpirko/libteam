@@ -250,13 +250,13 @@ static int lw_nsnap_receive(struct lw_psr_port_priv *psr_ppriv)
 	if ((nap.ip6h.ip6_vfc & 0xf0) != 0x60 /* IPV6 */ ||
 	    nap.ip6h.ip6_plen != htons(sizeof(nap) - sizeof(nap.ip6h)) ||
 	    nap.ip6h.ip6_nxt != IPPROTO_ICMPV6 ||
-	    nap.ip6h.ip6_hlim != 255 /* Do not route */ ||
-	    memcmp(&nap.ip6h.ip6_src, &nsnap_ppriv->dst.sin6_addr,
-		   sizeof(struct in6_addr)))
+	    nap.ip6h.ip6_hlim != 255 /* Do not route */)
 		return 0;
 
 	/* check ICMP6 header */
 	if (nap.nah.nd_na_type != ND_NEIGHBOR_ADVERT ||
+	    memcmp(&nap.nah.nd_na_target, &nsnap_ppriv->dst.sin6_addr,
+		   sizeof(struct in6_addr)) ||
 	    nap.opt.nd_opt_type != ND_OPT_TARGET_LINKADDR ||
 	    nap.opt.nd_opt_len != 1 /* 8 bytes */)
 		return 0;
