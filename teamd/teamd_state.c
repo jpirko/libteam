@@ -318,8 +318,9 @@ static int __find_by_item_path(struct teamd_state_val_item **p_item,
 		subpath = ifname_end + 1;
 
 		teamd_for_each_tdport(cur_tdport, ctx) {
+			size_t curname_len = strlen(cur_tdport->ifname);
 			if (!strncmp(cur_tdport->ifname, ifname_start,
-				     ifname_len)) {
+				     ((ifname_len>curname_len)?ifname_len:curname_len))) {
 				tdport = cur_tdport;
 				break;
 			}
