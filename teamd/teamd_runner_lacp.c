@@ -23,14 +23,20 @@
 #include <unistd.h>
 #include <limits.h>
 #include <sys/ioctl.h>
+#if defined(__GLIBC__)
 #include <linux/if_ether.h>
+#else
+#include <net/ethernet.h>
+#endif
 #include <sys/socket.h>
 #include <linux/netdevice.h>
 #include <netinet/in.h>
 #include <errno.h>
 #include <team.h>
 #include <private/misc.h>
+#if defined(__GLIBC__)
 #include <net/ethernet.h>
+#endif
 
 #include "teamd.h"
 #include "teamd_config.h"

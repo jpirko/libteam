@@ -21,7 +21,11 @@
 #include <netdb.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
+#if defined(__GLIBC__)
 #include <linux/if_ether.h>
+#else
+#include <net/ethernet.h>
+#endif
 #include <private/misc.h>
 #include "teamd.h"
 #include "teamd_link_watch.h"
