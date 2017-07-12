@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <sys/ioctl.h>
+#include <net/ethernet.h>
 #include <linux/if_ether.h>
 #include <sys/socket.h>
 #include <linux/netdevice.h>
@@ -30,7 +31,6 @@
 #include <errno.h>
 #include <team.h>
 #include <private/misc.h>
-#include <net/ethernet.h>
 
 #include "teamd.h"
 #include "teamd_config.h"
