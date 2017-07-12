@@ -24,6 +24,7 @@
 #include <getopt.h>
 #include <errno.h>
 #include <sys/signalfd.h>
+#include <sys/select.h>
 #include <signal.h>
 #include <unistd.h>
 #include <team.h>
