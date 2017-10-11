@@ -1075,6 +1075,9 @@ static int lacpdu_recv(struct lacp_port *lacp_port)
 	if (err <= 0)
 		return err;
 
+	if (!teamd_port_present(lacp_port->ctx, lacp_port->tdport))
+		return 0;
+
 	if (!lacpdu_check(&lacpdu)) {
 		teamd_log_warn("malformed LACP PDU came.");
 		return 0;
