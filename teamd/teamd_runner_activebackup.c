@@ -39,6 +39,8 @@ struct ab_hwaddr_policy {
 	const char *name;
 	int (*hwaddr_changed)(struct teamd_context *ctx,
 			      struct ab *ab);
+	int (*port_hwaddr_changed)(struct teamd_context *ctx, struct ab *ab,
+				   struct teamd_port *tdport);
 	int (*port_added)(struct teamd_context *ctx, struct ab *ab,
 			  struct teamd_port *tdport);
 	int (*active_set)(struct teamd_context *ctx, struct ab *ab,
@@ -95,6 +97,26 @@ static int ab_hwaddr_policy_same_all_hwaddr_changed(struct teamd_context *ctx,
 	return 0;
 }
 
+static int
+ab_hwaddr_policy_same_all_port_hwaddr_changed(struct teamd_context *ctx,
+					      struct ab *ab,
+					      struct teamd_port *tdport)
+{
+	int err;
+
+	if (!memcmp(team_get_ifinfo_hwaddr(tdport->team_ifinfo),
+		    ctx->hwaddr, ctx->hwaddr_len))
+		return 0;
+
+	err = team_hwaddr_set(ctx->th, tdport->ifindex, ctx->hwaddr,
+			      ctx->hwaddr_len);
+	if (err)
+		teamd_log_err("%s: Failed to set port hardware address.",
+			      tdport->ifname);
+
+	return err;
+}
+
 static int ab_hwaddr_policy_same_all_port_added(struct teamd_context *ctx,
 						struct ab *ab,
 						struct teamd_port *tdport)
@@ -114,6 +136,7 @@ static int ab_hwaddr_policy_same_all_port_added(struct teamd_context *ctx,
 static const struct ab_hwaddr_policy ab_hwaddr_policy_same_all = {
 	.name = "same_all",
 	.hwaddr_changed = ab_hwaddr_policy_same_all_hwaddr_changed,
+	.port_hwaddr_changed = ab_hwaddr_policy_same_all_port_hwaddr_changed,
 	.port_added = ab_hwaddr_policy_same_all_port_added,
 };
 
@@ -411,6 +434,21 @@ static int ab_event_watch_hwaddr_changed(struct teamd_context *ctx, void *priv)
 	return 0;
 }
 
+static int ab_event_watch_port_hwaddr_changed(struct teamd_context *ctx,
+					      struct teamd_port *tdport,
+					      void *priv)
+{
+	struct ab *ab = priv;
+
+	if (!teamd_port_present(ctx, tdport))
+		return 0;
+
+	if (ab->hwaddr_policy->port_hwaddr_changed)
+		return ab->hwaddr_policy->port_hwaddr_changed(ctx, ab, tdport);
+
+	return 0;
+}
+
 static int ab_port_load_config(struct teamd_context *ctx,
 			       struct ab_port *ab_port)
 {
@@ -491,6 +529,7 @@ static int ab_event_watch_prio_option_changed(struct teamd_context *ctx,
 
 static const struct teamd_event_watch_ops ab_event_watch_ops = {
 	.hwaddr_changed = ab_event_watch_hwaddr_changed,
+	.port_hwaddr_changed = ab_event_watch_port_hwaddr_changed,
 	.port_added = ab_event_watch_port_added,
 	.port_link_changed = ab_event_watch_port_link_changed,
 	.option_changed = ab_event_watch_prio_option_changed,
