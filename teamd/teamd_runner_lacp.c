@@ -1336,6 +1336,31 @@ static int lacp_event_watch_hwaddr_changed(struct teamd_context *ctx,
 	return 0;
 }
 
+static int lacp_event_watch_port_hwaddr_changed(struct teamd_context *ctx,
+						struct teamd_port *tdport,
+						void *priv)
+{
+	struct lacp_port *lacp_port;
+	struct lacp *lacp = priv;
+	int err;
+
+	if (!teamd_port_present(ctx, tdport))
+		return 0;
+
+	if (!memcmp(team_get_ifinfo_hwaddr(tdport->team_ifinfo),
+		    ctx->hwaddr, ctx->hwaddr_len))
+		return 0;
+
+	err = lacp_port_set_mac(ctx, tdport);
+	if (err)
+		return err;
+
+	lacp_port = lacp_port_get(lacp, tdport);
+	lacp_port_actor_system_update(lacp_port);
+
+	return 0;
+}
+
 static int lacp_event_watch_admin_state_changed(struct teamd_context *ctx,
 					        void *priv)
 {
@@ -1389,6 +1414,7 @@ static int lacp_event_watch_port_changed(struct teamd_context *ctx,
 
 static const struct teamd_event_watch_ops lacp_event_watch_ops = {
 	.hwaddr_changed = lacp_event_watch_hwaddr_changed,
+	.port_hwaddr_changed = lacp_event_watch_port_hwaddr_changed,
 	.port_added = lacp_event_watch_port_added,
 	.port_removed = lacp_event_watch_port_removed,
 	.port_changed = lacp_event_watch_port_changed,
