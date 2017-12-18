@@ -146,7 +146,7 @@ class TeamDaemon(object):
             if port.linkup:
                 if (not best or
                     port.speed > best.speed or
-                    (port.speed == best.speed and port.duplex > port.duplex)):
+                    (port.speed == best.speed and port.duplex > best.duplex)):
                     best = port
         if best:
             self._change_active_port(active, best)
