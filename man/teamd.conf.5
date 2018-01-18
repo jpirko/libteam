@@ -229,7 +229,7 @@ System priority, value can be 0 \(en 65535.
 .RS 7
 .PP
 Default:
-.BR "255"
+.BR "65535"
 .RE
 .TP
 .BR "runner.min_ports " (int)
@@ -269,6 +269,11 @@ Default:
 .TP
 .BR "ports.PORTIFNAME.lacp_prio " (int)
 Port priority according to LACP standard. The lower number means higher priority.
+.RS 7
+.PP
+Default:
+.BR "255"
+.RE
 .TP
 .BR "ports.PORTIFNAME.lacp_key " (int)
 Port key according to LACP standard. It is only possible to aggregate ports with the same key.
