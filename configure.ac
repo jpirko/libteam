@@ -39,8 +39,10 @@ LT_INIT
 
 PKG_CHECK_MODULES([LIBNL], [libnl-3.0 libnl-genl-3.0 libnl-route-3.0 libnl-cli-3.0])
 	TMP_CFLAGS="$CFLAGS"
+	TMP_LDFLAGS="$LDFLAGS"
 	TMP_LIBS="$LIBS"
 	CFLAGS="$CPPFLAGS $LIBNL_CFLAGS"
+	LDFLAGS=""
 	LIBS="$LIBS $LIBNL_LIBS"
 	AC_CHECK_LIB([nl-route-3], [rtnl_link_get_phys_port_id],
 		     AC_DEFINE(HAVE_RTNL_LINK_GET_PHYS_ID, [1], [Define to 1 if you have rtnl_link_get_phys_port_id function.]))
@@ -49,6 +51,7 @@ PKG_CHECK_MODULES([LIBNL], [libnl-3.0 libnl-genl-3.0 libnl-route-3.0 libnl-cli-3
 	AC_CHECK_LIB([nl-route-3], [rtnl_link_get_carrier],
 		     AC_DEFINE(HAVE_RTNL_LINK_GET_CARRIER, [1], [Define to 1 if you have rtnl_link_get_carrier.]))
 	CFLAGS="$TMP_CFLAGS"
+	LDFLAGS="$TMP_LDFLAGS"
 	LIBS="$TMP_LIBS"
 
 PKG_CHECK_MODULES([LIBDAEMON], [libdaemon])
