@@ -344,7 +344,8 @@ static bool __team_port_str(struct team_port *port,
 			    team_is_port_removed(port) ? "-" :
 				team_is_port_changed(port) ? "*" : " ",
 			    ifindex,
-			    team_get_ifinfo_ifname(ifinfo),
+			    ifinfo ? team_get_ifinfo_ifname(ifinfo) :
+				"(removed)",
 			    team_is_port_link_up(port) ? "up": "down",
 			    team_get_port_speed(port),
 			    team_get_port_duplex(port) ? "FD" : "HD");

@@ -258,6 +258,8 @@ static void obj_input_newlink(struct nl_object *obj, void *arg, bool event)
 	uint32_t ifindex;
 	int err;
 
+	ifinfo_destroy_removed(th);
+
 	link = (struct rtnl_link *) obj;
 
 	ifindex = rtnl_link_get_ifindex(link);
@@ -293,6 +295,8 @@ static void event_handler_obj_input_dellink(struct nl_object *obj, void *arg)
 	struct team_ifinfo *ifinfo;
 	uint32_t ifindex;
 	int err;
+
+	ifinfo_destroy_removed(th);
 
 	link = (struct rtnl_link *) obj;
 
@@ -412,7 +416,8 @@ int get_ifinfo_list(struct team_handle *th)
 		}
 	}
 
-	ret = check_call_change_handlers(th, TEAM_IFINFO_CHANGE);
+	ret = check_call_change_handlers(th, TEAM_IFINFO_CHANGE |
+					     TEAM_IFINFO_REFRESH);
 	if (ret < 0)
 		err(th, "get_ifinfo_list: check_call_change_handers failed");
 	return ret;
