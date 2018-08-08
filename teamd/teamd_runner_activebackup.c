@@ -520,6 +520,13 @@ static int ab_event_watch_port_link_changed(struct teamd_context *ctx,
 	return ab_link_watch_handler(ctx, priv);
 }
 
+static int ab_event_watch_port_master_ifindex_changed(struct teamd_context *ctx,
+						      struct teamd_port *tdport,
+						      void *priv)
+{
+	return ab_link_watch_handler(ctx, priv);
+}
+
 static int ab_event_watch_prio_option_changed(struct teamd_context *ctx,
 					      struct team_option *option,
 					      void *priv)
@@ -532,6 +539,7 @@ static const struct teamd_event_watch_ops ab_event_watch_ops = {
 	.port_hwaddr_changed = ab_event_watch_port_hwaddr_changed,
 	.port_added = ab_event_watch_port_added,
 	.port_link_changed = ab_event_watch_port_link_changed,
+	.port_master_ifindex_changed = ab_event_watch_port_master_ifindex_changed,
 	.option_changed = ab_event_watch_prio_option_changed,
 	.option_changed_match_name = "priority",
 };

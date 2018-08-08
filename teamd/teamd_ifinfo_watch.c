@@ -59,6 +59,11 @@ static int ifinfo_change_handler_func(struct team_handle *th, void *priv,
 			if (err)
 				return err;
 		}
+		if (team_is_ifinfo_master_ifindex_changed(ifinfo)) {
+			err = teamd_event_ifinfo_master_ifindex_changed(ctx, ifinfo);
+			if (err)
+				return err;
+		}
 	}
 	return 0;
 }

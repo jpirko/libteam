@@ -189,6 +189,9 @@ struct teamd_event_watch_ops {
 				   struct teamd_port *tdport, void *priv);
 	int (*port_ifname_changed)(struct teamd_context *ctx,
 				   struct teamd_port *tdport, void *priv);
+	int (*port_master_ifindex_changed)(struct teamd_context *ctx,
+					   struct teamd_port *tdport,
+					   void *priv);
 	int (*option_changed)(struct teamd_context *ctx,
 			      struct team_option *option, void *priv);
 	char *option_changed_match_name;
@@ -208,6 +211,8 @@ int teamd_event_ifinfo_hwaddr_changed(struct teamd_context *ctx,
 				      struct team_ifinfo *ifinfo);
 int teamd_event_ifinfo_ifname_changed(struct teamd_context *ctx,
 				      struct team_ifinfo *ifinfo);
+int teamd_event_ifinfo_master_ifindex_changed(struct teamd_context *ctx,
+					      struct team_ifinfo *ifinfo);
 int teamd_event_ifinfo_admin_state_changed(struct teamd_context *ctx,
 					   struct team_ifinfo *ifinfo);
 int teamd_events_init(struct teamd_context *ctx);
