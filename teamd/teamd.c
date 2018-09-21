@@ -107,6 +107,7 @@ static void print_help(const struct teamd_context *ctx) {
             "                             file will be ignored)\n"
             "    -p --pid-file=FILE       Use the specified PID file\n"
             "    -g --debug               Increase verbosity\n"
+            "    -l --log-output          Force teamd log output to stdout, stderr or syslog\n"
             "    -r --force-recreate      Force team device recreation in case it\n"
             "                             already exists\n"
             "    -o --take-over           Take over the device if it already exists\n"
@@ -140,6 +141,7 @@ static int parse_command_line(struct teamd_context *ctx,
 		{ "config",		required_argument,	NULL, 'c' },
 		{ "pid-file",		required_argument,	NULL, 'p' },
 		{ "debug",		no_argument,		NULL, 'g' },
+		{ "log-output",		required_argument,	NULL, 'l' },
 		{ "force-recreate",	no_argument,		NULL, 'r' },
 		{ "take-over",		no_argument,		NULL, 'o' },
 		{ "no-quit-destroy",	no_argument,		NULL, 'N' },
@@ -152,7 +154,7 @@ static int parse_command_line(struct teamd_context *ctx,
 		{ NULL, 0, NULL, 0 }
 	};
 
-	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:groNt:nDZ:Uu",
+	while ((opt = getopt_long(argc, argv, "hdkevf:c:p:gl:roNt:nDZ:Uu",
 				  long_options, NULL)) >= 0) {
 
 		switch(opt) {
@@ -190,6 +192,10 @@ static int parse_command_line(struct teamd_context *ctx,
 			break;
 		case 'g':
 			ctx->debug++;
+			break;
+		case 'l':
+			free(ctx->log_output);
+			ctx->log_output = strdup(optarg);
 			break;
 		case 'r':
 			ctx->force_recreate = true;
@@ -1492,6 +1498,16 @@ static int teamd_start(struct teamd_context *ctx, enum teamd_exit_code *p_ret)
 		}
 
 	/* Child */
+	}
+
+	ctx->log_output = ctx->log_output ? : getenv("TEAM_LOG_OUTPUT");
+	if (ctx->log_output) {
+		if (strcmp(ctx->log_output, "stdout") == 0)
+			daemon_log_use = DAEMON_LOG_STDOUT;
+		else if (strcmp(ctx->log_output, "stderr") == 0)
+			daemon_log_use = DAEMON_LOG_STDERR;
+		else if (strcmp(ctx->log_output, "syslog") == 0)
+			daemon_log_use = DAEMON_LOG_SYSLOG;
 	}
 
 	if (daemon_close_all(-1) < 0) {

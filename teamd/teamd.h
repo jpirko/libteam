@@ -99,6 +99,7 @@ struct teamd_context {
 	enum teamd_command		cmd;
 	bool				daemonize;
 	unsigned int			debug;
+	char *				log_output;
 	bool				force_recreate;
 	bool				take_over;
 	bool				no_quit_destroy;
