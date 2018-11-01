@@ -352,6 +352,14 @@ Default:
 .BR "false"
 .RE
 .TP
+.BR "link_watch.vlanid "| " ports.PORTIFNAME.link_watch.vlanid " (int)
+By default, ARP requests are sent without VLAN tags. This option causes outgoing ARP requests to be sent with the specified VLAN ID number.
+.RS 7
+.PP
+Default:
+.BR "None"
+.RE
+.TP
 .BR "link_watch.send_always "| " ports.PORTIFNAME.link_watch.send_always " (bool)
 By default, ARP requests are sent on active ports only. This option allows sending even on inactive ports.
 .RS 7
