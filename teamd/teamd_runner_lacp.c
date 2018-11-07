@@ -965,7 +965,12 @@ static int lacp_port_set_state(struct lacp_port *lacp_port,
 	case PORT_STATE_DEFAULTED:
 		teamd_loop_callback_disable(lacp_port->ctx,
 					    LACP_TIMEOUT_CB_NAME, lacp_port);
-		/* fall through */
+		memset(&lacp_port->partner, 0, sizeof(lacp_port->partner));
+		lacp_port->partner.state |= INFO_STATE_LACP_TIMEOUT;
+		err = lacp_port_partner_update(lacp_port);
+		if (err)
+			return err;
+		break;
 	case PORT_STATE_DISABLED:
 		memset(&lacp_port->partner, 0, sizeof(lacp_port->partner));
 		err = lacp_port_partner_update(lacp_port);
