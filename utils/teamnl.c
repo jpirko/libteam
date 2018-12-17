@@ -521,7 +521,9 @@ static void print_help(const char *argv0) {
 
 	printf(
             "%s [options] teamdevname command [command args]\n"
-            "\t-h --help                Show this help\n",
+            "\t-h --help                Show this help\n"
+            "\t-p --port_name           team slave port name\n"
+            "\t-a --array_index         team option array index\n",
             argv0);
 	printf("Commands:\n");
 	for (i = 0; i < CMD_TYPE_COUNT; i++) {
