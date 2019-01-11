@@ -336,7 +336,8 @@ static int lw_ap_receive(struct lw_psr_port_priv *psr_ppriv)
 		if (ap.ah.ar_hrd != htons(ll_my.sll_hatype) ||
 		    ap.ah.ar_pro != htons(ETH_P_IP) ||
 		    ap.ah.ar_hln != ll_my.sll_halen ||
-		    ap.ah.ar_pln != 4) {
+		    ap.ah.ar_pln != 4 ||
+		    ap.ah.ar_op != htons(ARPOP_REPLY)) {
 			return 0;
 		}
 
