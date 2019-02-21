@@ -203,6 +203,9 @@ static int lw_nsnap_send(struct lw_psr_port_priv *psr_ppriv)
 	struct sockaddr_in6 sendto_addr;
 	struct ns_packet nsp;
 
+	if (!(psr_ppriv->common.forced_send))
+		return 0;
+
 	err = teamd_getsockname_hwaddr(psr_ppriv->sock, &ll_my,
 				       sizeof(nsp.hwaddr));
 	if (err)
