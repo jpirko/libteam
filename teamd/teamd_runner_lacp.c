@@ -333,7 +333,8 @@ static int lacp_port_should_be_enabled(struct lacp_port *lacp_port)
 	struct lacp *lacp = lacp_port->lacp;
 
 	if (lacp_port_selected(lacp_port) &&
-	    lacp_port->agg_lead == lacp->selected_agg_lead)
+	    lacp_port->agg_lead == lacp->selected_agg_lead &&
+	    lacp_port->partner.state & INFO_STATE_SYNCHRONIZATION)
 		return true;
 	return false;
 }
@@ -343,7 +344,8 @@ static int lacp_port_should_be_disabled(struct lacp_port *lacp_port)
 	struct lacp *lacp = lacp_port->lacp;
 
 	if (!lacp_port_selected(lacp_port) ||
-	    lacp_port->agg_lead != lacp->selected_agg_lead)
+	    lacp_port->agg_lead != lacp->selected_agg_lead ||
+	    !(lacp_port->partner.state & INFO_STATE_SYNCHRONIZATION))
 		return true;
 	return false;
 }
@@ -914,9 +916,13 @@ static void lacp_port_actor_update(struct lacp_port *lacp_port)
 	if (lacp_port->lacp->cfg.fast_rate)
 		state |= INFO_STATE_LACP_TIMEOUT;
 	if (lacp_port_selected(lacp_port) &&
-	    lacp_port_agg_selected(lacp_port))
-		state |= INFO_STATE_SYNCHRONIZATION |
-			 INFO_STATE_COLLECTING | INFO_STATE_DISTRIBUTING;
+	    lacp_port_agg_selected(lacp_port)) {
+		state |= INFO_STATE_SYNCHRONIZATION;
+		state &= ~(INFO_STATE_COLLECTING | INFO_STATE_DISTRIBUTING);
+		if (lacp_port->partner.state & INFO_STATE_SYNCHRONIZATION)
+			state |= INFO_STATE_COLLECTING |
+				 INFO_STATE_DISTRIBUTING;
+	}
 	if (lacp_port->state == PORT_STATE_EXPIRED)
 		state |= INFO_STATE_EXPIRED;
 	if (lacp_port->state == PORT_STATE_DEFAULTED)
