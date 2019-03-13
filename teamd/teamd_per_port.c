@@ -42,6 +42,8 @@ struct port_obj {
 };
 
 #define _port(port_obj) (&(port_obj)->port)
+static int teamd_port_remove(struct teamd_context *ctx,
+			     struct teamd_port *tdport);
 
 int teamd_port_priv_create_and_get(void **ppriv, struct teamd_port *tdport,
 				   const struct teamd_port_priv *pp,
@@ -203,6 +205,7 @@ static int port_obj_create(struct teamd_context *ctx,
 teamd_event_port_removed:
 	teamd_event_port_removed(ctx, tdport);
 list_del:
+	teamd_port_remove(ctx, tdport);
 	port_obj_destroy(ctx, port_obj);
 	port_obj_free(port_obj);
 	return err;
@@ -214,6 +217,7 @@ static void port_obj_remove(struct teamd_context *ctx,
 	struct teamd_port *tdport = _port(port_obj);
 
 	teamd_event_port_removed(ctx, tdport);
+	teamd_port_remove(ctx, tdport);
 	port_obj_destroy(ctx, port_obj);
 	port_obj_free(port_obj);
 }
