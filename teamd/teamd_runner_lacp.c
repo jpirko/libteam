@@ -184,6 +184,8 @@ struct lacp_port {
 #define		LACP_PORT_CFG_DFLT_LACP_KEY 0
 		bool sticky;
 #define		LACP_PORT_CFG_DFLT_STICKY false
+		uint16_t ifindex_base;
+#define		LACP_PORT_CFG_DFLT_IFINDEX_BASE 0
 	} cfg;
 };
 
@@ -903,7 +905,7 @@ static void lacp_port_actor_init(struct lacp_port *lacp_port)
 	actor->system_priority = htons(lacp_port->lacp->cfg.sys_prio);
 	actor->key = htons(lacp_port->cfg.lacp_key);
 	actor->port_priority = htons(lacp_port->cfg.lacp_prio);
-	actor->port = htons(lacp_port->tdport->ifindex);
+	actor->port = htons(lacp_port->tdport->ifindex + lacp_port->cfg.ifindex_base);
 	lacp_port_actor_system_update(lacp_port);
 }
 
@@ -1213,7 +1215,21 @@ static int lacp_port_load_config(struct teamd_context *ctx,
 		lacp_port->cfg.lacp_key = tmp;
 	}
 	teamd_log_dbg("%s: Using lacp_key \"%d\".", port_name,
-		      lacp_port->cfg.lacp_key);
+			  lacp_port->cfg.lacp_key);
+
+	err = teamd_config_int_get(ctx, &tmp,
+					"$.ports.%s.ifindex_base", port_name);
+	if (err) {
+		lacp_port->cfg.ifindex_base = LACP_PORT_CFG_DFLT_IFINDEX_BASE;
+	} else if (tmp < 0 || tmp > USHRT_MAX) {
+		teamd_log_err("%s: \"ifindex_base\" value is out of its limits.",
+				port_name);
+		return -EINVAL;
+	} else {
+		lacp_port->cfg.ifindex_base = tmp;
+	}
+	teamd_log_dbg("%s: Using ifindex_base \"%d\".", port_name,
+			lacp_port->cfg.ifindex_base);
 
 	err = teamd_config_bool_get(ctx, &lacp_port->cfg.sticky,
 				    "$.ports.%s.sticky", port_name);
