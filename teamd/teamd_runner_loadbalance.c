@@ -109,12 +109,27 @@ static int lb_event_watch_port_hwaddr_changed(struct teamd_context *ctx,
 	return err;
 }
 
+static int lb_event_watch_enabled_option_changed(struct teamd_context *ctx,
+						 struct team_option *option,
+						 void *priv)
+{
+	struct teamd_port *tdport;
+
+	tdport = teamd_get_port(ctx, team_get_option_port_ifindex(option));
+	if (!tdport)
+		return 0;
+
+	return lb_event_watch_port_link_changed(ctx, tdport, priv);
+}
+
 static const struct teamd_event_watch_ops lb_port_watch_ops = {
 	.hwaddr_changed = lb_event_watch_hwaddr_changed,
 	.port_hwaddr_changed = lb_event_watch_port_hwaddr_changed,
 	.port_added = lb_event_watch_port_added,
 	.port_removed = lb_event_watch_port_removed,
 	.port_link_changed = lb_event_watch_port_link_changed,
+	.option_changed = lb_event_watch_enabled_option_changed,
+	.option_changed_match_name = "enabled",
 };
 
 static int lb_init(struct teamd_context *ctx, void *priv)
