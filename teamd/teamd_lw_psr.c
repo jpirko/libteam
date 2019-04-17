@@ -28,6 +28,7 @@
  */
 
 static const struct timespec lw_psr_default_init_wait = { 0, 1 };
+#define LW_PSR_DEFAULT_INTERVAL   1000
 #define LW_PSR_DEFAULT_MISSED_MAX 3
 
 #define LW_PERIODIC_CB_NAME "lw_periodic"
@@ -77,9 +78,13 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 	int tmp;
 
 	err = teamd_config_int_get(ctx, &tmp, "@.interval", cpcookie);
-	if (err) {
-		teamd_log_err("Failed to get \"interval\" link-watch option.");
-		return -EINVAL;
+	if (!err) {
+		if (tmp < 0) {
+			teamd_log_err("\"interval\" must not be negative number.");
+			return -EINVAL;
+		}
+	} else {
+		tmp = LW_PSR_DEFAULT_INTERVAL;
 	}
 	teamd_log_dbg("interval \"%d\".", tmp);
 	ms_to_timespec(&psr_ppriv->interval, tmp);
