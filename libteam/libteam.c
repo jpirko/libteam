@@ -638,6 +638,7 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 	nl_socket_modify_cb(th->nl_cli.sock_event, NL_CB_VALID,
 			    NL_CB_CUSTOM, cli_event_handler, th);
 	nl_cli_connect(th->nl_cli.sock_event, NETLINK_ROUTE);
+	nl_socket_set_nonblocking(th->nl_cli.sock_event);
 
 	env = getenv("TEAM_EVENT_BUFSIZE");
 	if (env) {
