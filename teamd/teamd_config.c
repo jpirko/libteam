@@ -84,7 +84,7 @@ static int get_port_obj(json_t **pport_obj, json_t *config_json,
 		ports_obj = json_object();
 		if (!ports_obj)
 			return -ENOMEM;
-		err = json_object_set(config_json, "ports", ports_obj);
+		err = json_object_set_new(config_json, "ports", ports_obj);
 		if (err) {
 			json_decref(ports_obj);
 			return -ENOMEM;
@@ -95,7 +95,7 @@ static int get_port_obj(json_t **pport_obj, json_t *config_json,
 		port_obj = json_object();
 		if (!port_obj)
 			return -ENOMEM;
-		err = json_object_set(ports_obj, port_name, port_obj);
+		err = json_object_set_new(ports_obj, port_name, port_obj);
 		if (err) {
 			json_decref(port_obj);
 			return -ENOMEM;
