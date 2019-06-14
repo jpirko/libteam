@@ -36,7 +36,7 @@ if [ -n "${TEAM_CONFIG}" ]; then
 	if [ ! -x /usr/bin/teamd ]; then
 		net_log $"Team support not available: teamd not found"
 		exit 1
-		fi
+	fi
 	/usr/bin/teamd ${TEAMD_CMDLINE} -d -D -t ${DEVICE} -c "${TEAM_CONFIG}" -p /var/run/teamd-${DEVICE}.pid || exit 1
 	# Bring up all existing port devices now
 	for device in $(LANG=C egrep -l "^[[:space:]]*TEAM_MASTER=\"?${DEVICE}\"?" /etc/sysconfig/network-scripts/ifcfg-*) ; do
