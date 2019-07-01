@@ -450,10 +450,19 @@ static int link_watch_enabled_option_changed(struct teamd_context *ctx,
 	return link_watch_refresh_forced_send(ctx);
 }
 
+
+static int link_watch_port_master_ifindex_changed(struct teamd_context *ctx,
+						  struct teamd_port *tdport,
+						  void *priv)
+{
+	return link_watch_refresh_forced_send(ctx);
+}
+
 static const struct teamd_event_watch_ops link_watch_port_watch_ops = {
 	.port_added = link_watch_event_watch_port_added,
 	.port_removed = link_watch_event_watch_port_removed,
 	.port_link_changed = link_watch_event_watch_port_link_changed,
+	.port_master_ifindex_changed = link_watch_port_master_ifindex_changed,
 	.option_changed = link_watch_enabled_option_changed,
 	.option_changed_match_name = "enabled",
 };
