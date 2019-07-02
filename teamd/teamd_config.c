@@ -164,7 +164,7 @@ static int teamd_config_port_set(struct teamd_context *ctx, const char *port_nam
 
 	tdport = teamd_get_port_by_ifname(ctx, port_name);
 	if (!tdport)
-		return -ENODEV;
+		return 0;
 
 	config = json_object_get(port_obj, "prio");
 	if (json_is_integer(config)) {
