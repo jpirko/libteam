@@ -167,17 +167,19 @@ static int teamd_config_port_set(struct teamd_context *ctx, const char *port_nam
 		return 0;
 
 	config = json_object_get(port_obj, "prio");
-	if (json_is_integer(config)) {
-		tmp = json_integer_value(config);
-		err = team_set_port_priority(ctx->th, tdport->ifindex, tmp);
-		if (err) {
-			teamd_log_err("%s: Failed to set \"priority\".",
-				      tdport->ifname);
-			return err;
-		}
+	if (!json_is_integer(config)) {
+		teamd_log_err("%s: Failed to get integer for \"priority\".",
+			      tdport->ifname);
+		return -ENOENT;
 	}
 
-	return 0;
+	tmp = json_integer_value(config);
+	err = team_set_port_priority(ctx->th, tdport->ifindex, tmp);
+	if (err)
+		teamd_log_err("%s: Failed to update \"priority\" to kernel",
+			      tdport->ifname);
+
+	return err;
 }
 
 int teamd_config_port_update(struct teamd_context *ctx, const char *port_name,
@@ -206,15 +208,13 @@ int teamd_config_port_update(struct teamd_context *ctx, const char *port_name,
 	/* replace existing object content */
 	json_object_clear(port_obj);
 	err = json_object_update(port_obj, port_new_obj);
-	if (err)
+	if (err) {
 		teamd_log_err("%s: Failed to update existing config "
 			      "port object", port_name);
-	else {
-		err = teamd_config_port_set(ctx, port_name, port_new_obj);
-		if (err)
-			teamd_log_err("%s: Failed to update config to kernel",
-				      port_name);
+		goto new_port_decref;
 	}
+
+	err = teamd_config_port_set(ctx, port_name, port_new_obj);
 
 new_port_decref:
 	json_decref(port_new_obj);
