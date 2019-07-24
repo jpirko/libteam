@@ -42,6 +42,9 @@ To do passive load balancing, runner only sets up BPF hash function which will d
 .PP
 .BR "lacp "\(em
 Implements 802.3ad LACP protocol. Can use same Tx port selection possibilities as loadbalance runner.
+.PP
+Default:
+.BR "roundrobin"
 .RE
 .TP
 .BR "notify_peers.count " (int)
@@ -182,6 +185,10 @@ Uses source and destination SCTP ports.
 .PP
 .BR "l4 "\(em
 Uses source and destination TCP and UDP and SCTP ports.
+.PP
+Default:
+.B
+["eth", "ipv4", "ipv6"]
 .RE
 .TP
 .BR "runner.tx_balancer.name " (string)
@@ -217,6 +224,11 @@ Default:
 Option specifies the rate at which our link partner is asked to transmit LACPDU packets. If this is
 .BR "true"
 then packets will be sent once per second. Otherwise they will be sent every 30 seconds.
+.RS 7
+.PP
+Default:
+.BR "false"
+.RE
 .TP
 .BR "runner.tx_hash " (array)
 Same as for load balance runner.
