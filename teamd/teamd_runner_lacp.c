@@ -254,7 +254,7 @@ static int lacp_load_config(struct teamd_context *ctx, struct lacp *lacp)
 	err = teamd_config_bool_get(ctx, &lacp->cfg.active, "$.runner.active");
 	if (err)
 		lacp->cfg.active =  LACP_CFG_DFLT_ACTIVE;
-	teamd_log_dbg("Using active \"%d\".", lacp->cfg.active);
+	teamd_log_dbg(ctx, "Using active \"%d\".", lacp->cfg.active);
 
 	err = teamd_config_int_get(ctx, &tmp, "$.runner.sys_prio");
 	if (err) {
@@ -265,12 +265,12 @@ static int lacp_load_config(struct teamd_context *ctx, struct lacp *lacp)
 	} else {
 		lacp->cfg.sys_prio = tmp;
 	}
-	teamd_log_dbg("Using sys_prio \"%d\".", lacp->cfg.sys_prio);
+	teamd_log_dbg(ctx, "Using sys_prio \"%d\".", lacp->cfg.sys_prio);
 
 	err = teamd_config_bool_get(ctx, &lacp->cfg.fast_rate, "$.runner.fast_rate");
 	if (err)
 		lacp->cfg.fast_rate = LACP_CFG_DFLT_FAST_RATE;
-	teamd_log_dbg("Using fast_rate \"%d\".", lacp->cfg.fast_rate);
+	teamd_log_dbg(ctx, "Using fast_rate \"%d\".", lacp->cfg.fast_rate);
 
 	err = teamd_config_int_get(ctx, &tmp, "$.runner.min_ports");
 	if (err) {
@@ -281,7 +281,7 @@ static int lacp_load_config(struct teamd_context *ctx, struct lacp *lacp)
 	} else {
 		lacp->cfg.min_ports = tmp;
 	}
-	teamd_log_dbg("Using min_ports \"%d\".", lacp->cfg.min_ports);
+	teamd_log_dbg(ctx, "Using min_ports \"%d\".", lacp->cfg.min_ports);
 
 	err = teamd_config_string_get(ctx, &agg_select_policy_name, "$.runner.agg_select_policy");
 	if (err)
@@ -292,7 +292,7 @@ static int lacp_load_config(struct teamd_context *ctx, struct lacp *lacp)
 			      agg_select_policy_name);
 		return err;
 	}
-	teamd_log_dbg("Using agg_select_policy \"%s\".",
+	teamd_log_dbg(ctx, "Using agg_select_policy \"%s\".",
 		      lacp_get_agg_select_policy_name(lacp));
 	return 0;
 }
@@ -634,7 +634,7 @@ static void lacp_switch_agg_lead(struct lacp_port *agg_lead,
 	struct teamd_port *tdport;
 	struct lacp_port *lacp_port;
 
-	teamd_log_dbg("Renaming aggregator %u to %u",
+	teamd_log_dbg(new_agg_lead->ctx, "Renaming aggregator %u to %u",
 		      lacp_agg_id(agg_lead), lacp_agg_id(new_agg_lead));
 	if (lacp->selected_agg_lead == agg_lead)
 		lacp->selected_agg_lead = new_agg_lead;
@@ -649,12 +649,12 @@ static void lacp_port_agg_select(struct lacp_port *lacp_port)
 {
 	struct lacp_port *agg_lead;
 
-	teamd_log_dbg("%s: Selecting LACP port", lacp_port->tdport->ifname);
+	teamd_log_dbg(lacp_port->ctx, "%s: Selecting LACP port", lacp_port->tdport->ifname);
 	agg_lead = lacp_get_agg_lead(lacp_port);
 	lacp_port->agg_lead = agg_lead;
 	if (lacp_port_better(lacp_port, agg_lead))
 		lacp_switch_agg_lead(agg_lead, lacp_port);
-	teamd_log_dbg("%s: LACP port selected into aggregator %u",
+	teamd_log_dbg(lacp_port->ctx, "%s: LACP port selected into aggregator %u",
 		      lacp_port->tdport->ifname, lacp_port_agg_id(lacp_port));
 }
 
@@ -677,8 +677,8 @@ static void lacp_port_agg_unselect(struct lacp_port *lacp_port)
 {
 	struct lacp_port *agg_lead = lacp_port->agg_lead;
 
-	teamd_log_dbg("%s: Unselecting LACP port", lacp_port->tdport->ifname);
-	teamd_log_dbg("%s: LACP port unselected from aggregator %u",
+	teamd_log_dbg(lacp_port->ctx, "%s: Unselecting LACP port", lacp_port->tdport->ifname);
+	teamd_log_dbg(lacp_port->ctx, "%s: LACP port unselected from aggregator %u",
 		      lacp_port->tdport->ifname, lacp_port_agg_id(lacp_port));
 	lacp_port->agg_lead = NULL;
 	if (lacp_port == agg_lead) {
@@ -715,7 +715,7 @@ static int lacp_selected_agg_update(struct lacp *lacp,
 	if (!next_agg_lead)
 		next_agg_lead = lacp_get_next_agg(lacp);
 	if (lacp->selected_agg_lead != next_agg_lead)
-		teamd_log_dbg("Selecting aggregator %u",
+		teamd_log_dbg(lacp->ctx, "Selecting aggregator %u",
 			      lacp_agg_id(next_agg_lead));
 	lacp->selected_agg_lead = next_agg_lead;
 
@@ -827,7 +827,7 @@ static int lacp_port_periodic_set(struct lacp_port *lacp_port)
 	int fast_on;
 
 	fast_on = lacp_port->partner.state & INFO_STATE_LACP_TIMEOUT;
-	teamd_log_dbg("%s: Setting periodic timer to \"%s\".",
+	teamd_log_dbg(lacp_port->ctx, "%s: Setting periodic timer to \"%s\".",
 		      lacp_port->tdport->ifname, fast_on ? "fast": "slow");
 	ms = fast_on ? LACP_PERIODIC_SHORT: LACP_PERIODIC_LONG;
 	ms_to_timespec(&ts, ms);
@@ -929,8 +929,8 @@ static void lacp_port_actor_update(struct lacp_port *lacp_port)
 		state |= INFO_STATE_DEFAULTED;
 	if (teamd_port_count(lacp_port->ctx) > 0)
 		state |= INFO_STATE_AGGREGATION;
-	teamd_log_dbg("%s: lacp info state: 0x%02X.", lacp_port->tdport->ifname,
-						      state);
+	teamd_log_dbg(lacp_port->ctx, "%s: lacp info state: 0x%02X.",
+		      lacp_port->tdport->ifname, state);
 	lacp_port->actor.state = state;
 }
 
@@ -1198,7 +1198,7 @@ static int lacp_port_load_config(struct teamd_context *ctx,
 	} else {
 		lacp_port->cfg.lacp_prio = tmp;
 	}
-	teamd_log_dbg("%s: Using lacp_prio \"%d\".", port_name,
+	teamd_log_dbg(ctx, "%s: Using lacp_prio \"%d\".", port_name,
 		      lacp_port->cfg.lacp_prio);
 
 	err = teamd_config_int_get(ctx, &tmp,
@@ -1212,14 +1212,14 @@ static int lacp_port_load_config(struct teamd_context *ctx,
 	} else {
 		lacp_port->cfg.lacp_key = tmp;
 	}
-	teamd_log_dbg("%s: Using lacp_key \"%d\".", port_name,
+	teamd_log_dbg(ctx, "%s: Using lacp_key \"%d\".", port_name,
 		      lacp_port->cfg.lacp_key);
 
 	err = teamd_config_bool_get(ctx, &lacp_port->cfg.sticky,
 				    "$.ports.%s.sticky", port_name);
 	if (err)
 		lacp_port->cfg.sticky = LACP_PORT_CFG_DFLT_STICKY;
-	teamd_log_dbg("%s: Using sticky \"%d\".", port_name,
+	teamd_log_dbg(ctx, "%s: Using sticky \"%d\".", port_name,
 		      lacp_port->cfg.sticky);
 	return 0;
 }

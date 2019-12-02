@@ -46,7 +46,7 @@ static int lw_psr_callback_periodic(struct teamd_context *ctx, int events, void 
 	} else {
 		psr_ppriv->missed++;
 		if (psr_ppriv->missed > psr_ppriv->missed_max && link_up) {
-			teamd_log_dbg("%s: Missed %u replies (max %u).",
+			teamd_log_dbg(ctx, "%s: Missed %u replies (max %u).",
 				      tdport->ifname, psr_ppriv->missed,
 				      psr_ppriv->missed_max);
 			link_up = false;
@@ -86,7 +86,7 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 	} else {
 		tmp = LW_PSR_DEFAULT_INTERVAL;
 	}
-	teamd_log_dbg("interval \"%d\".", tmp);
+	teamd_log_dbg(ctx, "interval \"%d\".", tmp);
 	ms_to_timespec(&psr_ppriv->interval, tmp);
 
 	err = teamd_config_int_get(ctx, &tmp, "@.init_wait", cpcookie);
@@ -95,7 +95,7 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 	/* if init_wait is set to 0, use default_init_wait */
 	if (err || !tmp)
 		psr_ppriv->init_wait = lw_psr_default_init_wait;
-	teamd_log_dbg("init_wait \"%d\".", timespec_to_ms(&psr_ppriv->init_wait));
+	teamd_log_dbg(ctx, "init_wait \"%d\".", timespec_to_ms(&psr_ppriv->init_wait));
 
 	err = teamd_config_int_get(ctx, &tmp, "@.missed_max", cpcookie);
 	if (!err) {
@@ -106,7 +106,7 @@ static int lw_psr_load_options(struct teamd_context *ctx,
 	} else {
 		tmp = LW_PSR_DEFAULT_MISSED_MAX;
 	}
-	teamd_log_dbg("missed_max \"%d\".", tmp);
+	teamd_log_dbg(ctx, "missed_max \"%d\".", tmp);
 	psr_ppriv->missed_max = tmp;
 
 	return 0;

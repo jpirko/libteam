@@ -49,15 +49,16 @@
 #define teamd_log_err(args...) daemon_log(LOG_ERR, ##args)
 #define teamd_log_warn(args...) daemon_log(LOG_WARNING, ##args)
 #define teamd_log_info(args...) daemon_log(LOG_INFO, ##args)
-#define teamd_log_dbg(args...) daemon_log(LOG_DEBUG, ##args)
 
 #define teamd_log_dbgx(ctx, val, args...)	\
 	if (val <= ctx->debug)			\
 		daemon_log(LOG_DEBUG, ##args)
 
+#define teamd_log_dbg(ctx, args...) teamd_log_dbgx(ctx, 1, ##args)
+
 static inline void TEAMD_BUG(void)
 {
-	teamd_log_dbg("BUG: %s:%d\n", __FILE__, __LINE__);
+	daemon_log(LOG_DEBUG, "BUG: %s:%d\n", __FILE__, __LINE__);
 	assert(0);
 }
 

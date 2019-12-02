@@ -178,7 +178,7 @@ static DBusHandlerResult message_handler(DBusConnection *con,
 	msg_interface = dbus_message_get_interface(message);
 	if (!method || !path || !msg_interface)
 		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
-	teamd_log_dbg("dbus: %s.%s (%s)", msg_interface, method, path);
+	teamd_log_dbg(ctx, "dbus: %s.%s (%s)", msg_interface, method, path);
 
 	if (!strcmp(method, "Introspect") &&
 	    !strcmp(msg_interface, "org.freedesktop.DBus.Introspectable")) {
@@ -504,7 +504,7 @@ int teamd_dbus_init(struct teamd_context *ctx)
 	if (err)
 		goto iface_fini;
 	id = dbus_connection_get_server_id(ctx->dbus.con),
-	teamd_log_dbg("dbus: connected to %s with name %s", id,
+	teamd_log_dbg(ctx, "dbus: connected to %s with name %s", id,
 		      dbus_bus_get_unique_name(ctx->dbus.con));
 	dbus_free(id);
 	return 0;
@@ -541,7 +541,7 @@ int teamd_dbus_expose_name(struct teamd_context *ctx)
 	err = dbus_bus_request_name(ctx->dbus.con, service_name, 0,
 				    &error);
 	if (err == DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
-		teamd_log_dbg("dbus: have name %s", service_name);
+		teamd_log_dbg(ctx, "dbus: have name %s", service_name);
 		err = 0;
 	} else if (dbus_error_is_set(&error)) {
 		teamd_log_err("dbus: Failed to acquire %s: %s: %s",

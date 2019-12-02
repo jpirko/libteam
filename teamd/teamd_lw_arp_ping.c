@@ -178,7 +178,7 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 	 * If source_host is not provided, just use address 0.0.0.0 according
 	 * to RFC 5227 (IPv4 Address Conflict Detection).
 	 */
-	teamd_log_dbg("source address \"%s\".",
+	teamd_log_dbg(ctx, "source address \"%s\".",
 		      str_in_addr(&ap_ppriv->src));
 
 	err = teamd_config_string_get(ctx, &host, "@.target_host", cpcookie);
@@ -189,25 +189,25 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 	err = set_in_addr(&ap_ppriv->dst, host);
 	if (err)
 		return err;
-	teamd_log_dbg("target address \"%s\".", str_in_addr(&ap_ppriv->dst));
+	teamd_log_dbg(ctx, "target address \"%s\".", str_in_addr(&ap_ppriv->dst));
 
 	err = teamd_config_bool_get(ctx, &ap_ppriv->validate_active,
 				    "@.validate_active", cpcookie);
 	if (err)
 		ap_ppriv->validate_active = false;
-	teamd_log_dbg("validate_active \"%d\".", ap_ppriv->validate_active);
+	teamd_log_dbg(ctx, "validate_active \"%d\".", ap_ppriv->validate_active);
 
 	err = teamd_config_bool_get(ctx, &ap_ppriv->validate_inactive,
 				    "@.validate_inactive", cpcookie);
 	if (err)
 		ap_ppriv->validate_inactive = false;
-	teamd_log_dbg("validate_inactive \"%d\".", ap_ppriv->validate_inactive);
+	teamd_log_dbg(ctx, "validate_inactive \"%d\".", ap_ppriv->validate_inactive);
 
 	err = teamd_config_bool_get(ctx, &ap_ppriv->send_always,
 				    "@.send_always", cpcookie);
 	if (err)
 		ap_ppriv->send_always = false;
-	teamd_log_dbg("send_always \"%d\".", ap_ppriv->send_always);
+	teamd_log_dbg(ctx, "send_always \"%d\".", ap_ppriv->send_always);
 
 	err = teamd_config_int_get(ctx, &tmp, "@.vlanid", cpcookie);
 	if (!err) {
@@ -217,7 +217,7 @@ static int lw_ap_load_options(struct teamd_context *ctx,
 		}
 		ap_ppriv->vlanid_in_use = true;
 		ap_ppriv->vlanid = tmp;
-		teamd_log_dbg("vlan id \"%u\".", ap_ppriv->vlanid);
+		teamd_log_dbg(ctx, "vlan id \"%u\".", ap_ppriv->vlanid);
 	}
 
 	return 0;

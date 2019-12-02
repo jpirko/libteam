@@ -174,12 +174,14 @@ static void tb_clear_rebalance_data(struct teamd_balancer *tb)
 	}
 }
 
-static int tb_hash_to_port_remap(struct team_handle *th,
+static int tb_hash_to_port_remap(struct teamd_balancer *tb,
+				 struct team_handle *th,
 				 struct tb_hash_info *tbhi,
 				 struct tb_port_info *tbpi)
 {
 	struct team_option *option;
 	struct teamd_port *new_tdport = tbpi->tdport;
+	struct teamd_context *ctx = tb->ctx;
 	uint8_t hash = tbhi->hash;
 	int err;
 
@@ -192,7 +194,7 @@ static int tb_hash_to_port_remap(struct team_handle *th,
 	err = team_set_option_value_u32(th, option, new_tdport->ifindex);
 	if (err)
 		return err;
-	teamd_log_dbg("Remapped hash \"%u\" (delta %" PRIu64 ") to port %s.",
+	teamd_log_dbg(ctx, "Remapped hash \"%u\" (delta %" PRIu64 ") to port %s.",
 		      hash, tb_stats_get_delta(&tbhi->stats),
 		      new_tdport->ifname);
 	return 0;
@@ -203,6 +205,7 @@ static int tb_rebalance(struct teamd_balancer *tb, struct team_handle *th)
 	int err;
 	struct tb_hash_info *tbhi;
 	struct tb_port_info *tbpi;
+	struct teamd_context *ctx = tb->ctx;
 
 	if (!tb->tx_balancing_enabled)
 		return 0;
@@ -216,7 +219,7 @@ static int tb_rebalance(struct teamd_balancer *tb, struct team_handle *th)
 			tbhi->rebalance.processed = true;
 			continue;
 		}
-		err = tb_hash_to_port_remap(th, tbhi, tbpi);
+		err = tb_hash_to_port_remap(tb, th, tbhi, tbpi);
 		if (err) {
 			tbpi->rebalance.unusable = true;
 			continue;
@@ -228,7 +231,7 @@ static int tb_rebalance(struct teamd_balancer *tb, struct team_handle *th)
 	list_for_each_node_entry(tbpi, &tb->port_info_list, list) {
 		if (tbpi->rebalance.unusable)
 			continue;
-		teamd_log_dbg("Port %s rebalanced, delta: %" PRIu64,
+		teamd_log_dbg(ctx, "Port %s rebalanced, delta: %" PRIu64,
 			      tbpi->tdport->ifname, tbpi->rebalance.bytes);
 	}
 	return 0;
@@ -303,7 +306,7 @@ static int tb_option_change_handler_func(struct team_handle *th, void *priv,
 					      array_index);
 				return -EINVAL;
 			}
-			teamd_log_dbg("stats update for hash \"%u\": \"%" PRIu64 "\".",
+			teamd_log_dbg(ctx, "stats update for hash \"%u\": \"%" PRIu64 "\".",
 				      array_index, lb_stats->tx_bytes);
 			tb_stats_update_hash(tb, array_index,
 					     lb_stats->tx_bytes);
@@ -319,7 +322,7 @@ static int tb_option_change_handler_func(struct team_handle *th, void *priv,
 					      port_ifindex);
 				return -EINVAL;
 			}
-			teamd_log_dbg("stats update for port %s: \"%" PRIu64 "\".",
+			teamd_log_dbg(ctx, "stats update for port %s: \"%" PRIu64 "\".",
 				      tdport->ifname, lb_stats->tx_bytes);
 			tb_stats_update_port(tb, tdport,
 					     lb_stats->tx_bytes);

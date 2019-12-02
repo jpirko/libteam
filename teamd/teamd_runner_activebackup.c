@@ -255,7 +255,7 @@ static int ab_clear_active_port(struct teamd_context *ctx, struct ab *ab,
 	ab->active_ifindex = 0;
 	if (!tdport || !teamd_port_present(ctx, tdport))
 		return 0;
-	teamd_log_dbg("Clearing active port \"%s\".", tdport->ifname);
+	teamd_log_dbg(ctx, "Clearing active port \"%s\".", tdport->ifname);
 
 	err = team_set_port_enabled(ctx->th, tdport->ifindex, false);
 	if (err) {
@@ -368,7 +368,7 @@ static int ab_link_watch_handler(struct teamd_context *ctx, struct ab *ab)
 
 	active_tdport = teamd_get_port(ctx, ab->active_ifindex);
 	if (active_tdport) {
-		teamd_log_dbg("Current active port: \"%s\" (ifindex \"%d\", prio \"%d\").",
+		teamd_log_dbg(ctx, "Current active port: \"%s\" (ifindex \"%d\", prio \"%d\").",
 			      active_tdport->ifname, active_tdport->ifindex,
 			      teamd_port_prio(ctx, active_tdport));
 
@@ -404,7 +404,7 @@ static int ab_link_watch_handler(struct teamd_context *ctx, struct ab *ab)
 	if (!best.tdport || best.tdport == active_tdport)
 		return 0;
 
-	teamd_log_dbg("Found best port: \"%s\" (ifindex \"%d\", prio \"%d\").",
+	teamd_log_dbg(ctx, "Found best port: \"%s\" (ifindex \"%d\", prio \"%d\").",
 		      best.tdport->ifname, best.tdport->ifindex, best.prio);
 
 	if (!active_tdport || !ab_is_port_sticky(ab, active_tdport)) {
@@ -459,7 +459,7 @@ static int ab_port_load_config(struct teamd_context *ctx,
 				    "$.ports.%s.sticky", port_name);
 	if (err)
 		ab_port->cfg.sticky = AB_DFLT_PORT_STICKY;
-	teamd_log_dbg("%s: Using sticky \"%d\".", port_name,
+	teamd_log_dbg(ctx, "%s: Using sticky \"%d\".", port_name,
 		      ab_port->cfg.sticky);
 	return 0;
 }
@@ -558,7 +558,7 @@ static int ab_load_config(struct teamd_context *ctx, struct ab *ab)
 			      hwaddr_policy_name);
 		return err;
 	}
-	teamd_log_dbg("Using hwaddr_policy \"%s\".", ab->hwaddr_policy->name);
+	teamd_log_dbg(ctx, "Using hwaddr_policy \"%s\".", ab->hwaddr_policy->name);
 	return 0;
 }
 

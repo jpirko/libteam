@@ -170,7 +170,7 @@ int teamd_hash_func_set(struct teamd_context *ctx)
 	int err;
 
 	if (!teamd_config_path_exists(ctx, "$.runner.tx_hash")) {
-		teamd_log_dbg("No Tx hash recipe found in config.");
+		teamd_log_dbg(ctx, "No Tx hash recipe found in config.");
 		err = teamd_hash_func_add_default_frags(ctx);
 		if (err)
 			return err;

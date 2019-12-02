@@ -332,7 +332,7 @@ static int teamd_run_loop_do_callbacks(struct list_item *lcb_list, fd_set *fds,
 			if (err) {
 				teamd_log_warn("Loop callback failed with: %s",
 					       strerror(-err));
-				teamd_log_dbg("Failed loop callback: %s, %p",
+				teamd_log_dbg(ctx, "Failed loop callback: %s, %p",
 					      lcb->name, lcb->priv);
 			}
 		}
@@ -519,7 +519,7 @@ static int __teamd_loop_callback_fd_add(struct teamd_context *ctx,
 		list_add_tail(&ctx->run_loop.callback_list, &lcb->list);
 	else
 		list_add(&ctx->run_loop.callback_list, &lcb->list);
-	teamd_log_dbg("Added loop callback: %s, %p", lcb->name, lcb->priv);
+	teamd_log_dbg(ctx, "Added loop callback: %s, %p", lcb->name, lcb->priv);
 	return 0;
 
 lcb_free:
@@ -636,7 +636,7 @@ void teamd_loop_callback_del(struct teamd_context *ctx, const char *cb_name,
 		list_del(&lcb->list);
 		if (lcb->is_period)
 			close(lcb->fd);
-		teamd_log_dbg("Removed loop callback: %s, %p",
+		teamd_log_dbg(ctx, "Removed loop callback: %s, %p",
 			      lcb->name, lcb->priv);
 		free(lcb->name);
 		free(lcb);
@@ -645,7 +645,7 @@ void teamd_loop_callback_del(struct teamd_context *ctx, const char *cb_name,
 	if (found)
 		teamd_run_loop_restart(ctx);
 	else
-		teamd_log_dbg("Callback named \"%s\" not found.", cb_name);
+		teamd_log_dbg(ctx, "Callback named \"%s\" not found.", cb_name);
 }
 
 int teamd_loop_callback_enable(struct teamd_context *ctx, const char *cb_name,
@@ -820,7 +820,7 @@ static int teamd_set_hwaddr(struct teamd_context *ctx)
 	if (err)
 		return 0; /* addr is not defined in config, no change needed */
 
-	teamd_log_dbg("Hwaddr string: \"%s\".", hwaddr_str);
+	teamd_log_dbg(ctx, "Hwaddr string: \"%s\".", hwaddr_str);
 	err = parse_hwaddr(hwaddr_str, &hwaddr, &hwaddr_len);
 	if (err) {
 		teamd_log_err("Failed to parse hardware address.");
@@ -953,16 +953,16 @@ static int teamd_runner_init(struct teamd_context *ctx)
 
 	err = teamd_config_string_get(ctx, &runner_name, "$.runner.name");
 	if (err) {
-		teamd_log_dbg("Failed to get team runner name from config.");
+		teamd_log_dbg(ctx, "Failed to get team runner name from config.");
 		runner_name = TEAMD_DEFAULT_RUNNER_NAME;
 		err = teamd_config_string_set(ctx, runner_name, "$.runner.name");
 		if (err) {
 			teamd_log_err("Failed to set default team runner name in config.");
 			return err;
 		}
-		teamd_log_dbg("Using default team runner \"%s\".", runner_name);
+		teamd_log_dbg(ctx, "Using default team runner \"%s\".", runner_name);
 	} else {
-		teamd_log_dbg("Using team runner \"%s\".", runner_name);
+		teamd_log_dbg(ctx, "Using team runner \"%s\".", runner_name);
 	}
 	ctx->runner = teamd_find_runner(runner_name);
 	if (!ctx->runner) {
@@ -1108,12 +1108,12 @@ static void debug_log_port_list(struct teamd_context *ctx)
 	char buf[120];
 	bool trunc;
 
-	teamd_log_dbg("<port_list>");
+	teamd_log_dbg(ctx, "<port_list>");
 	team_for_each_port(port, ctx->th) {
 		trunc = team_port_str(port, buf, sizeof(buf));
-		teamd_log_dbg("%s %s", buf, trunc ? "<trunc>" : "");
+		teamd_log_dbg(ctx, "%s %s", buf, trunc ? "<trunc>" : "");
 	}
-	teamd_log_dbg("</port_list>");
+	teamd_log_dbg(ctx, "</port_list>");
 }
 
 static void debug_log_option_list(struct teamd_context *ctx)
@@ -1139,12 +1139,12 @@ static void debug_log_ifinfo_list(struct teamd_context *ctx)
 	char buf[120];
 	bool trunc;
 
-	teamd_log_dbg("<ifinfo_list>");
+	teamd_log_dbg(ctx, "<ifinfo_list>");
 	team_for_each_ifinfo(ifinfo, ctx->th) {
 		trunc = team_ifinfo_str(ifinfo, buf, sizeof(buf));
-		teamd_log_dbg("%s %s", buf, trunc ? "<trunc>" : "");
+		teamd_log_dbg(ctx, "%s %s", buf, trunc ? "<trunc>" : "");
 	}
-	teamd_log_dbg("</ifinfo_list>");
+	teamd_log_dbg(ctx, "</ifinfo_list>");
 }
 
 static int debug_change_handler_func(struct team_handle *th, void *priv,
@@ -1573,7 +1573,7 @@ static int teamd_generate_devname(struct teamd_context *ctx)
 		if (err)
 			return err;
 	} while (ifindex);
-	teamd_log_dbg("Generated team device name \"%s\".", buf);
+	teamd_log_dbg(ctx, "Generated team device name \"%s\".", buf);
 
 	ctx->team_devname = strdup(buf);
 	if (!ctx->team_devname)
@@ -1597,7 +1597,7 @@ static int teamd_get_devname(struct teamd_context *ctx, bool generate_enabled)
 			}
 			goto skip_set;
 		} else {
-			teamd_log_dbg("Failed to get team device name from config.");
+			teamd_log_dbg(ctx, "Failed to get team device name from config.");
 			if (generate_enabled) {
 				err = teamd_generate_devname(ctx);
 				if (err) {
@@ -1617,7 +1617,7 @@ static int teamd_get_devname(struct teamd_context *ctx, bool generate_enabled)
 	}
 
 skip_set:
-	teamd_log_dbg("Using team device \"%s\".", ctx->team_devname);
+	teamd_log_dbg(ctx, "Using team device \"%s\".", ctx->team_devname);
 
 	err = asprintf(&ctx->ident, "%s_%s", ctx->argv0, ctx->team_devname);
 	if (err == -1) {
@@ -1835,9 +1835,9 @@ int main(int argc, char **argv)
 	daemon_log_ident = ctx->ident;
 	daemon_pid_file_proc = teamd_pid_file_proc;
 
-	teamd_log_dbg("Using PID file \"%s\"", daemon_pid_file_proc());
+	teamd_log_dbg(ctx, "Using PID file \"%s\"", daemon_pid_file_proc());
 	if (ctx->config_file)
-		teamd_log_dbg("Using config file \"%s\"", ctx->config_file);
+		teamd_log_dbg(ctx, "Using config file \"%s\"", ctx->config_file);
 
 	switch (ctx->cmd) {
 	case DAEMON_CMD_HELP:

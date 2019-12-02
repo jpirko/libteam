@@ -88,8 +88,8 @@ static int lw_tipc_link_state_change(struct teamd_context *ctx,
 		if (strcmp(link->name, lnr->linkname))
 			continue;
 		link->up = link_up;
-		teamd_log_dbg("tipc: link <%s> went %s.",
-			       lnr->linkname, link_up ? "up" : "down");
+		teamd_log_dbg(ctx, "tipc: link <%s> went %s.",
+			      lnr->linkname, link_up ? "up" : "down");
 check:
 		path_ok = lw_tipc_topology_check(priv, link->peer);
 		return teamd_link_watch_check_link_up(ctx, ppriv->tdport, ppriv,
@@ -100,7 +100,7 @@ check:
 			      lnr->linkname);
 		return -EINVAL;
 	}
-	teamd_log_dbg("tipc: established new link <%s>", lnr->linkname);
+	teamd_log_dbg(ctx, "tipc: established new link <%s>", lnr->linkname);
 	link = malloc(sizeof(struct tipc_link));
 	if (!link)
 		return -ENOMEM;
@@ -153,7 +153,7 @@ static int lw_tipc_callback_socket(struct teamd_context *ctx, int events, void *
 	else if (event.event == htonl(TIPC_WITHDRAWN))
 		return lw_tipc_link_state_change(ctx, &lnr, tipc_ppriv, false);
 tipc_cb_err:
-	teamd_log_dbg("tipc: link state event error");
+	teamd_log_dbg(ctx, "tipc: link state event error");
 	return -EINVAL;
 }
 
@@ -234,7 +234,7 @@ static void lw_tipc_port_removed(struct teamd_context *ctx,
 	struct lw_tipc_port_priv *tipc_ppriv = priv;
 	struct tipc_link *link;
 
-	teamd_log_dbg("tipc port removed\n");
+	teamd_log_dbg(ctx, "tipc port removed\n");
 	teamd_loop_callback_del(ctx, LW_TIPC_TOPSRV_SOCKET, priv);
 	close(tipc_ppriv->topsrv_sock);
 	while (!LIST_EMPTY(&tipc_ppriv->links)) {

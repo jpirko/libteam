@@ -340,7 +340,7 @@ int teamd_port_add_ifname(struct teamd_context *ctx, const char *port_name)
 	uint32_t ifindex;
 
 	ifindex = team_ifname2ifindex(ctx->th, port_name);
-	teamd_log_dbg("%s: Adding port (found ifindex \"%d\").",
+	teamd_log_dbg(ctx, "%s: Adding port (found ifindex \"%d\").",
 		      port_name, ifindex);
 	return team_port_add(ctx->th, ifindex);
 }
@@ -350,7 +350,7 @@ static int teamd_port_remove(struct teamd_context *ctx,
 {
 	int err;
 
-	teamd_log_dbg("%s: Removing port (found ifindex \"%d\").",
+	teamd_log_dbg(ctx, "%s: Removing port (found ifindex \"%d\").",
 		      tdport->ifname, tdport->ifindex);
 	err = team_port_remove(ctx->th, tdport->ifindex);
 	if (err)
@@ -440,7 +440,7 @@ int teamd_port_check_enable(struct teamd_context *ctx,
 	else
 		return 0;
 
-	teamd_log_dbg("%s: %s port", tdport->ifname,
+	teamd_log_dbg(ctx, "%s: %s port", tdport->ifname,
 		      new_enabled_state ? "Enabling": "Disabling");
 	err = team_set_port_enabled(ctx->th, tdport->ifindex,
 				    new_enabled_state);

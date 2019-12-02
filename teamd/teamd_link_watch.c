@@ -281,7 +281,7 @@ static int link_watch_load_config_one(struct teamd_context *ctx,
 
 	err = team_get_port_user_linkup(ctx->th, tdport->ifindex, &linkup);
 	if (!err) {
-		teamd_log_dbg("%s: Current user link state is \"%s\".",
+		teamd_log_dbg(ctx, "%s: Current user link state is \"%s\".",
 			      tdport->ifname, linkup ? "up" : "down");
 	}
 
@@ -351,7 +351,7 @@ static int link_watch_event_watch_port_added(struct teamd_context *ctx,
 	cpcookie = teamd_config_path_cookie_get(ctx, "$.ports.%s.link_watch",
 						tdport->ifname);
 	if (cpcookie) {
-		teamd_log_dbg("%s: Got link watch from port config.",
+		teamd_log_dbg(ctx, "%s: Got link watch from port config.",
 			      tdport->ifname);
 		err = link_watch_load_config(ctx, tdport, cpcookie);
 		if (err)
@@ -360,7 +360,7 @@ static int link_watch_event_watch_port_added(struct teamd_context *ctx,
 
 	cpcookie = teamd_config_path_cookie_get(ctx, "$.link_watch");
 	if (cpcookie) {
-		teamd_log_dbg("%s: Got link watch from global config.",
+		teamd_log_dbg(ctx, "%s: Got link watch from global config.",
 			      tdport->ifname);
 		err = link_watch_load_config(ctx, tdport, cpcookie);
 		if (err)
@@ -380,7 +380,7 @@ static int link_watch_event_watch_port_added(struct teamd_context *ctx,
 				      tdport->ifname);
 			return err;
 		}
-		teamd_log_dbg("%s: Using implicit link watch.", tdport->ifname);
+		teamd_log_dbg(ctx, "%s: Using implicit link watch.", tdport->ifname);
 		return link_watch_event_watch_port_added(ctx, tdport, priv);
 	}
 	return 0;

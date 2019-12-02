@@ -138,28 +138,28 @@ static int process_rcv_msg(struct teamd_context *ctx, char *rcv_msg)
 
 	str = teamd_zmq_msg_getline(&rest);
 	if (!str) {
-		teamd_log_dbg("zmq: Incomplete message.");
+		teamd_log_dbg(ctx, "zmq: Incomplete message.");
 		return 0;
 	}
 	if (strcmp(TEAMD_ZMQ_REQUEST_PREFIX, str)) {
-		teamd_log_dbg("zmq: Unsupported message type.");
+		teamd_log_dbg(ctx, "zmq: Unsupported message type.");
 		return 0;
 	}
 
 	str = teamd_zmq_msg_getline(&rest);
 	if (!str) {
-		teamd_log_dbg("zmq: Incomplete message.");
+		teamd_log_dbg(ctx, "zmq: Incomplete message.");
 		return 0;
 	}
 	if (!teamd_ctl_method_exists(str)) {
-		teamd_log_dbg("zmq: Unknown method \"%s\".", str);
+		teamd_log_dbg(ctx, "zmq: Unknown method \"%s\".", str);
 		return 0;
 	}
 
 	zmq_ops_priv.sock = ctx->zmq.sock;
 	zmq_ops_priv.rcv_msg_args = rest;
 
-	teamd_log_dbg("zmq: calling method \"%s\"", str);
+	teamd_log_dbg(ctx, "zmq: calling method \"%s\"", str);
 
 	return teamd_ctl_method_call(ctx, str, &teamd_zmq_ctl_method_ops,
 				     &zmq_ops_priv);

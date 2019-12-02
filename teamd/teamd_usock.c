@@ -171,28 +171,28 @@ static int process_rcv_msg(struct teamd_context *ctx, int sock, char *rcv_msg)
 
 	str = teamd_usock_msg_getline(&rest);
 	if (!str) {
-		teamd_log_dbg("usock: Incomplete message.");
+		teamd_log_dbg(ctx, "usock: Incomplete message.");
 		return 0;
 	}
 	if (strcmp(TEAMD_USOCK_REQUEST_PREFIX, str)) {
-		teamd_log_dbg("usock: Unsupported message type.");
+		teamd_log_dbg(ctx, "usock: Unsupported message type.");
 		return 0;
 	}
 
 	str = teamd_usock_msg_getline(&rest);
 	if (!str) {
-		teamd_log_dbg("usock: Incomplete message.");
+		teamd_log_dbg(ctx, "usock: Incomplete message.");
 		return 0;
 	}
 	if (!teamd_ctl_method_exists(str)) {
-		teamd_log_dbg("usock: Unknown method \"%s\".", str);
+		teamd_log_dbg(ctx, "usock: Unknown method \"%s\".", str);
 		return 0;
 	}
 
 	usock_ops_priv.sock = sock;
 	usock_ops_priv.rcv_msg_args = rest;
 
-	teamd_log_dbg("usock: calling method \"%s\"", str);
+	teamd_log_dbg(ctx, "usock: calling method \"%s\"", str);
 
 	return teamd_ctl_method_call(ctx, str, &teamd_usock_ctl_method_ops,
 				     &usock_ops_priv);
@@ -315,7 +315,7 @@ static int teamd_usock_sock_open(struct teamd_context *ctx)
 	teamd_usock_get_sockpath(addr.sun_path, sizeof(addr.sun_path),
 				 ctx->team_devname);
 
-	teamd_log_dbg("usock: Using sockpath \"%s\"", addr.sun_path);
+	teamd_log_dbg(ctx, "usock: Using sockpath \"%s\"", addr.sun_path);
 	err = unlink(addr.sun_path);
 	if (err == -1 && errno != ENOENT) {
 		teamd_log_err("usock: Failed to remove socket file.");

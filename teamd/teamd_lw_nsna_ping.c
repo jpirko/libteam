@@ -175,7 +175,7 @@ static int lw_nsnap_load_options(struct teamd_context *ctx,
 	err = set_sockaddr_in6(&nsnap_ppriv->dst, host);
 	if (err)
 		return err;
-	teamd_log_dbg("target address \"%s\".",
+	teamd_log_dbg(ctx, "target address \"%s\".",
 		      str_sockaddr_in6(&nsnap_ppriv->dst));
 
 	return 0;

@@ -115,7 +115,7 @@ static int lw_ethtool_load_options(struct teamd_context *ctx,
 			teamd_log_err("\"delay_up\" must not be negative number.");
 			return -EINVAL;
 		}
-		teamd_log_dbg("delay_up \"%d\".", tmp);
+		teamd_log_dbg(ctx, "delay_up \"%d\".", tmp);
 		ms_to_timespec(&ethtool_ppriv->delay_up, tmp);
 	}
 	err = teamd_config_int_get(ctx, &tmp, "@.delay_down", cpcookie);
@@ -124,7 +124,7 @@ static int lw_ethtool_load_options(struct teamd_context *ctx,
 			teamd_log_err("\"delay_down\" must not be negative number.");
 			return -EINVAL;
 		}
-		teamd_log_dbg("delay_down \"%d\".", tmp);
+		teamd_log_dbg(ctx, "delay_down \"%d\".", tmp);
 		ms_to_timespec(&ethtool_ppriv->delay_down, tmp);
 	}
 	return 0;
