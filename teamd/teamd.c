@@ -867,7 +867,7 @@ static int teamd_add_ports(struct teamd_context *ctx)
 static int teamd_hwaddr_check_change(struct teamd_context *ctx,
 				     struct teamd_port *tdport)
 {
-	const char *hwaddr;
+	char *hwaddr;
 	unsigned char hwaddr_len;
 	int err;
 
@@ -885,6 +885,8 @@ static int teamd_hwaddr_check_change(struct teamd_context *ctx,
 		teamd_log_err("Failed to set team device hardware address.");
 		return err;
 	}
+	ctx->hwaddr = hwaddr;
+	ctx->hwaddr_len = hwaddr_len;
 	return 0;
 }
 
