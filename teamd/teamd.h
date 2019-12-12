@@ -51,8 +51,7 @@
 #define teamd_log_info(args...) daemon_log(LOG_INFO, ##args)
 
 #define teamd_log_dbgx(ctx, val, args...)	\
-	if (val <= ctx->debug)			\
-		daemon_log(LOG_DEBUG, ##args)
+	({ if (val <= ctx->debug) daemon_log(LOG_DEBUG, ##args); })
 
 #define teamd_log_dbg(ctx, args...) teamd_log_dbgx(ctx, 1, ##args)
 
