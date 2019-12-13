@@ -634,7 +634,7 @@ static void lacp_switch_agg_lead(struct lacp_port *agg_lead,
 	struct teamd_port *tdport;
 	struct lacp_port *lacp_port;
 
-	teamd_log_dbg(new_agg_lead->ctx, "Renaming aggregator %u to %u",
+	teamd_log_dbg(agg_lead->ctx, "Renaming aggregator %u to %u",
 		      lacp_agg_id(agg_lead), lacp_agg_id(new_agg_lead));
 	if (lacp->selected_agg_lead == agg_lead)
 		lacp->selected_agg_lead = new_agg_lead;
