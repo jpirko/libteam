@@ -423,9 +423,16 @@ static int link_watch_refresh_forced_send(struct teamd_context *ctx)
 	int err;
 
 	teamd_for_each_tdport(tdport, ctx) {
-		err = teamd_port_enabled(ctx, tdport, &port_enabled);
-		if (err)
-			return err;
+		err = teamd_port_enabled_check(ctx, tdport, &port_enabled);
+		if (err) {
+			/* Looks like the options are not ready for this port.
+			 * This can happen when called from
+			 * link_watch_port_master_ifindex_changed(). Skip this
+			 * for now, let it be handled by future call of
+			 * link_watch_enabled_option_changed().
+			 */
+			continue;
+		}
 		__set_forced_send_for_port(tdport, port_enabled);
 		if (port_enabled)
 			enabled_port_count++;

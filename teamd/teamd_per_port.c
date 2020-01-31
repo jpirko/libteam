@@ -389,24 +389,38 @@ int teamd_port_remove_ifname(struct teamd_context *ctx, const char *port_name)
 	return teamd_port_remove(ctx, tdport);
 }
 
-int teamd_port_enabled(struct teamd_context *ctx, struct teamd_port *tdport,
-		       bool *enabled)
+int __teamd_port_enabled(struct teamd_context *ctx, struct teamd_port *tdport,
+			 bool *enabled, bool may_fail)
 {
 	struct team_option *option;
 
 	option = team_get_option(ctx->th, "np", "enabled", tdport->ifindex);
 	if (!option) {
-		teamd_log_err("%s: Failed to find \"enabled\" option.",
-			      tdport->ifname);
+		if (!may_fail)
+			teamd_log_err("%s: Failed to find \"enabled\" option.",
+				      tdport->ifname);
 		return -ENOENT;
 	}
 	if (team_get_option_type(option) != TEAM_OPTION_TYPE_BOOL) {
-		teamd_log_err("Unexpected type of \"enabled\" option.");
+		if (!may_fail)
+			teamd_log_err("Unexpected type of \"enabled\" option.");
 		return -EINVAL;
 	}
 
 	*enabled = team_get_option_value_bool(option);
 	return 0;
+}
+
+int teamd_port_enabled(struct teamd_context *ctx, struct teamd_port *tdport,
+		       bool *enabled)
+{
+	return __teamd_port_enabled(ctx, tdport, enabled, false);
+}
+
+int teamd_port_enabled_check(struct teamd_context *ctx,
+			     struct teamd_port *tdport, bool *enabled)
+{
+	return __teamd_port_enabled(ctx, tdport, enabled, true);
 }
 
 int teamd_port_prio(struct teamd_context *ctx, struct teamd_port *tdport)

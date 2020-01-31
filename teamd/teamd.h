@@ -325,6 +325,8 @@ int teamd_port_remove_all(struct teamd_context *ctx);
 void teamd_port_obj_remove_all(struct teamd_context *ctx);
 int teamd_port_enabled(struct teamd_context *ctx, struct teamd_port *tdport,
 		       bool *enabled);
+int teamd_port_enabled_check(struct teamd_context *ctx,
+			     struct teamd_port *tdport, bool *enabled);
 int teamd_port_prio(struct teamd_context *ctx, struct teamd_port *tdport);
 int teamd_port_check_enable(struct teamd_context *ctx,
 			    struct teamd_port *tdport,
