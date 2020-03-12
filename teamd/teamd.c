@@ -265,6 +265,10 @@ static int handle_period_fd(int fd)
 		teamd_log_err("read() failed.");
 		return -errno;
 	}
+	if (ret == 0) {
+		teamd_log_warn("read() for timer_fd returned 0.");
+		return 0;
+	}
 	if (ret != sizeof(uint64_t)) {
 		teamd_log_err("read() returned unexpected number of bytes.");
 		return -EINVAL;
