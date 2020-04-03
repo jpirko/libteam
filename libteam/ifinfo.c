@@ -453,7 +453,10 @@ int ifinfo_link_with_port(struct team_handle *th, uint32_t ifindex,
 {
 	struct team_ifinfo *ifinfo;
 
-	ifinfo = ifinfo_find(th, ifindex);
+	if (port)
+		ifinfo = ifinfo_find_create(th, ifindex);
+	else
+		ifinfo = ifinfo_find(th, ifindex);
 	if (!ifinfo)
 		return -ENOENT;
 	if (ifinfo->linked)
