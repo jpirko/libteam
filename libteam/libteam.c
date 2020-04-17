@@ -600,12 +600,24 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 		return -errno;
 	}
 
-	err = nl_socket_set_buffer_size(th->nl_sock, NETLINK_RCVBUF, 0);
+	env = getenv("TEAM_EVENT_BUFSIZE");
+	if (env) {
+		eventbufsize = strtol(env, NULL, 10);
+		/* ignore other errors, libnl forces minimum 32k and
+		 * too large values are truncated to system rmem_max
+		 */
+		if (eventbufsize < 0)
+			eventbufsize = 0;
+	} else {
+		eventbufsize = NETLINK_RCVBUF;
+	}
+
+	err = nl_socket_set_buffer_size(th->nl_sock, eventbufsize, 0);
 	if (err) {
 		err(th, "Failed to set buffer size of netlink sock.");
 		return -nl2syserr(err);
 	}
-	err = nl_socket_set_buffer_size(th->nl_sock_event, NETLINK_RCVBUF, 0);
+	err = nl_socket_set_buffer_size(th->nl_sock_event, eventbufsize, 0);
 	if (err) {
 		err(th, "Failed to set buffer size of netlink event sock.");
 		return -nl2syserr(err);
@@ -639,18 +651,6 @@ int team_init(struct team_handle *th, uint32_t ifindex)
 			    NL_CB_CUSTOM, cli_event_handler, th);
 	nl_cli_connect(th->nl_cli.sock_event, NETLINK_ROUTE);
 	nl_socket_set_nonblocking(th->nl_cli.sock_event);
-
-	env = getenv("TEAM_EVENT_BUFSIZE");
-	if (env) {
-		eventbufsize = strtol(env, NULL, 10);
-		/* ignore other errors, libnl forces minimum 32k and
-		 * too large values are truncated to system rmem_max
-		 */
-		if (eventbufsize < 0)
-			eventbufsize = 0;
-	} else {
-		eventbufsize = NETLINK_RCVBUF;
-	}
 
 	err = nl_socket_set_buffer_size(th->nl_cli.sock_event, eventbufsize, 0);
 	if (err) {
