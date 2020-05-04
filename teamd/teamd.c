@@ -837,7 +837,14 @@ static int teamd_set_hwaddr(struct teamd_context *ctx)
 		err = -EINVAL;
 		goto free_hwaddr;
 	}
-	err = team_hwaddr_set(ctx->th, ctx->ifindex, hwaddr, hwaddr_len);
+
+	if (memcmp(hwaddr, ctx->hwaddr, hwaddr_len))
+		err = team_hwaddr_set(ctx->th, ctx->ifindex, hwaddr, hwaddr_len);
+	else {
+		err = 0;
+		teamd_log_dbg(ctx, "Skip setting same hwaddr string: \"%s\".", hwaddr_str);
+	}
+
 	if (!err)
 		ctx->hwaddr_explicit = true;
 free_hwaddr:
