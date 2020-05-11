@@ -996,8 +996,7 @@ static int lacp_port_set_state(struct lacp_port *lacp_port,
 		return err;
 
 	lacp_port_actor_update(lacp_port);
-	if (lacp_port->periodic_on)
-		return 0;
+
 	return lacpdu_send(lacp_port);
 }
 
@@ -1110,9 +1109,10 @@ static int lacpdu_recv(struct lacp_port *lacp_port)
 	if (err)
 		return err;
 
+	lacp_port_actor_update(lacp_port);
+
 	/* Check if the other side has correct info about us */
-	if (!lacp_port->periodic_on &&
-	    memcmp(&lacpdu.partner, &lacp_port->actor,
+	if (memcmp(&lacpdu.partner, &lacp_port->actor,
 		   sizeof(struct lacpdu_info))) {
 		err = lacpdu_send(lacp_port);
 		if (err)
