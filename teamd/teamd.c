@@ -896,7 +896,7 @@ static int teamd_hwaddr_check_change(struct teamd_context *ctx,
 		teamd_log_err("Failed to set team device hardware address.");
 		return err;
 	}
-	ctx->hwaddr = hwaddr;
+	memcpy(ctx->hwaddr, hwaddr, hwaddr_len);
 	ctx->hwaddr_len = hwaddr_len;
 	return 0;
 }
