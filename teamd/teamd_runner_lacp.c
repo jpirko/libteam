@@ -97,16 +97,26 @@ static void lacpdu_init(struct lacpdu *lacpdu)
 static bool lacpdu_check(struct lacpdu *lacpdu)
 {
 	/*
+	 * According to Annex 43B, section 4, aside from LACP, the Slow
+	 * Protocol linktype is also to be used by other protocols, like
+	 * 0x02 for LAMP, 0x03 for OAM. So for none LACP protocols, just
+	 * silence ignore.
+	 */
+	if (lacpdu->subtype != 0x01)
+		return false;
+
+	/*
 	 * According to 43.4.12 version_number, tlv_type and reserved fields
 	 * should not be checked.
 	 */
 
-	if (lacpdu->subtype		!= 0x01 ||
-	    lacpdu->actor_info_len	!= 0x14 ||
+	if (lacpdu->actor_info_len	!= 0x14 ||
 	    lacpdu->partner_info_len	!= 0x14 ||
 	    lacpdu->collector_info_len	!= 0x10 ||
-	    lacpdu->terminator_info_len	!= 0x00)
+	    lacpdu->terminator_info_len	!= 0x00) {
+		teamd_log_warn("malformed LACP PDU came.");
 		return false;
+	}
 	return true;
 }
 
@@ -1088,10 +1098,8 @@ static int lacpdu_recv(struct lacp_port *lacp_port)
 	if (!teamd_port_present(lacp_port->ctx, lacp_port->tdport))
 		return 0;
 
-	if (!lacpdu_check(&lacpdu)) {
-		teamd_log_warn("malformed LACP PDU came.");
+	if (!lacpdu_check(&lacpdu))
 		return 0;
-	}
 
 	/* Check if we have correct info about the other side */
 	if (memcmp(&lacpdu.actor, &lacp_port->partner,
