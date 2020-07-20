@@ -331,7 +331,7 @@ vfile_load_ifcfg()
 	oIFS="$IFS"
 	IFS=$'\n'
 	VFILE=( $(LANG=C \
-		grep -iv 'BONDING_OPTS\|SLAVE\|MASTER\|DEVICETYPE\|TEAM' \
+		grep -iv 'BONDING_OPTS\|SLAVE\|MASTER\|TYPE\|DEVICETYPE\|TEAM' \
 		$ifcfg ))
 	IFS="$oIFS"
 }
