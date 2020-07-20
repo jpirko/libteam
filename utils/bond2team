@@ -623,7 +623,7 @@ team_ifcfg_write()
 team_ifcfg_deliver()
 {
 	pr_dbg "${FUNCNAME} $*"
-	if ! to_stdout; then
+	if to_stdout; then
 		return 0
 	fi
 
