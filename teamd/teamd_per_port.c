@@ -442,14 +442,18 @@ int teamd_port_check_enable(struct teamd_context *ctx,
 			    bool should_enable, bool should_disable)
 {
 	bool new_enabled_state;
+	bool curr_enabled_state;
 	int err;
 
 	if (!teamd_port_present(ctx, tdport))
 		return 0;
+	err = teamd_port_enabled(ctx, tdport, &curr_enabled_state);
+	if (err)
+		return err;
 
-	if (should_enable)
+	if (!curr_enabled_state && should_enable)
 		new_enabled_state = true;
-	else if (should_disable)
+	else if (curr_enabled_state && should_disable)
 		new_enabled_state = false;
 	else
 		return 0;
