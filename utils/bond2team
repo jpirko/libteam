@@ -95,7 +95,7 @@ To convert given bonding parameters without any ifcfg:
 # $0 --bonding_opts "mode=1 miimon=500"
 
 To convert given bonding parameters without any ifcfg with ports:
-# $0 --bonding_opts "mode=1 miimon=500 primary=eth1 primary_reselect-0" \\
+# $0 --bonding_opts "mode=1 miimon=500 primary=eth1 primary_reselect=0" \\
      --port eth1 --port eth2 --port eth3 --port eth4
 
 EOF
