@@ -1858,7 +1858,7 @@ int main(int argc, char **argv)
 		break;
 	case DAEMON_CMD_KILL:
 		if (daemon_pid_file_is_running() > 0) {
-			err = daemon_pid_file_kill_wait(SIGTERM, 5);
+			err = daemon_pid_file_kill_wait(SIGTERM, 30);
 			if (err)
 				teamd_log_warn("Failed to kill daemon: %s",
 					       strerror(errno));
