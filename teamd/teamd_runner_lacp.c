@@ -23,9 +23,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <sys/ioctl.h>
-#include <linux/if_ether.h>
 #include <sys/socket.h>
-#include <linux/netdevice.h>
 #include <netinet/in.h>
 #include <errno.h>
 #include <team.h>
