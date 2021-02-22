@@ -148,6 +148,7 @@ struct lacp {
 #define		LACP_CFG_DFLT_FAST_RATE false
 		int min_ports;
 #define		LACP_CFG_DFLT_MIN_PORTS 1
+#define		LACP_CFG_DFLT_MIN_PORTS_MAX 1024
 		enum lacp_agg_select_policy agg_select_policy;
 #define		LACP_CFG_DFLT_AGG_SELECT_POLICY LACP_AGG_SELECT_LACP_PRIO
 	} cfg;
@@ -283,7 +284,7 @@ static int lacp_load_config(struct teamd_context *ctx, struct lacp *lacp)
 	err = teamd_config_int_get(ctx, &tmp, "$.runner.min_ports");
 	if (err) {
 		lacp->cfg.min_ports = LACP_CFG_DFLT_MIN_PORTS;
-	} else if (tmp < 1 || tmp > UCHAR_MAX) {
+	} else if (tmp < 1 || tmp > LACP_CFG_DFLT_MIN_PORTS_MAX) {
 		teamd_log_err("\"min_ports\" value is out of its limits.");
 		return -EINVAL;
 	} else {
