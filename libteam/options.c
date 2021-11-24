@@ -688,10 +688,10 @@ static int local_set_option_value(struct team_handle *th,
 
 	err = update_option(th, &option, opt_id, opt_type,
 			    data, data_len, true, true);
-	if (option->temporary)
-		destroy_option(option);
 	if (err)
 		return err;
+	if (option->temporary)
+		destroy_option(option);
 	return 0;
 }
 
