@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 """
 Basic test.
 
@@ -32,11 +32,11 @@ def usage():
     """
     Print usage of this app
     """
-    print "Usage: team_basic_test.py [OPTION...]"
-    print ""
-    print "  -h, --help                         print this message"
-    print "  -c, --loop-count=NUMBER            number of loops (default 1)"
-    print "  -p, --port=NETDEV                  port device (can be defined multiple times)"
+    print("Usage: team_basic_test.py [OPTION...]")
+    print("")
+    print("  -h, --help                         print this message")
+    print("  -c, --loop-count=NUMBER            number of loops (default 1)")
+    print("  -p, --port=NETDEV                  port device (can be defined multiple times)")
     sys.exit()
 
 class CmdExecFailedException(Exception):
@@ -55,15 +55,15 @@ class CmdExecUnexpectedOutputException(Exception):
         return "Command execution output unexpected: \"%s\" != \"%s\"" % (self.__output, self.__expected_output)
 
 def print_output(out_type, string):
-    print("%s:\n"
+    print(("%s:\n"
           "----------------------------\n"
           "%s"
-          "----------------------------" % (out_type, string))
+          "----------------------------" % (out_type, string)))
 
 def cmd_exec(cmd, expected_output=None, cleaner=False):
     cmd = cmd.rstrip(" ")
     if not cleaner:
-        print("# \"%s\"" % cmd)
+        print(("# \"%s\"" % cmd))
     subp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE)
     (data_stdout, data_stderr) = subp.communicate()
@@ -74,7 +74,7 @@ def cmd_exec(cmd, expected_output=None, cleaner=False):
         if data_stderr:
             print_output("Stderr", data_stderr)
         raise CmdExecFailedException(subp.returncode)
-    output = data_stdout.rstrip()
+    output = (data_stdout.rstrip()).decode()
     if expected_output:
         if output != expected_output:
             raise CmdExecUnexpectedOutputException(output, expected_output)
@@ -166,17 +166,17 @@ TEAM_PORT_CONFIG='{"prio": 10}'
             os.removedirs("/tmp/team_test/")
 
     def _run_one_loop(self, run_nr):
-        print "RUN #%d" % (run_nr)
+        print("RUN #%d" % (run_nr))
         self._created_teams = []
         try:
             for mode_name in self._team_modes:
                 self._run_one_mode(mode_name)
-            self._run_teamd_initscripts()
+            #self._run_teamd_initscripts()
         finally:
             cmd_exec("modprobe -r team_mode_loadbalance team_mode_roundrobin team_mode_activebackup team_mode_broadcast team");
 
     def run(self):
-        for i in xrange(self._loop_count):
+        for i in range(self._loop_count):
             self._run_one_loop(i + 1)
 
 def main():
@@ -186,8 +186,8 @@ def main():
             "hc:p:",
             ["help", "loop-count=", "port="]
         )
-    except getopt.GetoptError, err:
-        print str(err)
+    except getopt.GetoptError as err:
+        print(str(err))
         usage()
 
     btest = TeamBasicTest()
