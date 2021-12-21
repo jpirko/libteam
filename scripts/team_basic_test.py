@@ -203,4 +203,10 @@ def main():
     btest.run()
 
 if __name__ == "__main__":
-    main()
+    try:
+        ret = main()
+    except Exception as esc:
+        ret = 1
+        import traceback
+        traceback.print_exc()
+    sys.exit(ret)
