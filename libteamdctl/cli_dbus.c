@@ -183,12 +183,17 @@ static int cli_dbus_init(struct teamdctl *tdc, const char *team_name, void *priv
 	if (ret == -1)
 		return -errno;
 
+	err = -EINVAL;
 	dbus_error_init(&error);
+	if (!dbus_validate_bus_name(cli_dbus->service_name, &error)) {
+		err(tdc, "dbus: Could not validate bus name: %s - %s",
+			 error.name, error.message);
+		goto free_service_name;
+	}
 	cli_dbus->conn = dbus_bus_get(DBUS_BUS_SYSTEM, &error);
 	if (!cli_dbus->conn) {
 		err(tdc, "dbus: Could not acquire the system bus: %s - %s",
 			 error.name, error.message);
-		err = -EINVAL;
 		goto free_service_name;
 	}
 	err = 0;
