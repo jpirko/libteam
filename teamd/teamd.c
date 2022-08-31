@@ -309,16 +309,28 @@ static void teamd_run_loop_set_fds(struct list_item *lcb_list,
 	}
 }
 
+static int teamd_check_ctrl(struct teamd_context *ctx)
+{
+	int ctrl_fd = ctx->run_loop.ctrl_pipe_r;
+	struct timeval tv;
+	fd_set rfds;
+
+	FD_ZERO(&rfds);
+	FD_SET(ctrl_fd, &rfds);
+	tv.tv_sec = tv.tv_usec = 0;
+
+	return select(ctrl_fd + 1, &rfds, NULL, NULL, &tv);
+}
+
 static int teamd_run_loop_do_callbacks(struct list_item *lcb_list, fd_set *fds,
 				       struct teamd_context *ctx)
 {
 	struct teamd_loop_callback *lcb;
-	struct teamd_loop_callback *tmp;
 	int i;
 	int events;
 	int err;
 
-	list_for_each_node_entry_safe(lcb, tmp, lcb_list, list) {
+	list_for_each_node_entry(lcb, lcb_list, list) {
 		for (i = 0; i < 3; i++) {
 			if (!(lcb->fd_event & (1 << i)))
 				continue;
@@ -339,6 +351,14 @@ static int teamd_run_loop_do_callbacks(struct list_item *lcb_list, fd_set *fds,
 				teamd_log_dbg(ctx, "Failed loop callback: %s, %p",
 					      lcb->name, lcb->priv);
 			}
+
+			/* If there's a control byte ready, it's possible that one
+			 * or more entries have been removed from the callback
+			 * list and restart has been requested. In any case, let the
+			 * main loop deal with it first so that we know we're safe
+			 * to proceed. */
+			if (teamd_check_ctrl(ctx))
+				return 0;
 		}
 	}
 	return 0;
