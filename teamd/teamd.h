@@ -102,7 +102,7 @@ struct teamd_context {
 	char *				log_output;
 	bool				force_recreate;
 	bool				take_over;
-	bool				no_quit_destroy;
+	unsigned int			no_quit_destroy;
 	bool				init_no_ports;
 	bool				pre_add_ports;
 	char *				config_file;

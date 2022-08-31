@@ -112,6 +112,7 @@ static void print_help(const struct teamd_context *ctx) {
             "                             already exists\n"
             "    -o --take-over           Take over the device if it already exists\n"
             "    -N --no-quit-destroy     Do not destroy the device on quit\n"
+            "                             Also leave ports in place if used multiple times\n"
             "    -t --team-dev=DEVNAME    Use the specified team device\n"
             "    -n --no-ports            Start without ports\n"
             "    -D --dbus-enable         Enable D-Bus interface\n"
@@ -204,7 +205,7 @@ static int parse_command_line(struct teamd_context *ctx,
 			ctx->take_over = true;
 			break;
 		case 'N':
-			ctx->no_quit_destroy = true;
+			ctx->no_quit_destroy++;
 			break;
 		case 't':
 			free(ctx->team_devname);
@@ -346,10 +347,13 @@ static int teamd_run_loop_do_callbacks(struct list_item *lcb_list, fd_set *fds,
 
 static int teamd_flush_ports(struct teamd_context *ctx)
 {
-	if (!ctx->no_quit_destroy)
+	switch (ctx->no_quit_destroy) {
+	case 0:
 		return teamd_port_remove_all(ctx);
-	else
+	case 1:
 		teamd_port_obj_remove_all(ctx);
+	/* If 2 or higher, don't remove any ports at all. */
+	}
 	return 0;
 }
 
@@ -370,8 +374,10 @@ static int teamd_run_loop_run(struct teamd_context *ctx)
 	 */
 
 	while (true) {
-		if (quit_in_progress && !teamd_has_ports(ctx))
-			return ctx->run_loop.err;
+		if (quit_in_progress) {
+			if (!teamd_has_ports(ctx) || ctx->no_quit_destroy > 1)
+				return ctx->run_loop.err;
+		}
 
 		for (i = 0; i < 3; i++)
 			FD_ZERO(&fds[i]);
