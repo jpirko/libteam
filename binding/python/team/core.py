@@ -101,7 +101,8 @@ class TeamNetDevice(object):
     @ifindex.setter
     def ifindex(self, ifindex):
         self._ifindex = ifindex
-        self.ifname = self._conv.dev_ifname(ifindex)
+        if self.ifindex:
+            self.ifname = self._conv.dev_ifname(ifindex)
 
     def get_hwaddr(self):
         err, hwaddr = capi.team_hwaddr_get(self._th, self.ifindex, 6)
