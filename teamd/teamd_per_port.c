@@ -217,7 +217,6 @@ static void port_obj_remove(struct teamd_context *ctx,
 	struct teamd_port *tdport = _port(port_obj);
 
 	teamd_event_port_removed(ctx, tdport);
-	teamd_port_remove(ctx, tdport);
 	port_obj_destroy(ctx, port_obj);
 	port_obj_free(port_obj);
 }
