@@ -236,7 +236,7 @@ int check_call_change_handlers(struct team_handle *th,
 				break;
 		}
 	}
-	if (call_type_mask & TEAM_IFINFO_REFRESH) {
+	if (call_type_mask & (TEAM_IFINFO_REFRESH | TEAM_IFINFO_CHANGE)) {
 		ifinfo_destroy_removed(th);
 		ifinfo_clear_changed(th);
 	}
