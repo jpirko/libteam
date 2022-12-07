@@ -351,6 +351,7 @@ static int teamd_port_remove(struct teamd_context *ctx,
 
 	teamd_log_dbg(ctx, "%s: Removing port (found ifindex \"%d\").",
 		      tdport->ifname, tdport->ifindex);
+	teamd_event_port_removing(ctx, tdport);
 	err = team_port_remove(ctx->th, tdport->ifindex);
 	if (err)
 		teamd_log_err("%s: Failed to remove port.", tdport->ifname);

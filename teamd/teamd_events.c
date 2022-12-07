@@ -50,6 +50,18 @@ int teamd_event_port_added(struct teamd_context *ctx,
 	return 0;
 }
 
+void teamd_event_port_removing(struct teamd_context *ctx,
+			       struct teamd_port *tdport)
+{
+	struct event_watch_item *watch;
+
+	list_for_each_node_entry(watch, &ctx->event_watch_list, list) {
+		if (!watch->ops->port_removing)
+			continue;
+		watch->ops->port_removing(ctx, tdport, watch->priv);
+	}
+}
+
 void teamd_event_port_removed(struct teamd_context *ctx,
 			      struct teamd_port *tdport)
 {

@@ -1420,6 +1420,17 @@ static int lacp_event_watch_port_added(struct teamd_context *ctx,
 	return teamd_balancer_port_added(lacp->tb, tdport);
 }
 
+static void lacp_event_watch_port_removing(struct teamd_context *ctx,
+					   struct teamd_port *tdport, void *priv)
+{
+	struct lacp *lacp = priv;
+	struct lacp_port *lacp_port = lacp_port_get(lacp, tdport);
+
+	/* Ensure that no incoming LACPDU is going to be processed. */
+	teamd_loop_callback_disable(ctx, LACP_SOCKET_CB_NAME, lacp_port);
+	lacp_port_set_state(lacp_port, PORT_STATE_DISABLED);
+}
+
 static void lacp_event_watch_port_removed(struct teamd_context *ctx,
 					  struct teamd_port *tdport, void *priv)
 {
@@ -1441,6 +1452,7 @@ static const struct teamd_event_watch_ops lacp_event_watch_ops = {
 	.hwaddr_changed = lacp_event_watch_hwaddr_changed,
 	.port_hwaddr_changed = lacp_event_watch_port_hwaddr_changed,
 	.port_added = lacp_event_watch_port_added,
+	.port_removing = lacp_event_watch_port_removing,
 	.port_removed = lacp_event_watch_port_removed,
 	.port_changed = lacp_event_watch_port_changed,
 	.admin_state_changed = lacp_event_watch_admin_state_changed,
