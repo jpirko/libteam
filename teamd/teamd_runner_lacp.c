@@ -747,7 +747,8 @@ static bool lacp_port_mergeable(struct lacp_port *lacp_port)
 	       lacp_get_agg_lead(lacp_port) != lacp_port;
 }
 
-static int lacp_port_agg_update(struct lacp_port *lacp_port)
+static int lacp_port_set_state_agg_update(struct lacp_port *lacp_port,
+					  enum lacp_port_state new_state)
 {
 	if (lacp_port_selected(lacp_port) &&
 	    (lacp_port_unselectable_state(lacp_port) ||
@@ -756,12 +757,19 @@ static int lacp_port_agg_update(struct lacp_port *lacp_port)
 	     lacp_port_mergeable(lacp_port)))
 		lacp_port_agg_unselect(lacp_port);
 
+	lacp_port->state = new_state;
+
 	if (!lacp_port_selected(lacp_port) &&
 	    (lacp_port_selectable_state(lacp_port) &&
 	     lacp_port_loopback_free(lacp_port)))
 		lacp_port_agg_select(lacp_port);
 
 	return lacp_selected_agg_update(lacp_port->lacp, NULL);
+}
+
+static int lacp_port_agg_update(struct lacp_port *lacp_port)
+{
+	return lacp_port_set_state_agg_update(lacp_port, lacp_port->state);
 }
 
 static const char slow_addr[ETH_ALEN] = { 0x01, 0x80, 0xC2, 0x00, 0x00, 0x02 };
@@ -998,9 +1006,8 @@ static int lacp_port_set_state(struct lacp_port *lacp_port,
 		       lacp_port->tdport->ifname,
 		       lacp_port_state_name[lacp_port->state],
 		       lacp_port_state_name[new_state]);
-	lacp_port->state = new_state;
 
-	err = lacp_port_agg_update(lacp_port);
+	err = lacp_port_set_state_agg_update(lacp_port, new_state);
 	if (err)
 		return err;
 
