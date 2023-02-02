@@ -956,9 +956,11 @@ static int lacpdu_send(struct lacp_port *lacp_port);
 static int lacp_port_set_state(struct lacp_port *lacp_port,
 			       enum lacp_port_state new_state)
 {
+	bool admin_state = team_get_ifinfo_admin_state(lacp_port->ctx->ifinfo);
 	int err;
 
-	if (new_state == lacp_port->state)
+	if (new_state == lacp_port->state ||
+	    (!admin_state && new_state != PORT_STATE_DISABLED))
 		return 0;
 	if (new_state == PORT_STATE_DISABLED)
 		lacp_port_periodic_off(lacp_port);
