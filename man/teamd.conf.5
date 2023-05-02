@@ -407,6 +407,23 @@ Default:
 .TP
 .BR "link_watch.target_host "| " ports.PORTIFNAME.link_watch.target_host " (hostname)
 Hostname to be converted to IPv6 address which will be filled into NS packet as target address.
+.TP
+.BR "link_watch_policy " (string)
+Name of link-watchers evaluation policy. Available options are following:
+.RS 7
+.PP
+.BR "any "\(em
+Link is up if
+.BR any
+of the link-watchers reports the link up.
+.PP
+.BR "all "\(em
+Link is up if
+.BR all
+of the link-watchers reports the link up.
+.PP
+Default:
+.BR "any"
 .SH EXAMPLES
 .PP
 .nf
@@ -516,6 +533,36 @@ This configuration uses ARP ping link watch.
 .fi
 .PP
 Similar to the previous one, only this time two link watchers are used at the same time.
+.PP
+.nf
+{
+  "device": "team0",
+  "runner": {"name": "activebackup"},
+  "link_watch_policy": "all",
+  "link_watch": [
+    {
+    "name": "arp_ping",
+    "interval": 100,
+    "missed_max": 30,
+    "target_host": "192.168.23.1"
+    },
+    {
+    "name": "ethtool"
+    }
+  ],
+  "ports":  {
+    "eth1": {
+      "prio": -10,
+      "sticky": true
+    },
+    "eth2": {
+      "prio": 100
+    }
+  }
+}
+.fi
+.PP
+Two link-watchers are used at the same time. Link is up only if all configured link-watchers report link is up.
 .PP
 .nf
 {

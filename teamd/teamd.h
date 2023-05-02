@@ -105,6 +105,7 @@ struct teamd_context {
 	bool				no_quit_destroy;
 	bool				init_no_ports;
 	bool				pre_add_ports;
+	bool				evaluate_all_watchers;
 	char *				config_file;
 	char *				config_text;
 	json_t *			config_json;

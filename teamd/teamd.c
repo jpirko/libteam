@@ -1805,6 +1805,28 @@ static int teamd_drop_privileges()
 
 #endif
 
+static int teamd_get_link_watch_policy(struct teamd_context *ctx)
+{
+	int err;
+	const char *link_watch_policy;
+
+	err = teamd_config_string_get(ctx, &link_watch_policy, "$.link_watch_policy");
+	if (!err) {
+		if (!strcmp(link_watch_policy, "all")) {
+			ctx->evaluate_all_watchers = true;
+		} else if (!strcmp(link_watch_policy, "any")) {
+			ctx->evaluate_all_watchers = false;
+		} else {
+			teamd_log_err("Unrecognized value for link_watch_policy.");
+			teamd_log_err("Only \"any\" or \"all\" are allowed but \"%s\" found in config.", link_watch_policy);
+			return -EINVAL;
+		}
+	} else {
+		teamd_log_dbg(ctx, "No link_watch_policy specified in config, using default value \"any\".");
+	}
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	enum teamd_exit_code ret = TEAMD_EXIT_FAILURE;
@@ -1860,6 +1882,10 @@ int main(int argc, char **argv)
 	teamd_init_debug_level(ctx);
 
 	err = teamd_get_devname(ctx, ctx->cmd == DAEMON_CMD_RUN);
+	if (err)
+		goto config_free;
+
+	err = teamd_get_link_watch_policy(ctx);
 	if (err)
 		goto config_free;
 

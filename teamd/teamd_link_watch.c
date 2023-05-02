@@ -133,11 +133,28 @@ bool teamd_link_watch_port_up(struct teamd_context *ctx,
 	if (!tdport)
 		return true;
 	link = true;
-	teamd_for_each_port_priv_by_creator(common_ppriv, tdport,
-					    LW_PORT_PRIV_CREATOR_PRIV) {
-		link = common_ppriv->link_up;
-		if (link)
-			return link;
+	if (ctx->evaluate_all_watchers) {
+		/*
+		 * If multiple link-watchers used at the same time,
+		 * link is up if ALL of the link-watchers reports the link up.
+		 */
+		teamd_for_each_port_priv_by_creator(common_ppriv, tdport,
+						    LW_PORT_PRIV_CREATOR_PRIV) {
+			link = common_ppriv->link_up;
+			if (!link)
+				return link;
+		}
+	} else {
+		/*
+		 * If multiple link-watchers used at the same time,
+		 * link is up if ANY of the link-watchers reports the link up.
+		 */
+		teamd_for_each_port_priv_by_creator(common_ppriv, tdport,
+						    LW_PORT_PRIV_CREATOR_PRIV) {
+			link = common_ppriv->link_up;
+			if (link)
+				return link;
+		}
 	}
 	return link;
 }
