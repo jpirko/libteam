@@ -277,7 +277,7 @@ static int callback_usock(struct teamd_context *ctx, int events, void *priv)
 	int err;
 
 	alen = sizeof(addr);
-	sock = accept(ctx->usock.sock, &addr, &alen);
+	sock = accept(ctx->usock.sock, (struct sockaddr *)&addr, &alen);
 	if (sock == -1) {
 		teamd_log_err("usock: Failed to accept connection.");
 		return -errno;
