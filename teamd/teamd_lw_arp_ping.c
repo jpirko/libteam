@@ -90,10 +90,11 @@ static const struct sock_fprog arp_novlan_rpl_fprog = {
 
 static struct sock_filter arp_vlan_rpl_flt[] = {
 	BPF_STMT(BPF_LD + BPF_B + BPF_ABS, SKF_AD_OFF + SKF_AD_PROTOCOL),
-	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ETH_P_ARP, 0, 8),
+	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ETH_P_ARP, 0, 9),
 	BPF_STMT(BPF_LD + BPF_B + BPF_ABS, SKF_AD_OFF + SKF_AD_VLAN_TAG_PRESENT),
-	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, 0, 6, 0),
+	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, 0, 7, 0),
 	BPF_STMT(BPF_LD + BPF_B + BPF_ABS, SKF_AD_OFF + SKF_AD_VLAN_TAG),
+	BPF_STMT(BPF_ALU + BPF_AND + BPF_K, 0xfff),
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, 0xffff, 0, 4), /* 0xffff will be replaced by vland id */
 	BPF_STMT(BPF_LD + BPF_H + BPF_ABS, OFFSET_ARP_OP_CODE),
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARPOP_REPLY, 1, 0),
@@ -103,7 +104,7 @@ static struct sock_filter arp_vlan_rpl_flt[] = {
 };
 
 /* this hack replaces vlanid value in filter code */
-#define SET_FILTER_VLANID(fprog, vlanid) (fprog)->filter[5].k = vlanid
+#define SET_FILTER_VLANID(fprog, vlanid) (fprog)->filter[6].k = vlanid
 
 static const struct sock_fprog arp_vlan_rpl_fprog = {
 	.len = ARRAY_SIZE(arp_vlan_rpl_flt),
