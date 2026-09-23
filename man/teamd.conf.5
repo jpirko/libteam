@@ -282,6 +282,18 @@ Default:
 .BR "lacp_prio"
 .RE
 .TP
+.BR "runner.col_dist_decoupled " (bool)
+If set, COLLECTING and DISTRIBUTING states are decoupled so an external control plane can drive the data path (make-before-break). A port advertises COLLECTING only after the control plane confirms it by writing the current
+.BR "collecting_request_id "
+state value back to the
+.BR "collecting_confirm "
+state value, and advertises DISTRIBUTING (mirrored into the kernel port "enabled" flag) only once confirmed and the link partner is collecting. Writing 0 withdraws the confirmation; a confirm carrying a stale request id is rejected. The confirmation is cleared when the port's own link goes down.
+.RS 7
+.PP
+Default:
+.BR "false"
+.RE
+.TP
 .BR "ports.PORTIFNAME.lacp_prio " (int)
 Port priority according to LACP standard. The lower number means higher priority.
 .RS 7

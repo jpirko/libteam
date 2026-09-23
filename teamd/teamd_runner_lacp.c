@@ -151,6 +151,8 @@ struct lacp {
 #define		LACP_CFG_DFLT_MIN_PORTS_MAX 1024
 		enum lacp_agg_select_policy agg_select_policy;
 #define		LACP_CFG_DFLT_AGG_SELECT_POLICY LACP_AGG_SELECT_LACP_PRIO
+		bool col_dist_decoupled;
+#define		LACP_CFG_DFLT_COL_DIST_DECOUPLED false
 	} cfg;
 	struct teamd_balancer *tb;
 };
@@ -194,6 +196,13 @@ struct lacp_port {
 		bool sticky;
 #define		LACP_PORT_CFG_DFLT_STICKY false
 	} cfg;
+	bool collecting_requested;
+	/* Request->confirm epoch: the control plane echoes
+	 * collecting_request_id back as the confirm; collecting_confirmed_id
+	 * is the confirmed epoch (0 = latch off).
+	 */
+	uint32_t collecting_request_id;
+	uint32_t collecting_confirmed_id;
 };
 
 static struct lacp_port *lacp_port_get(struct lacp *lacp,
@@ -281,6 +290,13 @@ static int lacp_load_config(struct teamd_context *ctx, struct lacp *lacp)
 		lacp->cfg.fast_rate = LACP_CFG_DFLT_FAST_RATE;
 	teamd_log_dbg(ctx, "Using fast_rate \"%d\".", lacp->cfg.fast_rate);
 
+	err = teamd_config_bool_get(ctx, &lacp->cfg.col_dist_decoupled,
+				    "$.runner.col_dist_decoupled");
+	if (err)
+		lacp->cfg.col_dist_decoupled = LACP_CFG_DFLT_COL_DIST_DECOUPLED;
+	teamd_log_dbg(ctx, "Using col_dist_decoupled \"%d\".",
+		      lacp->cfg.col_dist_decoupled);
+
 	err = teamd_config_int_get(ctx, &tmp, "$.runner.min_ports");
 	if (err) {
 		lacp->cfg.min_ports = LACP_CFG_DFLT_MIN_PORTS;
@@ -345,7 +361,14 @@ static bool lacp_port_synced(struct lacp_port *lacp_port)
 
 static int lacp_port_should_be_enabled(struct lacp_port *lacp_port)
 {
-	return lacp_port_synced(lacp_port);
+	struct lacp *lacp = lacp_port->lacp;
+
+	if (!lacp_port_synced(lacp_port))
+		return false;
+	if (lacp->cfg.col_dist_decoupled)
+		return lacp_port->collecting_confirmed_id != 0 &&
+		       (lacp_port->partner.state & INFO_STATE_COLLECTING);
+	return true;
 }
 
 static int lacp_port_should_be_disabled(struct lacp_port *lacp_port)
@@ -710,17 +733,33 @@ static int lacp_ports_update_enabled(struct lacp *lacp)
 	return 0;
 }
 
+static int lacp_ports_actor_refresh(struct lacp *lacp);
+
 static int lacp_selected_agg_update(struct lacp *lacp,
 				    struct lacp_port *next_agg_lead)
 {
+	bool agg_changed;
 	int err;
 
 	if (!next_agg_lead)
 		next_agg_lead = lacp_get_next_agg(lacp);
-	if (lacp->selected_agg_lead != next_agg_lead)
+	agg_changed = lacp->selected_agg_lead != next_agg_lead;
+	if (agg_changed)
 		teamd_log_dbg(lacp->ctx, "Selecting aggregator %u",
 			      lacp_agg_id(next_agg_lead));
 	lacp->selected_agg_lead = next_agg_lead;
+
+	/* The selected aggregator is input to every port's decoupled
+	 * collecting/distributing decision: refresh actor state (and the
+	 * request epoch) on all ports before mirroring it to the kernel,
+	 * so a stale collecting_requested cannot satisfy a confirm for a
+	 * superseded selection.
+	 */
+	if (agg_changed && lacp->cfg.col_dist_decoupled) {
+		err = lacp_ports_actor_refresh(lacp);
+		if (err)
+			return err;
+	}
 
 	err = lacp_ports_update_enabled(lacp);
 	if (err)
@@ -918,12 +957,30 @@ static void lacp_port_actor_update(struct lacp_port *lacp_port)
 		state |= INFO_STATE_LACP_ACTIVITY;
 	if (lacp_port->lacp->cfg.fast_rate)
 		state |= INFO_STATE_LACP_TIMEOUT;
+	if (lacp_port->lacp->cfg.col_dist_decoupled) {
+		bool new_request = lacp_port_synced(lacp_port);
+
+		if (new_request && !lacp_port->collecting_requested) {
+			/* New episode: bump the epoch (rejecting stale
+			 * confirms); the latch persists across self-heal,
+			 * cleared only on own-link-down.
+			 */
+			if (++lacp_port->collecting_request_id == 0)
+				lacp_port->collecting_request_id = 1; /* 0 == withdraw sentinel */
+		}
+		lacp_port->collecting_requested = new_request;
+	}
 	if (lacp_port_selected(lacp_port) &&
 	    lacp_port_agg_selected(lacp_port)) {
 		state |= INFO_STATE_SYNCHRONIZATION;
 		state &= ~(INFO_STATE_COLLECTING | INFO_STATE_DISTRIBUTING);
-		if (lacp_port->partner.state & INFO_STATE_SYNCHRONIZATION)
+		if (lacp_port->lacp->cfg.col_dist_decoupled) {
+			if (lacp_port->collecting_requested &&
+			    lacp_port->collecting_confirmed_id != 0)
+				state |= INFO_STATE_COLLECTING;
+		} else if (lacp_port->partner.state & INFO_STATE_SYNCHRONIZATION) {
 			state |= INFO_STATE_COLLECTING;
+		}
 		if (lacp_port_should_be_enabled(lacp_port))
 			state |= INFO_STATE_DISTRIBUTING;
 	}
@@ -939,6 +996,26 @@ static void lacp_port_actor_update(struct lacp_port *lacp_port)
 }
 
 static int lacpdu_send(struct lacp_port *lacp_port);
+
+static int lacp_ports_actor_refresh(struct lacp *lacp)
+{
+	struct teamd_port *tdport;
+	struct lacp_port *lacp_port;
+	uint8_t old_state;
+	int err;
+
+	teamd_for_each_tdport(tdport, lacp->ctx) {
+		lacp_port = lacp_port_get(lacp, tdport);
+		old_state = lacp_port->actor.state;
+		lacp_port_actor_update(lacp_port);
+		if (lacp_port->actor.state != old_state) {
+			err = lacpdu_send(lacp_port);
+			if (err)
+				return err;
+		}
+	}
+	return 0;
+}
 
 static int lacp_port_set_state(struct lacp_port *lacp_port,
 			       enum lacp_port_state new_state)
@@ -988,6 +1065,12 @@ static int lacp_port_set_state(struct lacp_port *lacp_port,
 		err = lacp_port_partner_update(lacp_port);
 		if (err)
 			return err;
+		/* Own link down: clear the latch so a later bring-up needs a
+		 * fresh control-plane confirm (agg (de)selection must not
+		 * clear it).
+		 */
+		if (lacp_port->lacp->cfg.col_dist_decoupled)
+			lacp_port->collecting_confirmed_id = 0;
 		break;
 	}
 
@@ -1114,6 +1197,19 @@ static int lacpdu_recv(struct lacp_port *lacp_port)
 		return err;
 
 	lacp_port_actor_update(lacp_port);
+
+	/* collecting_requested is (re)computed in actor_update above and the
+	 * partner COLLECTING bit does not affect aggregation, so re-evaluate
+	 * enable + carrier now.
+	 */
+	if (lacp_port->lacp->cfg.col_dist_decoupled) {
+		err = lacp_port_update_enabled(lacp_port);
+		if (err)
+			return err;
+		err = lacp_update_carrier(lacp_port->lacp);
+		if (err)
+			return err;
+	}
 
 	/* Check if the other side has correct info about us */
 	if (memcmp(&lacpdu.partner, &lacp_port->actor,
@@ -1519,6 +1615,16 @@ static int lacp_state_select_policy_get(struct teamd_context *ctx,
 	return 0;
 }
 
+static int lacp_state_col_dist_decoupled_get(struct teamd_context *ctx,
+					     struct team_state_gsc *gsc,
+					     void *priv)
+{
+	struct lacp *lacp = priv;
+
+	gsc->data.bool_val = lacp->cfg.col_dist_decoupled;
+	return 0;
+}
+
 static const struct teamd_state_val lacp_state_vals[] = {
 	{
 		.subpath = "active",
@@ -1539,6 +1645,11 @@ static const struct teamd_state_val lacp_state_vals[] = {
 		.subpath = "select_policy",
 		.type = TEAMD_STATE_ITEM_TYPE_STRING,
 		.getter = lacp_state_select_policy_get,
+	},
+	{
+		.subpath = "col_dist_decoupled",
+		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
+		.getter = lacp_state_col_dist_decoupled_get,
 	},
 };
 
@@ -1839,6 +1950,106 @@ static int lacp_port_state_prio_get(struct teamd_context *ctx,
 	return 0;
 }
 
+static int lacp_port_state_collecting_requested_get(struct teamd_context *ctx,
+						    struct team_state_gsc *gsc,
+						    void *priv)
+{
+	gsc->data.bool_val = lacp_port_gsc(gsc, priv)->collecting_requested;
+	return 0;
+}
+
+static int lacp_port_state_collecting_request_id_get(struct teamd_context *ctx,
+						     struct team_state_gsc *gsc,
+						     void *priv)
+{
+	gsc->data.int_val = lacp_port_gsc(gsc, priv)->collecting_request_id;
+	return 0;
+}
+
+static int lacp_port_state_collecting_confirm_get(struct teamd_context *ctx,
+						  struct team_state_gsc *gsc,
+						  void *priv)
+{
+	struct lacp_port *lacp_port = lacp_port_gsc(gsc, priv);
+
+	/* Epoch the control plane last confirmed (0 = none); persists as
+	 * request_id advances so a stale confirm stays visible.
+	 */
+	gsc->data.int_val = (int) lacp_port->collecting_confirmed_id;
+	return 0;
+}
+
+/* Advertised COLLECTING bit (from actor.state), mirroring "distributing";
+ * distinct from collecting_confirm (CP latch) and collecting_requested.
+ */
+static int lacp_port_state_collecting_get(struct teamd_context *ctx,
+					  struct team_state_gsc *gsc,
+					  void *priv)
+{
+	struct lacp_port *lacp_port = lacp_port_gsc(gsc, priv);
+
+	gsc->data.bool_val = !!(lacp_port->actor.state & INFO_STATE_COLLECTING);
+	return 0;
+}
+
+static int lacp_port_state_distributing_get(struct teamd_context *ctx,
+					    struct team_state_gsc *gsc,
+					    void *priv)
+{
+	struct lacp_port *lacp_port = lacp_port_gsc(gsc, priv);
+
+	gsc->data.bool_val = !!(lacp_port->actor.state & INFO_STATE_DISTRIBUTING);
+	return 0;
+}
+
+/* Control-plane confirm, fenced by the request epoch: writing the current
+ * request id latches collecting, 0 withdraws, a stale id is rejected.
+ */
+static int lacp_port_state_collecting_confirm_set(struct teamd_context *ctx,
+						  struct team_state_gsc *gsc,
+						  void *priv)
+{
+	struct lacp_port *lacp_port = lacp_port_gsc(gsc, priv);
+	const char *ifname = lacp_port->tdport->ifname;
+	uint32_t id = (uint32_t) gsc->data.int_val;
+	int err;
+
+	if (!lacp_port->lacp->cfg.col_dist_decoupled) {
+		teamd_log_warn("%s: collecting_confirm ignored (not col_dist_decoupled)",
+			       ifname);
+		return -EOPNOTSUPP;
+	}
+
+	if (id == 0) {
+		lacp_port->collecting_confirmed_id = 0;
+		teamd_log_info("%s: collecting withdrawn by control plane",
+			       ifname);
+	} else if (id == lacp_port->collecting_request_id &&
+		   lacp_port->collecting_requested) {
+		lacp_port->collecting_confirmed_id = id;
+		teamd_log_info("%s: collecting confirmed for epoch %u",
+			       ifname, id);
+	} else {
+		/* stale epoch or not currently requesting: reject */
+		teamd_log_warn("%s: rejecting collecting confirm (epoch %u, "
+			       "current %u, requested %d)", ifname, id,
+			       lacp_port->collecting_request_id,
+			       lacp_port->collecting_requested);
+		return -EINVAL;
+	}
+
+	lacp_port_actor_update(lacp_port);
+	err = lacpdu_send(lacp_port);
+	if (err)
+		teamd_log_warn("%s: lacpdu_send after collecting confirm "
+			       "failed: %d", ifname, err);
+
+	err = lacp_port_update_enabled(lacp_port);
+	if (err)
+		return err;
+	return lacp_update_carrier(lacp_port->lacp);
+}
+
 static const struct teamd_state_val lacp_port_state_vals[] = {
 	{
 		.subpath = "selected",
@@ -1870,6 +2081,32 @@ static const struct teamd_state_val lacp_port_state_vals[] = {
 		.subpath = "prio",
 		.type = TEAMD_STATE_ITEM_TYPE_INT,
 		.getter = lacp_port_state_prio_get,
+	},
+	{
+		.subpath = "collecting_requested",
+		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
+		.getter = lacp_port_state_collecting_requested_get,
+	},
+	{
+		.subpath = "collecting_request_id",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lacp_port_state_collecting_request_id_get,
+	},
+	{
+		.subpath = "collecting_confirm",
+		.type = TEAMD_STATE_ITEM_TYPE_INT,
+		.getter = lacp_port_state_collecting_confirm_get,
+		.setter = lacp_port_state_collecting_confirm_set,
+	},
+	{
+		.subpath = "collecting",
+		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
+		.getter = lacp_port_state_collecting_get,
+	},
+	{
+		.subpath = "distributing",
+		.type = TEAMD_STATE_ITEM_TYPE_BOOL,
+		.getter = lacp_port_state_distributing_get,
 	},
 	{
 		.subpath = "actor_lacpdu_info",
