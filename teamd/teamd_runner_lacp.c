@@ -337,26 +337,20 @@ static bool lacp_port_selected(struct lacp_port *lacp_port)
 	return lacp_port->agg_lead;
 }
 
+static bool lacp_port_synced(struct lacp_port *lacp_port)
+{
+	return lacp_port_agg_selected(lacp_port) &&
+	       (lacp_port->partner.state & INFO_STATE_SYNCHRONIZATION);
+}
+
 static int lacp_port_should_be_enabled(struct lacp_port *lacp_port)
 {
-	struct lacp *lacp = lacp_port->lacp;
-
-	if (lacp_port_selected(lacp_port) &&
-	    lacp_port->agg_lead == lacp->selected_agg_lead &&
-	    lacp_port->partner.state & INFO_STATE_SYNCHRONIZATION)
-		return true;
-	return false;
+	return lacp_port_synced(lacp_port);
 }
 
 static int lacp_port_should_be_disabled(struct lacp_port *lacp_port)
 {
-	struct lacp *lacp = lacp_port->lacp;
-
-	if (!lacp_port_selected(lacp_port) ||
-	    lacp_port->agg_lead != lacp->selected_agg_lead ||
-	    !(lacp_port->partner.state & INFO_STATE_SYNCHRONIZATION))
-		return true;
-	return false;
+	return !lacp_port_should_be_enabled(lacp_port);
 }
 
 static int lacp_port_update_enabled(struct lacp_port *lacp_port)
@@ -929,8 +923,9 @@ static void lacp_port_actor_update(struct lacp_port *lacp_port)
 		state |= INFO_STATE_SYNCHRONIZATION;
 		state &= ~(INFO_STATE_COLLECTING | INFO_STATE_DISTRIBUTING);
 		if (lacp_port->partner.state & INFO_STATE_SYNCHRONIZATION)
-			state |= INFO_STATE_COLLECTING |
-				 INFO_STATE_DISTRIBUTING;
+			state |= INFO_STATE_COLLECTING;
+		if (lacp_port_should_be_enabled(lacp_port))
+			state |= INFO_STATE_DISTRIBUTING;
 	}
 	if (lacp_port->state == PORT_STATE_EXPIRED)
 		state |= INFO_STATE_EXPIRED;
